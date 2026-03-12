@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+.venv/
+venv/
+
+bot_empanadas/audios_temp/
+n8n_data/
+
+.env

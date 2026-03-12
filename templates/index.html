@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Que Chimba Empanadas | Empanadas Colombianas en Ciudad Juárez</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #1A1208;
+            background-color: #FFF8F0;
+        }
+
+        /* ========== HEADER & NAV ========== */
+        header {
+            background: linear-gradient(135deg, #007F3B 0%, #F5A623 100%);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 127, 59, 0.2);
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #1A1208;
+            text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.3);
+            letter-spacing: 2px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            list-style: none;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a {
+            color: #1A1208;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+        }
+
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .nav-links {
+                justify-content: center;
+            }
+        }
+
+        /* ========== HERO SECTION ========== */
+        .hero {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            text-align: center;
+            background: linear-gradient(180deg, #FFF8F0 0%, #FFE4CC 100%);
+        }
+
+        .hero-logo {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #CE1126;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 8px rgba(0, 127, 59, 0.15);
+            letter-spacing: 1px;
+        }
+
+        .hero .tagline {
+            font-size: 1.5rem;
+            color: #007F3B;
+            margin-bottom: 2rem;
+            font-style: italic;
+            font-weight: bold;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .btn-whatsapp {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            color: white;
+            padding: 1.2rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 900;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            box-shadow: 0 6px 20px rgba(37, 211, 102, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-whatsapp:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.5);
+        }
+
+        .qr-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            display: inline-block;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 3px solid #F5A623;
+        }
+
+        #qrcode {
+            margin: 0 auto;
+        }
+
+        .qr-label {
+            font-size: 0.9rem;
+            color: #1A1208;
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero .tagline {
+                font-size: 1.2rem;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+            }
+
+            .btn-whatsapp {
+                width: 100%;
+            }
+        }
+
+        /* ========== STATISTICS SECTION ========== */
+        .stats {
+            background: linear-gradient(135deg, #007F3B 0%, #003A22 100%);
+            padding: 4rem 2rem;
+            color: white;
+        }
+
+        .stats-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .stats h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #F5A623;
+        }
+
+        .stat-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #F5A623;
+            margin: 1rem 0;
+        }
+
+        .stat-label {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #FFE4CC;
+        }
+
+        /* ========== PRODUCTS SECTION ========== */
+        .products {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .products h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            color: #CE1126;
+            margin-bottom: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border: 3px solid #F5A623;
+        }
+
+        .product-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            background: linear-gradient(135deg, #FFE4CC 0%, #F5A623 100%);
+        }
+
+        .product-info {
+            padding: 2rem;
+        }
+
+        .product-name {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #CE1126;
+            margin-bottom: 0.5rem;
+        }
+
+        .product-description {
+            color: #666;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .product-price {
+            font-size: 2rem;
+            font-weight: 900;
+            color: #007F3B;
+            margin-top: 1rem;
+        }
+
+        /* ========== SERVICES SECTION ========== */
+        .services {
+            background: linear-gradient(135deg, #FFE4CC 0%, #FFF8F0 100%);
+            padding: 4rem 2rem;
+        }
+
+        .services-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .services h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            color: #007F3B;
+            margin-bottom: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .service-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-left: 6px solid #CE1126;
+        }
+
+        .service-card h3 {
+            font-size: 1.5rem;
+            color: #CE1126;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .service-icon {
+            font-size: 2rem;
+        }
+
+        .service-card ul {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .service-card li {
+            padding: 0.5rem 0;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .service-card li:before {
+            content: "✓";
+            color: #007F3B;
+            font-weight: bold;
+        }
+
+        /* ========== GALLERY SECTION ========== */
+        .gallery {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .gallery h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            color: #CE1126;
+            margin-bottom: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .gallery-item {
+            background: linear-gradient(135deg, #F5A623 0%, #CE1126 100%);
+            border-radius: 15px;
+            overflow: hidden;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .gallery-item:hover {
+            transform: scale(1.05) rotate(2deg);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ========== TEAM SECTION ========== */
+        .team {
+            background: linear-gradient(135deg, #007F3B 0%, #003A22 100%);
+            padding: 4rem 2rem;
+            color: white;
+        }
+
+        .team-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .team h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .team-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .team-card:hover {
+            transform: translateY(-5px);
+            border-color: #F5A623;
+        }
+
+        .team-avatar {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .team-name {
+            font-size: 1.3rem;
+            font-weight: 900;
+            margin-bottom: 0.5rem;
+            color: #F5A623;
+        }
+
+        .team-role {
+            color: #FFE4CC;
+            margin-bottom: 1rem;
+        }
+
+        /* ========== REVIEWS SECTION ========== */
+        .reviews {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .reviews h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            color: #CE1126;
+            margin-bottom: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .reviews-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .review-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #F5A623;
+        }
+
+        .review-stars {
+            color: #F5A623;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            letter-spacing: 2px;
+        }
+
+        .review-text {
+            color: #666;
+            margin-bottom: 1rem;
+            font-style: italic;
+            line-height: 1.6;
+        }
+
+        .review-author {
+            font-weight: 900;
+            color: #CE1126;
+        }
+
+        .review-loading {
+            text-align: center;
+            padding: 2rem;
+            color: #999;
+        }
+
+        /* ========== SOCIALS SECTION ========== */
+        .socials {
+            background: linear-gradient(135deg, #FFE4CC 0%, #FFF8F0 100%);
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .socials-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .socials h3 {
+            font-size: 1.8rem;
+            color: #007F3B;
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .social-link {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #F5A623 0%, #CE1126 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(206, 17, 38, 0.2);
+        }
+
+        .social-link:hover {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 8px 20px rgba(206, 17, 38, 0.4);
+        }
+
+        /* ========== CONTACT SECTION ========== */
+        .contact {
+            background: linear-gradient(135deg, #007F3B 0%, #003A22 100%);
+            padding: 4rem 2rem;
+            color: white;
+        }
+
+        .contact-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .contact h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .contact-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .contact-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .contact-info h3 {
+            color: #F5A623;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .contact-info a, .contact-info p {
+            color: #FFE4CC;
+            text-decoration: none;
+            transition: color 0.3s ease;
+            word-break: break-word;
+        }
+
+        .contact-info a:hover {
+            color: #F5A623;
+        }
+
+        .form-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .form-section h3 {
+            color: #F5A623;
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #FFE4CC;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            font-family: inherit;
+            background: rgba(255, 255, 255, 0.9);
+            color: #1A1208;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #F5A623;
+            box-shadow: 0 0 8px rgba(245, 166, 35, 0.3);
+            background: white;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #F5A623 0%, #CE1126 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(245, 166, 35, 0.3);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .form-message {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+            font-weight: 600;
+        }
+
+        .form-message.success {
+            background: rgba(76, 175, 80, 0.3);
+            color: #90EE90;
+            display: block;
+        }
+
+        .form-message.error {
+            background: rgba(244, 67, 54, 0.3);
+            color: #FF9999;
+            display: block;
+        }
+
+        /* ========== FOOTER ========== */
+        footer {
+            background: #1A1208;
+            padding: 2rem;
+            text-align: center;
+            color: #FFE4CC;
+            border-top: 3px solid #F5A623;
+        }
+
+        footer p {
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-emoji {
+            font-size: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        /* ========== UTILITIES ========== */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .hero-logo {
+                font-size: 3rem;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .stats h2,
+            .products h2,
+            .services h2,
+            .gallery h2,
+            .reviews h2,
+            .contact h2 {
+                font-size: 2rem;
+            }
+
+            .contact-content {
+                grid-template-columns: 1fr;
+            }
+
+            .form-section {
+                grid-column: 1 / -1;
+            }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #F5A623;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- ========== HEADER ========== -->
+    <header>
+        <nav>
+            <div class="logo">🙌 Que Chimba</div>
+            <ul class="nav-links">
+                <li><a href="#productos">Productos</a></li>
+                <li><a href="#servicios">Servicios</a></li>
+                <li><a href="#galeria">Galería</a></li>
+                <li><a href="#comentarios">Comentarios</a></li>
+                <li><a href="#contacto">Contacto</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- ========== HERO SECTION ========== -->
+    <section class="hero">
+        <div class="hero-logo">🫔</div>
+        <h1>QUE CHIMBA EMPANADAS</h1>
+        <p class="tagline">¡Ay qué sabroso, parce! Empanadas colombianas que te dejan con ganas de más.</p>
+        
+        <div class="hero-buttons">
+            <a href="https://wa.me/+52NUMERO?text=Hola%20Que%20Chimba%2C%20quiero%20pedir%20unas%20empanadas" class="btn-whatsapp">
+                📱 Pedir por WhatsApp
+            </a>
+            <div class="qr-container">
+                <div id="qrcode"></div>
+                <div class="qr-label">Escanea para pedir</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== STATISTICS SECTION ========== -->
+    <section class="stats">
+        <div class="stats-container">
+            <h2>📊 Estamos que nos Explotan</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🫔</div>
+                    <div class="stat-number" id="stat-empanadas">-</div>
+                    <div class="stat-label">Empanadas Vendidas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">😋</div>
+                    <div class="stat-number" id="stat-clientes">-</div>
+                    <div class="stat-label">Clientes Felices</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎉</div>
+                    <div class="stat-number" id="stat-eventos">-</div>
+                    <div class="stat-label">Eventos Realizados</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== PRODUCTS SECTION ========== -->
+    <section class="products" id="productos">
+        <h2>Nuestros Productos</h2>
+        <div class="products-grid" id="products-grid">
+            <div class="spinner"></div>
+        </div>
+    </section>
+
+    <!-- ========== SERVICES SECTION ========== -->
+    <section class="services" id="servicios">
+        <div class="services-container">
+            <h2>Nuestros Servicios</h2>
+            <div class="services-grid">
+                <div class="service-card">
+                    <h3><span class="service-icon">📦</span> Órdenes Individuales</h3>
+                    <ul>
+                        <li>Venta por unidad</li>
+                        <li>Entrega rápida a domicilio</li>
+                        <li>Horario flexible</li>
+                        <li>Formas de pago seguras</li>
+                    </ul>
+                    <p style="margin-top: 1rem; color: #CE1126; font-weight: bold;">Consulta precios en WhatsApp</p>
+                </div>
+                <div class="service-card">
+                    <h3><span class="service-icon">🎊</span> Eventos y Catering</h3>
+                    <ul>
+                        <li>Cotización personalizada</li>
+                        <li>Cantidad mínima: 50 unidades</li>
+                        <li>Presentación premium</li>
+                        <li>Contacto directo para eventos</li>
+                    </ul>
+                    <p style="margin-top: 1rem; color: #CE1126; font-weight: bold;">¡Pregunta por tu evento!</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== GALLERY SECTION ========== -->
+    <section class="gallery" id="galeria">
+        <h2>Nuestra Galería</h2>
+        <div class="gallery-grid">
+            <div class="gallery-item">🫔</div>
+            <div class="gallery-item">😋</div>
+            <div class="gallery-item">🤤</div>
+            <div class="gallery-item">🇨🇴</div>
+            <div class="gallery-item">✨</div>
+            <div class="gallery-item">🔥</div>
+        </div>
+    </section>
+
+    <!-- ========== TEAM SECTION ========== -->
+    <section class="team">
+        <div class="team-container">
+            <h2>Conoce Nuestro Equipo</h2>
+            <div class="team-grid">
+                <div class="team-card">
+                    <div class="team-avatar">👨‍🍳</div>
+                    <div class="team-name">Chef Colombiano</div>
+                    <div class="team-role">Maestro Empanadas</div>
+                    <p style="color: #FFE4CC; font-size: 0.9rem;">Recetas auténticas de la región andina</p>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">👩‍💼</div>
+                    <div class="team-name">Gestora de Calidad</div>
+                    <div class="team-role">Control QA</div>
+                    <p style="color: #FFE4CC; font-size: 0.9rem;">Garantiza el mejor sabor en cada orden</p>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">🚴</div>
+                    <div class="team-name">Red de Repartidores</div>
+                    <div class="team-role">Entrega Rápida 🚀</div>
+                    <p style="color: #FFE4CC; font-size: 0.9rem;">Tus empanadas, calientes a domicilio</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== REVIEWS SECTION ========== -->
+    <section class="reviews" id="comentarios">
+        <h2>Lo Que Dicen Nuestros Clientes</h2>
+        <div class="reviews-grid" id="reviews-grid">
+            <div class="review-loading">
+                <div class="spinner"></div>
+                <p>Cargando comentarios...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== SOCIALS SECTION ========== -->
+    <section class="socials">
+        <div class="socials-container">
+            <h3>Síguenos en Redes</h3>
+            <div class="social-links">
+                <a href="#" class="social-link" title="Facebook">f</a>
+                <a href="#" class="social-link" title="Instagram">📷</a>
+                <a href="#" class="social-link" title="TikTok">🎵</a>
+                <a href="#" class="social-link" title="X (Twitter)">𝕏</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== CONTACT SECTION ========== -->
+    <section class="contact" id="contacto">
+        <div class="contact-container">
+            <h2>Contacto y Cotizaciones</h2>
+            
+            <div class="contact-content">
+                <div class="contact-info">
+                    <h3>📱 WhatsApp</h3>
+                    <a href="https://wa.me/+52NUMERO">+52 XXX XXX XXXX</a>
+                </div>
+                <div class="contact-info">
+                    <h3>📧 Email</h3>
+                    <a href="mailto:info@quechimba.com">info@quechimba.com</a>
+                </div>
+                <div class="contact-info">
+                    <h3>📍 Ubicación</h3>
+                    <p>Ciudad Juárez, Chihuahua, México</p>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>📋 Cotización para Eventos</h3>
+                <form id="quotation-form">
+                    <div class="form-group">
+                        <label for="name">Nombre Completo *</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email *</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Teléfono/WhatsApp *</label>
+                        <input type="tel" id="phone" name="phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="date">Fecha del Evento *</label>
+                        <input type="date" id="date" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Cantidad de Empanadas *</label>
+                        <input type="number" id="quantity" name="quantity" min="50" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Detalles Adicionales</label>
+                        <textarea id="message" name="message" placeholder="Cuéntanos sobre tu evento..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-submit">Enviar Cotización</button>
+                    <div class="form-message" id="form-message"></div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== FOOTER ========== -->
+    <footer>
+        <p>© 2026 Que Chimba Empanadas. Todos los derechos reservados.</p>
+        <p>Hecho con ❤️ en Ciudad Juárez, Chihuahua 🇲🇽</p>
+        <div class="footer-emoji">🫔 😋 🇨🇴 ✨</div>
+        <p style="font-size: 0.9rem; margin-top: 1rem;"><em>"Ay qué chimba" - Made with love for Colombia and México</em></p>
+    </footer>
+
+    <script>
+        // ========== QR CODE GENERATION ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            // Generate QR Code
+            const whatsappUrl = "https://wa.me/+52NUMERO?text=Hola%20Que%20Chimba%2C%20quiero%20pedir%20unas%20empanadas";
+            new QRCode(document.getElementById('qrcode'), {
+                text: whatsappUrl,
+                width: 200,
+                height: 200,
+                colorDark: '#1A1208',
+                colorLight: '#FFFFFF',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            // Load statistics
+            loadStatistics();
+            
+            // Load products
+            loadProducts();
+            
+            // Load reviews
+            loadReviews();
+            
+            // Setup form submission
+            setupQuotationForm();
+        });
+
+        // ========== LOAD STATISTICS ==========
+        function loadStatistics() {
+            fetch('/api/stats/publicas')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('stat-empanadas').textContent = 
+                        data.total_empanadas_vendidas || '0';
+                    document.getElementById('stat-clientes').textContent = 
+                        data.total_clientes_felices || '0';
+                    document.getElementById('stat-eventos').textContent = 
+                        data.total_eventos || '0';
+                })
+                .catch(error => {
+                    console.error('Error cargando estadísticas:', error);
+                    document.getElementById('stat-empanadas').textContent = '∞';
+                    document.getElementById('stat-clientes').textContent = '∞';
+                    document.getElementById('stat-eventos').textContent = '∞';
+                });
+        }
+
+        // ========== LOAD PRODUCTS ==========
+        function loadProducts() {
+            fetch('/api/productos')
+                .then(response => response.json())
+                .then(data => {
+                    const grid = document.getElementById('products-grid');
+                    grid.innerHTML = '';
+                    
+                    data.forEach(product => {
+                        const emoji = product.tipo === 'carne' ? '🥩' : '🍗';
+                        const card = document.createElement('div');
+                        card.className = 'product-card';
+                        card.innerHTML = `
+                            <div class="product-image">${emoji}</div>
+                            <div class="product-info">
+                                <div class="product-name">Empanada de ${product.tipo.toUpperCase()}</div>
+                                <div class="product-description">${product.descripcion || 'Relleno sabroso y delicioso'}</div>
+                                <div class="product-price">$${product.precio} MXN</div>
+                            </div>
+                        `;
+                        grid.appendChild(card);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error cargando productos:', error);
+                    const grid = document.getElementById('products-grid');
+                    grid.innerHTML = `
+                        <div class="product-card">
+                            <div class="product-image">🥩</div>
+                            <div class="product-info">
+                                <div class="product-name">Empanada de CARNE</div>
+                                <div class="product-description">Relleno de carne molida con especias colombianas</div>
+                                <div class="product-price">Consultar en WhatsApp</div>
+                            </div>
+                        </div>
+                        <div class="product-card">
+                            <div class="product-image">🍗</div>
+                            <div class="product-info">
+                                <div class="product-name">Empanada de POLLO</div>
+                                <div class="product-description">Relleno de pollo desmenuzado y cremoso</div>
+                                <div class="product-price">Consultar en WhatsApp</div>
+                            </div>
+                        </div>
+                    `;
+                });
+        }
+
+        // ========== LOAD REVIEWS ==========
+        function loadReviews() {
+            fetch('/api/evaluaciones/publicas')
+                .then(response => response.json())
+                .then(data => {
+                    const grid = document.getElementById('reviews-grid');
+                    grid.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        grid.innerHTML = '<div class="review-loading">Aún no hay evaluaciones. ¡Sé el primero!</div>';
+                        return;
+                    }
+                    
+                    data.forEach(review => {
+                        const stars = '⭐'.repeat(review.calificacion);
+                        const card = document.createElement('div');
+                        card.className = 'review-card';
+                        card.innerHTML = `
+                            <div class="review-stars">${stars}</div>
+                            <div class="review-text">"${review.comentario}"</div>
+                            <div class="review-author">- ${review.nombre_cliente}</div>
+                        `;
+                        grid.appendChild(card);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error cargando evaluaciones:', error);
+                    const grid = document.getElementById('reviews-grid');
+                    grid.innerHTML = `
+                        <div class="review-card">
+                            <div class="review-stars">⭐⭐⭐⭐⭐</div>
+                            <div class="review-text">"¡Ay qué chimba! Las empanadas más sabrosas que he probado."</div>
+                            <div class="review-author">- Cliente Feliz</div>
+                        </div>
+                        <div class="review-card">
+                            <div class="review-stars">⭐⭐⭐⭐⭐</div>
+                            <div class="review-text">"Entrega rápida y calidad garantizada. Muy recomendado."</div>
+                            <div class="review-author">- Cliente Satisfecho</div>
+                        </div>
+                    `;
+                });
+        }
+
+        // ========== SETUP QUOTATION FORM ==========
+        function setupQuotationForm() {
+            const form = document.getElementById('quotation-form');
+            const messageDiv = document.getElementById('form-message');
+            
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const submitBtn = form.querySelector('.btn-submit');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Enviando...';
+                messageDiv.className = '';
+                
+                const formData = {
+                    nombre: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    telefono: document.getElementById('phone').value,
+                    fecha_evento: document.getElementById('date').value,
+                    cantidad: parseInt(document.getElementById('quantity').value),
+                    detalles: document.getElementById('message').value
+                };
+                
+                try {
+                    const response = await fetch('/api/cotizaciones', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    if (response.ok) {
+                        messageDiv.className = 'form-message success';
+                        messageDiv.textContent = '✅ ¡Cotización enviada! Te contactaremos pronto.';
+                        form.reset();
+                    } else {
+                        messageDiv.className = 'form-message error';
+                        messageDiv.textContent = '❌ Error al enviar. Intenta de nuevo.';
+                    }
+                } catch (error) {
+                    messageDiv.className = 'form-message error';
+                    messageDiv.textContent = '❌ Error de conexión. Intenta de nuevo.';
+                    console.error('Error:', error);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Enviar Cotización';
+                }
+            });
+        }
+
+        // ========== SMOOTH SCROLL BEHAVIOR ==========
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                if (href !== '#') {
+                    e.preventDefault();
+                    const element = document.querySelector(href);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Que Chimba - Panel de Cocina</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg: #101316;
+      --bg-soft: #171b20;
+      --card: #1f252c;
+      --line: #313a44;
+      --text: #f2f4f7;
+      --muted: #b8c2cc;
+      --accent: #ffa62b;
+      --yellow: #ffd447;
+      --yellow-ink: #2f2500;
+      --green: #39c97d;
+      --green-ink: #05240f;
+      --danger: #ff6b6b;
+      --radius: 16px;
+      --shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, #2a2f36 0%, transparent 35%),
+        radial-gradient(circle at 90% 20%, #1d2730 0%, transparent 36%),
+        linear-gradient(180deg, #0e1115 0%, #12171c 100%);
+      min-height: 100vh;
+      padding: 22px;
+    }
+
+    .layout {
+      max-width: 1450px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 18px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%), var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-top: 4px;
+    }
+
+    .badge {
+      background: rgba(255, 166, 43, 0.15);
+      color: #ffdca8;
+      border: 1px solid rgba(255, 166, 43, 0.35);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: var(--muted);
+      margin-bottom: 14px;
+      font-size: 0.98rem;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(57, 201, 125, 0.22);
+    }
+
+    .orders {
+      display: grid;
+      gap: 12px;
+    }
+
+    .order-card {
+      border: 1px solid var(--line);
+      border-left: 8px solid var(--accent);
+      border-radius: 12px;
+      padding: 14px;
+      background: rgba(10, 13, 17, 0.52);
+    }
+
+    .order-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .order-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+    }
+
+    .state-pill {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.93rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border: 1px solid transparent;
+    }
+
+    .state-recibido {
+      color: #ffe3ab;
+      background: rgba(255, 179, 0, 0.14);
+      border-color: rgba(255, 179, 0, 0.35);
+    }
+
+    .state-en_preparacion {
+      color: #cde6ff;
+      background: rgba(44, 148, 255, 0.14);
+      border-color: rgba(44, 148, 255, 0.35);
+    }
+
+    .order-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      gap: 8px 14px;
+      margin-top: 8px;
+      margin-bottom: 12px;
+      font-size: 1.08rem;
+    }
+
+    .label {
+      color: var(--muted);
+      margin-right: 6px;
+      font-weight: 600;
+    }
+
+    .products {
+      margin-top: 4px;
+      padding-left: 16px;
+      line-height: 1.5;
+      font-size: 1.05rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 1.02rem;
+      font-weight: 800;
+      cursor: pointer;
+      min-height: 50px;
+      min-width: 180px;
+      transition: transform 0.1s ease, filter 0.15s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.02);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-yellow {
+      background: linear-gradient(180deg, #ffe685 0%, var(--yellow) 100%);
+      color: var(--yellow-ink);
+    }
+
+    .btn-green {
+      background: linear-gradient(180deg, #8ef0ba 0%, var(--green) 100%);
+      color: var(--green-ink);
+    }
+
+    .btn-dark {
+      background: linear-gradient(180deg, #38414b 0%, #28313a 100%);
+      color: #f3f6fa;
+      border: 1px solid #465362;
+      min-width: 220px;
+    }
+
+    .group-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .zone-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(16, 22, 28, 0.72);
+      padding: 12px;
+    }
+
+    .zone-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #ffcf88;
+      margin-bottom: 8px;
+    }
+
+    .zone-items {
+      list-style: none;
+      display: grid;
+      gap: 6px;
+      font-size: 1rem;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 1.1rem;
+    }
+
+    .error {
+      color: var(--danger);
+      font-weight: 700;
+      margin-top: 6px;
+      min-height: 22px;
+    }
+
+    @media (max-width: 1080px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 14px;
+      }
+
+      h1 {
+        font-size: 1.6rem;
+      }
+
+      .order-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <section class="panel">
+      <div class="header">
+        <div>
+          <h1>Panel de Cocina</h1>
+          <p class="subtitle">Pedidos activos: recibidos y en preparacion.</p>
+        </div>
+        <span class="badge" id="totalBadge">0 pedidos</span>
+      </div>
+
+      <div class="meta">
+        <span class="dot" aria-hidden="true"></span>
+        <span>Actualizacion automatica cada 15 segundos</span>
+        <span>|</span>
+        <span id="lastUpdate">Sin actualizar</span>
+      </div>
+
+      <div class="orders" id="ordersContainer"></div>
+      <p class="error" id="errorText"></p>
+    </section>
+
+    <aside class="panel">
+      <div class="header">
+        <div>
+          <h2>Organizacion por cercania</h2>
+          <p class="subtitle">Ordenado por codigo postal (CP)</p>
+        </div>
+      </div>
+      <div class="group-list" id="zoneContainer"></div>
+    </aside>
+  </div>
+
+  <script>
+    const API_QUEUE_URL = "/api/pedidos?estado=recibido,en_preparacion";
+    const API_STATUS_BASE = "/api/pedidos";
+    const REFRESH_MS = 15000;
+
+    const ordersContainer = document.getElementById("ordersContainer");
+    const zoneContainer = document.getElementById("zoneContainer");
+    const totalBadge = document.getElementById("totalBadge");
+    const lastUpdate = document.getElementById("lastUpdate");
+    const errorText = document.getElementById("errorText");
+
+    let currentOrders = [];
+
+    function getField(obj, keys, fallback = "-") {
+      for (const key of keys) {
+        const value = obj?.[key];
+        if (value !== undefined && value !== null && value !== "") {
+          return value;
+        }
+      }
+      return fallback;
+    }
+
+    function asArray(value) {
+      if (Array.isArray(value)) {
+        return value;
+      }
+      return [];
+    }
+
+    function formatTime(value) {
+      if (!value || value === "-") {
+        return "-";
+      }
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) {
+        return String(value);
+      }
+      return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function formatState(state) {
+      if (state === "en_preparacion") {
+        return "En preparacion";
+      }
+      if (state === "recibido") {
+        return "Recibido";
+      }
+      return String(state || "-");
+    }
+
+    function normalizeOrder(raw) {
+      const id = getField(raw, ["id", "pedido_id", "numero", "numero_pedido"], "");
+      const number = getField(raw, ["numero_pedido", "numero", "folio", "id"], id || "-");
+      const customer = getField(raw, ["cliente_nombre", "nombre_cliente", "cliente", "nombre"], "Cliente sin nombre");
+      const state = getField(raw, ["estado"], "recibido");
+      const receivedAt = getField(raw, ["hora_recepcion", "recibido_en", "created_at", "fecha_hora"], "-");
+      const address = getField(raw, ["direccion_entrega", "direccion", "entrega_direccion"], "Direccion no disponible");
+      const postalCode = String(getField(raw, ["codigo_postal", "cp"], "00000"));
+      const items = asArray(getField(raw, ["productos", "items", "detalle"], []));
+      const totalQty = Number(getField(raw, ["cantidad_total", "total_cantidad"], NaN));
+
+      return {
+        id,
+        number,
+        customer,
+        state,
+        receivedAt,
+        address,
+        postalCode,
+        items,
+        totalQty: Number.isNaN(totalQty) ? sumItems(items) : totalQty
+      };
+    }
+
+    function sumItems(items) {
+      return items.reduce((acc, item) => acc + Number(getField(item, ["cantidad", "qty"], 0)), 0);
+    }
+
+    function renderProducts(items) {
+      if (!items.length) {
+        return "<li>Sin detalle de productos</li>";
+      }
+
+      return items.map((item) => {
+        const name = getField(item, ["producto", "nombre", "tipo", "sabor"], "Producto");
+        const qty = getField(item, ["cantidad", "qty"], "-");
+        return `<li>${name} x ${qty}</li>`;
+      }).join("");
+    }
+
+    function buildOrderCard(order) {
+      const stateClass = `state-${order.state}`;
+      const safeId = String(order.id || order.number);
+
+      return `
+        <article class="order-card">
+          <div class="order-head">
+            <h3 class="order-title">Pedido #${order.number}</h3>
+            <span class="state-pill ${stateClass}">${formatState(order.state)}</span>
+          </div>
+
+          <div class="order-grid">
+            <p><span class="label">Cliente:</span>${order.customer}</p>
+            <p><span class="label">Hora recepcion:</span>${formatTime(order.receivedAt)}</p>
+            <p><span class="label">Cantidad total:</span>${order.totalQty}</p>
+            <p><span class="label">CP:</span>${order.postalCode}</p>
+          </div>
+
+          <p class="label">Productos:</p>
+          <ul class="products">${renderProducts(order.items)}</ul>
+
+          <div class="actions">
+            <button class="btn btn-yellow" data-action="prep" data-id="${safeId}">En preparacion</button>
+            <button class="btn btn-green" data-action="ready" data-id="${safeId}">Listo para entregar</button>
+            <button class="btn btn-dark" data-action="print" data-id="${safeId}">Imprimir etiqueta QR</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderOrders(orders) {
+      if (!orders.length) {
+        ordersContainer.innerHTML = "<div class='empty'>No hay pedidos en cola.</div>";
+        return;
+      }
+
+      ordersContainer.innerHTML = orders.map(buildOrderCard).join("");
+    }
+
+    function renderZones(orders) {
+      if (!orders.length) {
+        zoneContainer.innerHTML = "<div class='empty'>Sin pedidos para agrupar.</div>";
+        return;
+      }
+
+      const sorted = [...orders].sort((a, b) => a.postalCode.localeCompare(b.postalCode));
+      const groups = new Map();
+
+      for (const order of sorted) {
+        const key = order.postalCode || "00000";
+        if (!groups.has(key)) {
+          groups.set(key, []);
+        }
+        groups.get(key).push(order);
+      }
+
+      const html = [];
+      for (const [cp, items] of groups.entries()) {
+        const lines = items.map((order) => {
+          return `<li>#${order.number} - ${order.customer} (${formatState(order.state)})</li>`;
+        }).join("");
+
+        html.push(`
+          <section class="zone-card">
+            <h3 class="zone-title">CP ${cp}</h3>
+            <ul class="zone-items">${lines}</ul>
+          </section>
+        `);
+      }
+
+      zoneContainer.innerHTML = html.join("");
+    }
+
+    function stampUpdateTime() {
+      const now = new Date();
+      lastUpdate.textContent = `Ultima actualizacion: ${now.toLocaleTimeString("es-MX")}`;
+    }
+
+    async function fetchOrders() {
+      try {
+        const response = await fetch(API_QUEUE_URL, { headers: { "Accept": "application/json" } });
+        if (!response.ok) {
+          throw new Error(`Error ${response.status} al cargar pedidos`);
+        }
+
+        const data = await response.json();
+        const rawOrders = Array.isArray(data) ? data : (data.pedidos || data.data || []);
+        currentOrders = rawOrders.map(normalizeOrder);
+
+        renderOrders(currentOrders);
+        renderZones(currentOrders);
+        totalBadge.textContent = `${currentOrders.length} pedido(s)`;
+        errorText.textContent = "";
+        stampUpdateTime();
+      } catch (error) {
+        errorText.textContent = `No se pudo actualizar la cola: ${error.message}`;
+      }
+    }
+
+    function getOrderById(orderId) {
+      const target = String(orderId);
+      return currentOrders.find((o) => String(o.id) === target || String(o.number) === target);
+    }
+
+    async function updateOrderStatus(orderId, newState) {
+      try {
+        const response = await fetch(`${API_STATUS_BASE}/${orderId}/estado`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({ estado: newState })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status} al cambiar estado`);
+        }
+
+        await fetchOrders();
+      } catch (error) {
+        errorText.textContent = `No se pudo actualizar el pedido #${orderId}: ${error.message}`;
+      }
+    }
+
+    function printOrderLabel(orderId) {
+      const order = getOrderById(orderId);
+      if (!order) {
+        errorText.textContent = `No se encontro el pedido #${orderId} para imprimir.`;
+        return;
+      }
+
+      const payload = {
+        pedido: order.number,
+        cliente: order.customer,
+        cp: order.postalCode,
+        direccion: order.address,
+        estado: order.state
+      };
+
+      const printWindow = window.open("", "_blank", "width=420,height=640");
+      if (!printWindow) {
+        errorText.textContent = "El navegador bloqueo la ventana de impresion.";
+        return;
+      }
+
+      printWindow.document.write(`
+        <!doctype html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Etiqueta Pedido #${order.number}</title>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 16px;
+              color: #111;
+            }
+            .sheet {
+              border: 1px solid #333;
+              border-radius: 8px;
+              padding: 12px;
+            }
+            h1 {
+              font-size: 18px;
+              margin-bottom: 8px;
+            }
+            p {
+              font-size: 14px;
+              margin: 6px 0;
+            }
+            .address {
+              font-weight: 700;
+              font-size: 15px;
+            }
+            #qr {
+              margin-top: 10px;
+              width: 180px;
+              height: 180px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="sheet">
+            <h1>Que Chimba - Pedido #${order.number}</h1>
+            <p><strong>Cliente:</strong> ${order.customer}</p>
+            <p><strong>Estado:</strong> ${formatState(order.state)}</p>
+            <p class="address"><strong>Direccion:</strong> ${order.address}</p>
+            <div id="qr"></div>
+          </div>
+          <script>
+            new QRCode(document.getElementById('qr'), {
+              text: ${JSON.stringify(JSON.stringify(payload))},
+              width: 180,
+              height: 180,
+              correctLevel: QRCode.CorrectLevel.H
+            });
+            setTimeout(function () {
+              window.print();
+            }, 400);
+          <\/script>
+        </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+    }
+
+    ordersContainer.addEventListener("click", async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const action = target.dataset.action;
+      const id = target.dataset.id;
+      if (!action || !id) {
+        return;
+      }
+
+      if (action === "prep") {
+        await updateOrderStatus(id, "en_preparacion");
+      } else if (action === "ready") {
+        await updateOrderStatus(id, "listo_para_entregar");
+      } else if (action === "print") {
+        printOrderLabel(id);
+      }
+    });
+
+    fetchOrders();
+    setInterval(fetchOrders, REFRESH_MS);
+  </script>
+</body>
+</html>

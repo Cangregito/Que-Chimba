@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Problema con el pago – Que Chimba Empanadas</title>
+  <style>
+    :root {
+      --bg:      #101316;
+      --card:    #1f252c;
+      --line:    #313a44;
+      --text:    #f2f4f7;
+      --muted:   #b8c2cc;
+      --danger:  #ff6b6b;
+      --accent:  #ffa62b;
+      --radius:  20px;
+      --shadow:  0 20px 40px rgba(0,0,0,.45);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #2c1a1a 0%, transparent 55%),
+                  linear-gradient(180deg, #0e1115 0%, #12171c 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: var(--text);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      max-width: 420px;
+      width: 100%;
+      padding: 40px 32px 36px;
+      text-align: center;
+    }
+    .icon {
+      width: 72px; height: 72px;
+      background: rgba(255,107,107,.12);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 36px;
+      border: 2px solid rgba(255,107,107,.3);
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--danger);
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      font-size: 1.03rem;
+      color: var(--muted);
+      margin-bottom: 28px;
+      line-height: 1.55;
+    }
+    .sugerencias {
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 26px;
+      text-align: left;
+    }
+    .sugerencias p {
+      font-size: .83rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    .sugerencias p:last-child { margin-bottom: 0; }
+    .sugerencias p::before { content: "→ "; color: var(--accent); }
+    .cta {
+      display: block;
+      background: var(--danger);
+      color: #fff;
+      border-radius: 100px;
+      padding: 14px 24px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      margin-bottom: 12px;
+      transition: opacity .2s;
+    }
+    .cta:hover { opacity: .85; }
+    .cta-sec {
+      display: block;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      border-radius: 100px;
+      padding: 13px 24px;
+      font-size: .95rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: border-color .2s;
+    }
+    .cta-sec:hover { border-color: var(--accent); color: var(--text); }
+    .footer-note {
+      margin-top: 20px;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">😬</div>
+
+    <h1>Uy parce, hubo un problema</h1>
+    <p class="subtitle">
+      El pago no pudo procesarse{% if pedido_id %} para el pedido
+      <strong style="color:#f2f4f7;">#{{ pedido_id }}</strong>{% endif %}.
+      ¡No te me rajes, inténtalo de nuevo!
+    </p>
+
+    <div class="sugerencias">
+      <p>Verifica que los datos de tu tarjeta sean correctos.</p>
+      <p>Asegúrate de tener fondos suficientes.</p>
+      <p>Intenta con otra tarjeta o método de pago.</p>
+      <p>Si el problema persiste, escríbenos por WhatsApp.</p>
+    </div>
+
+    <a class="cta" href="javascript:history.back()">
+      Intentar de nuevo
+    </a>
+    <a class="cta-sec" href="javascript:window.close()">
+      Volver a WhatsApp
+    </a>
+
+    <p class="footer-note">
+      Tu pedido sigue guardado. Cuando el pago se confirme,
+      empezamos a preparar tus empanadas. 🫔
+    </p>
+  </div>
+</body>
+</html>

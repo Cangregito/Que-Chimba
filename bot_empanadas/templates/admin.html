@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Que Chimba - Admin Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --brand-gold: #F5A623;
+      --brand-gold-soft: #FFD47A;
+      --ink: #1A1A1A;
+      --coffee: #2B1F17;
+      --paper: #F7F1E3;
+      --card: #FFFDF8;
+      --muted: #6C6257;
+      --danger: #C62828;
+      --ok: #1B8B3A;
+      --line: #E4DCCB;
+      --shadow: 0 10px 28px rgba(19, 13, 9, 0.12);
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 10% 5%, #FFE7AF 0%, #F7F1E3 38%, #F2E6CF 100%);
+      min-height: 100vh;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: linear-gradient(190deg, #2B1F17 0%, #1A1A1A 90%);
+      color: #FFF7E8;
+      padding: 26px 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      border-right: 2px solid rgba(245, 166, 35, 0.26);
+    }
+
+    .brand {
+      border: 1px solid rgba(245, 166, 35, 0.45);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 26px;
+      background: rgba(245, 166, 35, 0.12);
+    }
+
+    .brand h1 {
+      font-size: 1.1rem;
+      margin-bottom: 4px;
+      color: var(--brand-gold-soft);
+      letter-spacing: 0.3px;
+    }
+
+    .brand p {
+      font-size: 0.84rem;
+      color: #EED6AA;
+    }
+
+    .nav a {
+      display: block;
+      text-decoration: none;
+      color: #FFF3D9;
+      margin: 8px 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      transition: 0.2s ease;
+      font-size: 0.95rem;
+    }
+
+    .nav a:hover,
+    .nav a.active {
+      background: rgba(245, 166, 35, 0.14);
+      border-color: rgba(245, 166, 35, 0.45);
+      color: #FFFFFF;
+    }
+
+    .sidebar-footer {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 20px;
+      font-size: 0.84rem;
+      color: #DBC8A0;
+    }
+
+    main {
+      padding: 26px 28px 42px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .topbar h2 {
+      font-size: 1.45rem;
+    }
+
+    .badge {
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #FFF8E8;
+      font-size: 0.86rem;
+      color: var(--coffee);
+    }
+
+    .section-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      margin-top: 14px;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .section-title h3 {
+      font-size: 1.1rem;
+      color: var(--coffee);
+    }
+
+    .btn {
+      border: 1px solid #B57A0B;
+      background: linear-gradient(180deg, #FFD47A 0%, #F5A623 100%);
+      color: #231A13;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-dark {
+      border: 1px solid #3D2B1E;
+      background: linear-gradient(180deg, #3A2A1F 0%, #221811 100%);
+      color: #FFE4AE;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .kpi {
+      background: #FFF8EA;
+      border: 1px solid #EDD9AF;
+      border-left: 6px solid var(--brand-gold);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .kpi h4 {
+      font-size: 0.86rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .kpi .value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--coffee);
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(240px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .chart-card {
+      background: #FFFCF4;
+      border: 1px solid #EEDFC0;
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 300px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 0.93rem;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid #E9DFC8;
+      text-align: left;
+      padding: 10px 8px;
+      vertical-align: top;
+    }
+
+    th {
+      color: #4D3A2E;
+      background: #FFF7E3;
+    }
+
+    .text-right {
+      text-align: right;
+    }
+
+    .danger-row {
+      background: rgba(198, 40, 40, 0.1);
+    }
+
+    .danger-text {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .field label {
+      font-size: 0.9rem;
+      color: #4F463F;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      padding: 10px;
+      border: 1px solid #D6C9AE;
+      border-radius: 10px;
+      background: #FFFCF7;
+      font: inherit;
+    }
+
+    .field textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    .progress-wrap {
+      margin-top: 10px;
+      display: none;
+    }
+
+    .progress-track {
+      width: 100%;
+      background: #F4E7C9;
+      border-radius: 999px;
+      overflow: hidden;
+      height: 12px;
+      border: 1px solid #DFCBA0;
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #D08A0D 0%, #F5A623 100%);
+      transition: width 0.2s ease;
+    }
+
+    .status {
+      margin-top: 6px;
+      font-size: 0.9rem;
+      color: #4F463F;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(27, 20, 14, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      padding: 16px;
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 560px;
+      background: #FFFCF6;
+      border-radius: 14px;
+      border: 1px solid #E7D6B2;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .link-like {
+      border: none;
+      background: none;
+      color: #5F2F18;
+      text-decoration: underline;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    @media (max-width: 1024px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: none;
+        border-bottom: 2px solid rgba(245, 166, 35, 0.26);
+      }
+
+      .sidebar-footer {
+        position: static;
+        margin-top: 14px;
+      }
+
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      main {
+        padding: 18px 14px 30px;
+      }
+
+      .kpis {
+        grid-template-columns: 1fr;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Que Chimba</h1>
+        <p>Panel de administracion</p>
+      </div>
+
+      <nav class="nav">
+        <a href="#ventas" class="active">Ventas</a>
+        <a href="#campanas">Campanas</a>
+        <a href="#inventario">Inventario</a>
+      </nav>
+
+      <div class="sidebar-footer">
+        Usuario: <strong>{{ user.username if user else 'admin' }}</strong>
+      </div>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <h2>Dashboard administrador</h2>
+        <span class="badge">Actualizado para demo local Flask + PostgreSQL</span>
+      </div>
+
+      <section id="ventas" class="section-card">
+        <div class="section-title">
+          <h3>Seccion ventas</h3>
+          <button id="btn-refrescar-ventas" class="btn" type="button">Refrescar</button>
+        </div>
+
+        <div class="kpis">
+          <article class="kpi">
+            <h4>Ventas hoy</h4>
+            <div class="value" id="kpi-hoy-ventas">0 pedidos</div>
+            <div class="muted" id="kpi-hoy-promedio">Promedio ticket: $0.00</div>
+          </article>
+          <article class="kpi">
+            <h4>Ventas mes</h4>
+            <div class="value" id="kpi-mes-ventas">0 pedidos</div>
+            <div class="muted" id="kpi-mes-promedio">Promedio ticket: $0.00</div>
+          </article>
+        </div>
+
+        <div class="grid-3">
+          <article class="chart-card">
+            <h4>Ventas del dia (por hora)</h4>
+            <canvas id="chart-dia"></canvas>
+          </article>
+          <article class="chart-card">
+            <h4>Ventas del mes (por dia)</h4>
+            <canvas id="chart-mes"></canvas>
+          </article>
+          <article class="chart-card">
+            <h4>Ventas del ano (por mes)</h4>
+            <canvas id="chart-ano"></canvas>
+          </article>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <h4>Top 20 mejores clientes</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>WhatsApp</th>
+                <th class="text-right">Total gastado (MXN)</th>
+              </tr>
+            </thead>
+            <tbody id="top-clientes-body">
+              <tr><td colspan="3" class="muted">Cargando top clientes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="campanas" class="section-card">
+        <div class="section-title">
+          <h3>Seccion campanas</h3>
+        </div>
+
+        <h4>Campanas enviadas</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Nombre</th>
+              <th class="text-right">Total enviados</th>
+            </tr>
+          </thead>
+          <tbody id="campanas-body">
+            <tr><td colspan="3" class="muted">Cargando campanas...</td></tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top: 14px;">
+          <h4>Crear nueva campana</h4>
+          <form id="form-campana" class="form-grid">
+            <div class="field">
+              <label for="campana-nombre">Nombre campana</label>
+              <input id="campana-nombre" name="nombre" placeholder="Promo jueves empanadero" required />
+            </div>
+
+            <div class="field">
+              <label for="campana-segmento">Filtro</label>
+              <select id="campana-segmento" name="segmento" required>
+                <option value="general">Todos</option>
+                <option value="solo_mujeres">Solo mujeres</option>
+                <option value="solo_hombres">Solo hombres</option>
+                <option value="top_compradores">Top compradores</option>
+                <option value="inactivos_30d">Clientes inactivos (30 dias)</option>
+              </select>
+            </div>
+
+            <div class="field full">
+              <label for="campana-mensaje">Mensaje</label>
+              <textarea id="campana-mensaje" name="mensaje" placeholder="Ay que chimba, hoy tenemos promo de empanadas..." required></textarea>
+            </div>
+
+            <div class="full" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <button class="btn" type="submit">Enviar campana por WhatsApp</button>
+              <span class="muted">Envio con progreso visual para la demo</span>
+            </div>
+
+            <div class="full progress-wrap" id="campana-progress-wrap">
+              <div class="progress-track">
+                <div class="progress-bar" id="campana-progress-bar"></div>
+              </div>
+              <div class="status" id="campana-status">Iniciando...</div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="inventario" class="section-card">
+        <div class="section-title">
+          <h3>Seccion inventario</h3>
+          <button id="btn-registrar-compra" type="button" class="btn btn-dark">Registrar compra</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Insumo</th>
+              <th>Unidad</th>
+              <th class="text-right">Stock actual</th>
+              <th class="text-right">Stock minimo</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="inventario-body">
+            <tr><td colspan="5" class="muted">Cargando inventario...</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="modal-compra" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h4>Registrar compra de insumo</h4>
+        <button class="link-like" id="cerrar-modal" type="button">Cerrar</button>
+      </div>
+
+      <form id="form-compra" class="form-grid">
+        <div class="field">
+          <label for="compra-insumo">Insumo</label>
+          <input id="compra-insumo" required placeholder="Harina de maiz" />
+        </div>
+
+        <div class="field">
+          <label for="compra-cantidad">Cantidad comprada</label>
+          <input id="compra-cantidad" type="number" min="0" step="0.01" required />
+        </div>
+
+        <div class="field">
+          <label for="compra-proveedor">Proveedor</label>
+          <input id="compra-proveedor" placeholder="Proveedor local" />
+        </div>
+
+        <div class="field">
+          <label for="compra-costo">Costo total (MXN)</label>
+          <input id="compra-costo" type="number" min="0" step="0.01" />
+        </div>
+
+        <div class="full" style="display:flex; gap: 10px; align-items:center;">
+          <button class="btn" type="submit">Guardar compra</button>
+          <span id="compra-status" class="muted"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      charts: {
+        dia: null,
+        mes: null,
+        ano: null
+      }
+    };
+
+    function mxn(value) {
+      return Number(value || 0).toLocaleString("es-MX", {
+        style: "currency",
+        currency: "MXN",
+        minimumFractionDigits: 2
+      });
+    }
+
+    async function fetchApi(url, options) {
+      const res = await fetch(url, options);
+      const payload = await res.json().catch(() => ({}));
+
+      if (!res.ok || payload.ok === false) {
+        const message = payload.error || "Error en API";
+        throw new Error(message);
+      }
+
+      return payload.data || [];
+    }
+
+    function buildBarChart(canvasId, label) {
+      return new Chart(document.getElementById(canvasId), {
+        type: "bar",
+        data: {
+          labels: [],
+          datasets: [{
+            label,
+            data: [],
+            backgroundColor: "rgba(245, 166, 35, 0.8)",
+            borderColor: "rgba(181, 122, 11, 1)",
+            borderWidth: 1,
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: (value) => "$" + value
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateChart(chart, rows) {
+      chart.data.labels = rows.map((row) => row.etiqueta || "N/A");
+      chart.data.datasets[0].data = rows.map((row) => Number(row.ventas || 0));
+      chart.update();
+    }
+
+    function calcTotals(rows) {
+      const pedidos = rows.reduce((acc, row) => acc + Number(row.pedidos || 0), 0);
+      const ventas = rows.reduce((acc, row) => acc + Number(row.ventas || 0), 0);
+      const promedio = pedidos > 0 ? ventas / pedidos : 0;
+      return { pedidos, promedio };
+    }
+
+    async function loadVentasDia() {
+      const rows = await fetchApi("/api/ventas/diarias");
+      updateChart(state.charts.dia, rows);
+      const totals = calcTotals(rows);
+      document.getElementById("kpi-hoy-ventas").textContent = `${totals.pedidos} pedidos`;
+      document.getElementById("kpi-hoy-promedio").textContent = `Promedio ticket: ${mxn(totals.promedio)}`;
+    }
+
+    async function loadVentasMes() {
+      const rows = await fetchApi("/api/ventas/mensuales");
+      updateChart(state.charts.mes, rows);
+      const totals = calcTotals(rows);
+      document.getElementById("kpi-mes-ventas").textContent = `${totals.pedidos} pedidos`;
+      document.getElementById("kpi-mes-promedio").textContent = `Promedio ticket: ${mxn(totals.promedio)}`;
+    }
+
+    async function loadVentasAno() {
+      const rows = await fetchApi("/api/ventas/anuales");
+      updateChart(state.charts.ano, rows);
+    }
+
+    async function loadTopClientes() {
+      const tbody = document.getElementById("top-clientes-body");
+      try {
+        const rows = await fetchApi("/api/clientes/top20");
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="3" class="muted">No hay clientes todavia.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = rows.map((row) => {
+          const nombre = [row.nombre, row.apellidos].filter(Boolean).join(" ") || "Sin nombre";
+          return `
+            <tr>
+              <td>${nombre}</td>
+              <td>${row.whatsapp_id || "-"}</td>
+              <td class="text-right">${mxn(row.monto_total_comprado)}</td>
+            </tr>
+          `;
+        }).join("");
+      } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="3" class="danger-text">${error.message}</td></tr>`;
+      }
+    }
+
+    async function loadCampanas() {
+      const tbody = document.getElementById("campanas-body");
+      const candidateEndpoints = ["/api/campanias/historial", "/api/campanias"];
+
+      for (const endpoint of candidateEndpoints) {
+        try {
+          const rows = await fetchApi(endpoint);
+          renderCampanas(rows);
+          return;
+        } catch (_error) {
+        }
+      }
+
+      tbody.innerHTML = '<tr><td colspan="3" class="muted">No hay endpoint GET de campanas aun. Se mostraran campanas nuevas al enviar.</td></tr>';
+    }
+
+    function renderCampanas(rows) {
+      const tbody = document.getElementById("campanas-body");
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="muted">Sin campanas enviadas.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map((row) => {
+        const fechaRaw = row.fecha || row.creado_en || row.enviado_en || "";
+        const fecha = fechaRaw ? new Date(fechaRaw).toLocaleString("es-MX") : "-";
+        return `
+          <tr>
+            <td>${fecha}</td>
+            <td>${row.nombre || "Campana"}</td>
+            <td class="text-right">${row.total_enviados || row.total || row.enviados || 0}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function appendCampanaRow(nombre) {
+      const tbody = document.getElementById("campanas-body");
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${new Date().toLocaleString("es-MX")}</td>
+        <td>${nombre}</td>
+        <td class="text-right">En proceso</td>
+      `;
+
+      if (tbody.textContent.includes("Sin campanas") || tbody.textContent.includes("No hay endpoint")) {
+        tbody.innerHTML = "";
+      }
+
+      tbody.prepend(row);
+    }
+
+    function simulateProgressTick(current) {
+      const increment = Math.floor(Math.random() * 12) + 6;
+      return Math.min(current + increment, 92);
+    }
+
+    async function submitCampana(event) {
+      event.preventDefault();
+
+      const nombre = document.getElementById("campana-nombre").value.trim();
+      const segmento = document.getElementById("campana-segmento").value;
+      const mensaje = document.getElementById("campana-mensaje").value.trim();
+      const wrap = document.getElementById("campana-progress-wrap");
+      const bar = document.getElementById("campana-progress-bar");
+      const status = document.getElementById("campana-status");
+
+      if (!nombre || !mensaje) {
+        status.textContent = "Nombre y mensaje son obligatorios.";
+        wrap.style.display = "block";
+        return;
+      }
+
+      wrap.style.display = "block";
+      bar.style.width = "8%";
+      status.textContent = "Enviando campana...";
+
+      let progress = 8;
+      const timer = setInterval(() => {
+        progress = simulateProgressTick(progress);
+        bar.style.width = progress + "%";
+      }, 250);
+
+      try {
+        await fetchApi("/api/campanias", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            nombre,
+            segmento,
+            mensaje
+          })
+        });
+
+        clearInterval(timer);
+        bar.style.width = "100%";
+        status.textContent = "Campana enviada por WhatsApp correctamente.";
+        appendCampanaRow(nombre);
+        event.target.reset();
+      } catch (error) {
+        clearInterval(timer);
+        bar.style.width = "100%";
+        status.textContent = `Error al enviar: ${error.message}`;
+      }
+    }
+
+    async function loadInventario() {
+      const tbody = document.getElementById("inventario-body");
+      const endpoints = ["/api/inventario", "/api/inventario/alertas"];
+
+      for (const endpoint of endpoints) {
+        try {
+          const rows = await fetchApi(endpoint);
+          renderInventario(rows, endpoint === "/api/inventario/alertas");
+          return;
+        } catch (_error) {
+        }
+      }
+
+      tbody.innerHTML = '<tr><td colspan="5" class="danger-text">No se pudo cargar inventario.</td></tr>';
+    }
+
+    function renderInventario(rows, fromAlertsOnly) {
+      const tbody = document.getElementById("inventario-body");
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">Sin datos de inventario.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map((row) => {
+        const actual = Number(row.stock_actual || 0);
+        const minimo = Number(row.stock_minimo || 0);
+        const low = actual < minimo;
+        const estado = low ? "Debajo del minimo" : "OK";
+
+        return `
+          <tr class="${low ? "danger-row" : ""}">
+            <td>${row.nombre || "-"}</td>
+            <td>${row.unidad_medida || "-"}</td>
+            <td class="text-right ${low ? "danger-text" : ""}">${actual}</td>
+            <td class="text-right">${minimo}</td>
+            <td class="${low ? "danger-text" : ""}">${estado}</td>
+          </tr>
+        `;
+      }).join("");
+
+      if (fromAlertsOnly) {
+        tbody.innerHTML += '<tr><td colspan="5" class="muted">Mostrando alertas por debajo del minimo (endpoint disponible).</td></tr>';
+      }
+    }
+
+    async function submitCompra(event) {
+      event.preventDefault();
+      const status = document.getElementById("compra-status");
+      const payload = {
+        insumo: document.getElementById("compra-insumo").value.trim(),
+        cantidad: Number(document.getElementById("compra-cantidad").value || 0),
+        proveedor: document.getElementById("compra-proveedor").value.trim(),
+        costo_total: Number(document.getElementById("compra-costo").value || 0)
+      };
+
+      status.textContent = "Guardando compra...";
+
+      try {
+        await fetchApi("/api/inventario/compras", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        status.textContent = "Compra registrada.";
+        await loadInventario();
+      } catch (_error) {
+        status.textContent = "Endpoint /api/inventario/compras aun no implementado en backend.";
+      }
+    }
+
+    function setUpModal() {
+      const modal = document.getElementById("modal-compra");
+      document.getElementById("btn-registrar-compra").addEventListener("click", () => {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+      });
+
+      document.getElementById("cerrar-modal").addEventListener("click", () => {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      });
+
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          modal.classList.remove("open");
+          modal.setAttribute("aria-hidden", "true");
+        }
+      });
+    }
+
+    async function initialLoad() {
+      state.charts.dia = buildBarChart("chart-dia", "Ventas del dia");
+      state.charts.mes = buildBarChart("chart-mes", "Ventas del mes");
+      state.charts.ano = buildBarChart("chart-ano", "Ventas del ano");
+
+      document.getElementById("btn-refrescar-ventas").addEventListener("click", loadVentasDia);
+      document.getElementById("form-campana").addEventListener("submit", submitCampana);
+      document.getElementById("form-compra").addEventListener("submit", submitCompra);
+
+      setUpModal();
+
+      await Promise.allSettled([
+        loadVentasDia(),
+        loadVentasMes(),
+        loadVentasAno(),
+        loadTopClientes(),
+        loadCampanas(),
+        loadInventario()
+      ]);
+
+      setInterval(() => {
+        loadVentasDia().catch(() => {
+        });
+      }, 60 * 60 * 1000);
+    }
+
+    initialLoad();
+  </script>
+</body>
+</html>

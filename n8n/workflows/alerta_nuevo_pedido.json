@@ -1,0 +1,236 @@
+{
+  "name": "Alerta nuevo pedido a cocina y repartidores",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pedido-alerta",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook Pedido",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "id",
+              "value": "={{ $json.body?.id || $json.id || '' }}"
+            },
+            {
+              "name": "productos",
+              "value": "={{ $json.body?.productos || $json.productos || '' }}"
+            },
+            {
+              "name": "direccion",
+              "value": "={{ $json.body?.direccion || $json.direccion || '' }}"
+            },
+            {
+              "name": "tipo",
+              "value": "={{ $json.body?.tipo || $json.tipo || 'individual' }}"
+            },
+            {
+              "name": "msg_cocina",
+              "value": "={{ 'NUEVO PEDIDO #' + ($json.body?.id || $json.id || 'N/A') + ': ' + ($json.body?.productos || $json.productos || 'sin productos') + ' - $' + ($json.body?.total || $json.total || '0') }}"
+            },
+            {
+              "name": "msg_admin",
+              "value": "={{ 'ALERTA EVENTO #' + ($json.body?.id || $json.id || 'N/A') + ': ' + ($json.body?.productos || $json.productos || 'sin productos') + ' - $' + ($json.body?.total || $json.total || '0') + ' | ' + ($json.body?.direccion || $json.direccion || 'sin direccion') }}"
+            }
+          ],
+          "number": [
+            {
+              "name": "total",
+              "value": "={{ Number($json.body?.total || $json.total || 0) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2",
+      "name": "Parsear Pedido",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        520,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.twilio.com/2010-04-01/Accounts/' + $env.TWILIO_ACCOUNT_SID + '/Messages.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "={{ $env.TWILIO_WHATSAPP_FROM }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $env.WHATSAPP_COCINA }}"
+            },
+            {
+              "name": "Body",
+              "value": "={{ $json.msg_cocina }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3",
+      "name": "Twilio Cocina",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.tipo }}",
+              "operation": "equal",
+              "value2": "evento"
+            }
+          ]
+        }
+      },
+      "id": "4",
+      "name": "Es Evento?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.twilio.com/2010-04-01/Accounts/' + $env.TWILIO_ACCOUNT_SID + '/Messages.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "={{ $env.TWILIO_WHATSAPP_FROM }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $env.WHATSAPP_ADMIN }}"
+            },
+            {
+              "name": "Body",
+              "value": "={{ $json.msg_admin }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5",
+      "name": "Twilio Admin Evento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.FLASK_BASE_URL + '/api/logs' }}",
+        "sendBody": true,
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"pedido_id\": $json.id,\n  \"canal\": \"whatsapp\",\n  \"destino\": \"cocina\",\n  \"tipo\": $json.tipo,\n  \"mensaje\": $json.msg_cocina,\n  \"total\": $json.total,\n  \"direccion\": $json.direccion\n}"
+      },
+      "id": "6",
+      "name": "Log en Flask API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Pedido": {
+      "main": [
+        [
+          {
+            "node": "Parsear Pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear Pedido": {
+      "main": [
+        [
+          {
+            "node": "Twilio Cocina",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio Cocina": {
+      "main": [
+        [
+          {
+            "node": "Es Evento?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log en Flask API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es Evento?": {
+      "main": [
+        [
+          {
+            "node": "Twilio Admin Evento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "QueChimbaAlertaPedido"
+}

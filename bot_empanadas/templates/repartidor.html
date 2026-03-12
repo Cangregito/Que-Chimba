@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Que Chimba - Panel Repartidor</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --bg-soft: #171e25;
+      --card: #202a34;
+      --line: #34424f;
+      --text: #f1f5f8;
+      --muted: #b6c2cc;
+      --accent: #ffad32;
+      --accent-soft: #ffd37c;
+      --ok: #36b87b;
+      --ok-ink: #052516;
+      --danger: #f05f6f;
+      --danger-ink: #2a060b;
+      --chip: #2a3642;
+      --radius: 14px;
+      --shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 8% 5%, #2a3139 0%, transparent 34%),
+        radial-gradient(circle at 88% 15%, #1c252e 0%, transparent 30%),
+        linear-gradient(180deg, #0d1217 0%, #121920 100%);
+      padding: 22px;
+    }
+
+    .layout {
+      max-width: 1360px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1.75fr 1fr;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%), var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 2px;
+    }
+
+    .title h1 {
+      font-size: 2rem;
+      margin-bottom: 4px;
+      letter-spacing: 0.2px;
+    }
+
+    .title p {
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .repartidor-chip {
+      border: 1px solid rgba(255, 173, 50, 0.35);
+      background: rgba(255, 173, 50, 0.14);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: #ffdca8;
+      font-weight: 700;
+      font-size: 0.96rem;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--accent);
+      background: #18212a;
+      border-radius: 11px;
+      padding: 10px 12px;
+    }
+
+    .stat .label {
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .stat .value {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #fce7be;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .section-head h2 {
+      font-size: 1.22rem;
+      color: #ffe3b0;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .alert {
+      display: none;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid transparent;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .alert.show {
+      display: block;
+    }
+
+    .alert-success {
+      background: rgba(54, 184, 123, 0.14);
+      border-color: rgba(54, 184, 123, 0.34);
+      color: #bbf4d7;
+    }
+
+    .alert-error {
+      background: rgba(240, 95, 111, 0.14);
+      border-color: rgba(240, 95, 111, 0.34);
+      color: #ffc6ce;
+    }
+
+    .orders {
+      display: grid;
+      gap: 12px;
+    }
+
+    .order-card {
+      border: 1px solid var(--line);
+      border-left: 7px solid var(--accent);
+      border-radius: 12px;
+      background: rgba(14, 20, 26, 0.54);
+      padding: 14px;
+    }
+
+    .order-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 9px;
+    }
+
+    .order-id {
+      font-size: 1.2rem;
+      font-weight: 900;
+      color: #ffdf9f;
+    }
+
+    .status {
+      border-radius: 999px;
+      border: 1px solid rgba(255, 173, 50, 0.35);
+      color: #ffe3b3;
+      background: rgba(255, 173, 50, 0.13);
+      padding: 4px 10px;
+      font-size: 0.84rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .order-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 14px;
+      margin-bottom: 8px;
+    }
+
+    .order-item .k {
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin-bottom: 2px;
+    }
+
+    .order-item .v {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .products {
+      margin-top: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #18222c;
+      padding: 10px;
+    }
+
+    .products .k {
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin-bottom: 4px;
+    }
+
+    .products .v {
+      white-space: pre-wrap;
+      line-height: 1.45;
+      font-size: 0.95rem;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(140px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 10px 12px;
+      min-height: 42px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 0.9rem;
+      transition: transform 0.1s ease, filter 0.14s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.03);
+    }
+
+    .btn:disabled {
+      opacity: 0.64;
+      cursor: not-allowed;
+      transform: none;
+      filter: none;
+    }
+
+    .btn-confirm {
+      background: linear-gradient(180deg, #92efbe 0%, var(--ok) 100%);
+      color: var(--ok-ink);
+      border-color: rgba(54, 184, 123, 0.36);
+    }
+
+    .btn-retry {
+      background: linear-gradient(180deg, #6cb4ff 0%, #2f89ef 100%);
+      color: #071d34;
+      border-color: rgba(88, 160, 245, 0.34);
+    }
+
+    .btn-maps {
+      background: linear-gradient(180deg, #ffd47f 0%, var(--accent) 100%);
+      color: #312100;
+      border-color: rgba(255, 173, 50, 0.34);
+    }
+
+    .confirm-box {
+      display: none;
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #17212a;
+      padding: 10px;
+    }
+
+    .confirm-box.active {
+      display: block;
+    }
+
+    .confirm-box label {
+      display: block;
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .confirm-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+    }
+
+    .confirm-row input {
+      width: 100%;
+      min-height: 40px;
+      border-radius: 9px;
+      border: 1px solid var(--line);
+      background: #0f151b;
+      color: var(--text);
+      padding: 9px 10px;
+      font-size: 1rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .confirm-row input:focus {
+      outline: none;
+      border-color: rgba(255, 173, 50, 0.58);
+      box-shadow: 0 0 0 3px rgba(255, 173, 50, 0.15);
+    }
+
+    .inline-btn {
+      min-height: 40px;
+      border-radius: 9px;
+      border: 1px solid transparent;
+      font-weight: 800;
+      cursor: pointer;
+      padding: 0 12px;
+    }
+
+    .inline-submit {
+      background: #36b87b;
+      border-color: rgba(54, 184, 123, 0.35);
+      color: #042012;
+    }
+
+    .inline-cancel {
+      background: #3a4652;
+      border-color: #536170;
+      color: #e8eff5;
+    }
+
+    .route-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .route-item {
+      display: grid;
+      grid-template-columns: 30px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(13, 20, 27, 0.52);
+      padding: 10px;
+    }
+
+    .route-order {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(255, 173, 50, 0.18);
+      border: 1px solid rgba(255, 173, 50, 0.42);
+      color: #ffdba1;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 0.88rem;
+    }
+
+    .route-main {
+      font-size: 0.95rem;
+      line-height: 1.35;
+    }
+
+    .route-main .cp {
+      font-size: 0.84rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 1024px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .order-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 14px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        grid-template-columns: 1fr;
+      }
+
+      .confirm-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <section class="panel header">
+      <div class="title">
+        <h1>Panel de Repartidores</h1>
+        <p>Pedidos listos para entregar, confirmacion por codigo y ruta optimizada.</p>
+      </div>
+      <div class="repartidor-chip">Repartidor: <span id="repartidor-nombre">{{ (user.username if user else 'demo') }}</span></div>
+      <div class="stats" aria-label="Estadisticas del repartidor">
+        <article class="stat">
+          <div class="label">Pedidos listos</div>
+          <div class="value" id="stat-listos">0</div>
+        </article>
+        <article class="stat">
+          <div class="label">Pendientes de confirmar</div>
+          <div class="value" id="stat-pendientes">0</div>
+        </article>
+        <article class="stat">
+          <div class="label">CP unicos en ruta</div>
+          <div class="value" id="stat-cps">0</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div id="msg-success" class="alert alert-success" role="status" aria-live="polite"></div>
+      <div id="msg-error" class="alert alert-error" role="alert" aria-live="assertive"></div>
+
+      <div class="section-head">
+        <h2>Pedidos asignados (estado listo)</h2>
+        <button class="btn btn-maps" id="btn-refresh" type="button">Actualizar</button>
+      </div>
+
+      <div class="orders" id="orders-container">
+        <div class="empty">Cargando pedidos del repartidor...</div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="section-head">
+        <h2>Ruta optimizada</h2>
+        <span class="subtle">Orden por cercania estimada (CP)</span>
+      </div>
+      <div class="route-list" id="route-container">
+        <div class="empty">La ruta aparecera cuando haya pedidos listos.</div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    let allPedidos = [];
+
+    const ordersContainer = document.getElementById("orders-container");
+    const routeContainer = document.getElementById("route-container");
+
+    const msgSuccess = document.getElementById("msg-success");
+    const msgError = document.getElementById("msg-error");
+
+    const statListos = document.getElementById("stat-listos");
+    const statPendientes = document.getElementById("stat-pendientes");
+    const statCps = document.getElementById("stat-cps");
+
+    const REFRESH_MS = 12000;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("btn-refresh").addEventListener("click", loadPedidos);
+      loadPedidos();
+      setInterval(loadPedidos, REFRESH_MS);
+    });
+
+    function normalizePayload(payload) {
+      const ok = Boolean(payload && (payload.ok === true || payload.success === true));
+      const rawData = payload && (payload.data !== undefined ? payload.data : payload.pedidos);
+      const data = Array.isArray(rawData) ? rawData : [];
+      const error = payload && (payload.error || payload.mensaje);
+      return { ok, data, error };
+    }
+
+    function toText(value, fallback = "-") {
+      return value === null || value === undefined || value === "" ? fallback : String(value);
+    }
+
+    function normalizePedido(p) {
+      const pedidoId = p.pedido_id ?? p.id ?? p.order_id;
+      const direccion = p.direccion_entrega ?? p.direccion ?? p.direccion_texto ?? "Sin direccion";
+      const cliente = p.cliente_nombre ?? p.nombre_cliente ?? p.cliente ?? "Cliente";
+      const cp = p.codigo_postal ?? p.cp ?? p.postal_code ?? "00000";
+
+      let productos = p.productos;
+      if (Array.isArray(productos)) {
+        productos = productos.map((it) => {
+          if (typeof it === "string") return it;
+          const nombre = it.nombre ?? "Producto";
+          const cantidad = it.cantidad ?? 1;
+          return `${cantidad} x ${nombre}`;
+        }).join("\n");
+      }
+
+      return {
+        id: pedidoId,
+        estado: (p.estado || "").toLowerCase(),
+        direccion: toText(direccion),
+        cliente: toText(cliente),
+        cp: toText(cp),
+        productos: toText(productos, "Sin detalle de productos"),
+        raw: p,
+      };
+    }
+
+    function onlyListos(pedidos) {
+      return pedidos.filter((p) => p.estado === "listo");
+    }
+
+    async function loadPedidos() {
+      hideMessages();
+      try {
+        const res = await fetch("/api/repartidor/pedidos", { method: "GET" });
+        const payload = await res.json();
+        const normalized = normalizePayload(payload);
+
+        if (!res.ok || !normalized.ok) {
+          showError(normalized.error || "No se pudieron cargar los pedidos asignados.");
+          allPedidos = [];
+          render();
+          return;
+        }
+
+        allPedidos = normalized.data.map(normalizePedido).filter((p) => p.id !== undefined && p.id !== null);
+        render();
+      } catch (err) {
+        allPedidos = [];
+        render();
+        showError("Error de conexion al cargar pedidos de repartidor.");
+      }
+    }
+
+    function render() {
+      const pedidosListos = onlyListos(allPedidos);
+      renderStats(pedidosListos);
+      renderPedidos(pedidosListos);
+      renderRuta(pedidosListos);
+    }
+
+    function renderStats(pedidosListos) {
+      const cps = new Set(pedidosListos.map((p) => p.cp));
+      statListos.textContent = pedidosListos.length;
+      statPendientes.textContent = pedidosListos.length;
+      statCps.textContent = cps.size;
+    }
+
+    function renderPedidos(pedidos) {
+      if (!pedidos.length) {
+        ordersContainer.innerHTML = '<div class="empty">No hay pedidos en estado listo para este repartidor.</div>';
+        return;
+      }
+
+      ordersContainer.innerHTML = pedidos.map((pedido) => {
+        const safeAddress = escapeHtml(pedido.direccion);
+        const safeCliente = escapeHtml(pedido.cliente);
+        const safeProductos = escapeHtml(pedido.productos);
+        const inputId = `codigo-${pedido.id}`;
+        const boxId = `confirm-${pedido.id}`;
+
+        return `
+          <article class="order-card" data-pedido-id="${pedido.id}">
+            <div class="order-head">
+              <div class="order-id">Pedido #${pedido.id}</div>
+              <span class="status">listo</span>
+            </div>
+
+            <div class="order-grid">
+              <div class="order-item">
+                <div class="k">Cliente</div>
+                <div class="v">${safeCliente}</div>
+              </div>
+              <div class="order-item">
+                <div class="k">Codigo Postal</div>
+                <div class="v">${escapeHtml(pedido.cp)}</div>
+              </div>
+              <div class="order-item" style="grid-column: 1 / -1;">
+                <div class="k">Direccion de entrega</div>
+                <div class="v">${safeAddress}</div>
+              </div>
+            </div>
+
+            <div class="products">
+              <div class="k">Productos</div>
+              <div class="v">${safeProductos}</div>
+            </div>
+
+            <div class="actions">
+              <button class="btn btn-confirm" type="button" onclick="openConfirm(${pedido.id})">Confirmar entrega</button>
+              <button class="btn btn-retry" type="button" onclick="reenviarCodigo(${pedido.id})">Reenviar codigo al cliente</button>
+              <button class="btn btn-maps" type="button" onclick="openMaps('${jsStringEscape(pedido.direccion)}')">Abrir Google Maps</button>
+            </div>
+
+            <div class="confirm-box" id="${boxId}">
+              <label for="${inputId}">Ingresa el codigo del cliente:</label>
+              <div class="confirm-row">
+                <input id="${inputId}" type="text" maxlength="12" placeholder="Ej: 483920" autocomplete="off" />
+                <button class="inline-btn inline-submit" type="button" onclick="confirmarEntrega(${pedido.id})">Enviar</button>
+                <button class="inline-btn inline-cancel" type="button" onclick="closeConfirm(${pedido.id})">Cancelar</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderRuta(pedidosListos) {
+      if (!pedidosListos.length) {
+        routeContainer.innerHTML = '<div class="empty">Sin pedidos para calcular ruta.</div>';
+        return;
+      }
+
+      const ordenados = [...pedidosListos].sort((a, b) => String(a.cp).localeCompare(String(b.cp)));
+      routeContainer.innerHTML = ordenados.map((pedido, idx) => `
+        <article class="route-item">
+          <div class="route-order">${idx + 1}</div>
+          <div class="route-main">
+            <strong>Pedido #${pedido.id}</strong><br />
+            ${escapeHtml(pedido.cliente)}<br />
+            ${escapeHtml(pedido.direccion)}
+            <div class="cp">CP ${escapeHtml(pedido.cp)}</div>
+          </div>
+          <button class="btn btn-maps" type="button" onclick="openMaps('${jsStringEscape(pedido.direccion)}')">Maps</button>
+        </article>
+      `).join("");
+    }
+
+    function openConfirm(pedidoId) {
+      document.querySelectorAll(".confirm-box.active").forEach((el) => el.classList.remove("active"));
+      const box = document.getElementById(`confirm-${pedidoId}`);
+      const input = document.getElementById(`codigo-${pedidoId}`);
+      if (box) {
+        box.classList.add("active");
+      }
+      if (input) {
+        input.value = "";
+        input.focus();
+      }
+    }
+
+    function closeConfirm(pedidoId) {
+      const box = document.getElementById(`confirm-${pedidoId}`);
+      if (box) {
+        box.classList.remove("active");
+      }
+    }
+
+    async function confirmarEntrega(pedidoId) {
+      hideMessages();
+      const input = document.getElementById(`codigo-${pedidoId}`);
+      const codigo = (input && input.value ? input.value.trim() : "");
+
+      if (!codigo) {
+        showError("Debes ingresar el codigo del cliente para confirmar la entrega.");
+        return;
+      }
+
+      try {
+        const confirmRes = await fetch(`/api/pedidos/${pedidoId}/confirmar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ codigo_entrega: codigo }),
+        });
+
+        const confirmPayload = await confirmRes.json();
+        const confirmOk = Boolean(confirmPayload && (confirmPayload.ok === true || confirmPayload.success === true));
+
+        if (!confirmRes.ok || !confirmOk) {
+          const msg = confirmPayload && (confirmPayload.error || confirmPayload.mensaje) ? (confirmPayload.error || confirmPayload.mensaje) : "Codigo incorrecto. No se pudo confirmar la entrega.";
+          showError(msg);
+          return;
+        }
+
+        showSuccess("Entrega confirmada correctamente. Pedido marcado como entregado.");
+
+        try {
+          // Programa la evaluacion de entrega para dispararse 15 minutos despues.
+          await fetch("/api/evaluaciones/programar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pedido_id: pedidoId, retraso_minutos: 15 }),
+          });
+        } catch (_e) {
+          // La entrega ya fue confirmada; si falla este paso no se revierte el estado.
+        }
+
+        closeConfirm(pedidoId);
+        await loadPedidos();
+      } catch (_err) {
+        showError("No fue posible confirmar la entrega en este momento.");
+      }
+    }
+
+    async function reenviarCodigo(pedidoId) {
+      hideMessages();
+      try {
+        const res = await fetch(`/api/pedidos/${pedidoId}/reenviar-codigo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const payload = await res.json();
+        const ok = Boolean(payload && (payload.ok === true || payload.success === true));
+
+        if (!res.ok || !ok) {
+          const msg = payload && (payload.error || payload.mensaje) ? (payload.error || payload.mensaje) : "No se pudo reenviar el codigo al cliente.";
+          showError(msg);
+          return;
+        }
+
+        showSuccess("Codigo reenviado al cliente por WhatsApp.");
+      } catch (_err) {
+        showError("Error de red al reenviar el codigo.");
+      }
+    }
+
+    function openMaps(direccion) {
+      const q = encodeURIComponent(direccion || "");
+      window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, "_blank", "noopener");
+    }
+
+    function hideMessages() {
+      msgSuccess.classList.remove("show");
+      msgError.classList.remove("show");
+    }
+
+    function showSuccess(message) {
+      msgError.classList.remove("show");
+      msgSuccess.textContent = message;
+      msgSuccess.classList.add("show");
+      setTimeout(() => msgSuccess.classList.remove("show"), 4200);
+    }
+
+    function showError(message) {
+      msgSuccess.classList.remove("show");
+      msgError.textContent = message;
+      msgError.classList.add("show");
+      setTimeout(() => msgError.classList.remove("show"), 4600);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function jsStringEscape(value) {
+      return String(value)
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\n/g, " ");
+    }
+  </script>
+</body>
+</html>

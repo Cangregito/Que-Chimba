@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Pago en proceso – Que Chimba Empanadas</title>
+  <style>
+    :root {
+      --bg:      #101316;
+      --card:    #1f252c;
+      --line:    #313a44;
+      --text:    #f2f4f7;
+      --muted:   #b8c2cc;
+      --yellow:  #ffd447;
+      --accent:  #ffa62b;
+      --radius:  20px;
+      --shadow:  0 20px 40px rgba(0,0,0,.45);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #2c2500 0%, transparent 55%),
+                  linear-gradient(180deg, #0e1115 0%, #12171c 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: var(--text);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      max-width: 420px;
+      width: 100%;
+      padding: 40px 32px 36px;
+      text-align: center;
+    }
+    .icon {
+      width: 72px; height: 72px;
+      background: rgba(255,212,71,.1);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 36px;
+      border: 2px solid rgba(255,212,71,.3);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1);    opacity: 1; }
+      50%       { transform: scale(1.06); opacity: .8; }
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--yellow);
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      font-size: 1.03rem;
+      color: var(--muted);
+      margin-bottom: 28px;
+      line-height: 1.55;
+    }
+    .info-box {
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 26px;
+      text-align: left;
+    }
+    .info-box p {
+      font-size: .84rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      line-height: 1.5;
+    }
+    .info-box p:last-child { margin-bottom: 0; }
+    .info-box span { color: var(--yellow); font-weight: 600; }
+    .cta {
+      display: block;
+      background: var(--accent);
+      color: #2f2000;
+      border-radius: 100px;
+      padding: 14px 24px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: opacity .2s;
+    }
+    .cta:hover { opacity: .85; }
+    .footer-note {
+      margin-top: 20px;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">⏳</div>
+
+    <h1>Listo parce, en proceso</h1>
+    <p class="subtitle">
+      Tu pago{% if pedido_id %} del pedido
+      <strong style="color:#f2f4f7;">#{{ pedido_id }}</strong>{% endif %}
+      está siendo verificado. ¡Tranquilo mi rey, esto es momentáneo!
+    </p>
+
+    <div class="info-box">
+      <p><span>¿Qué pasa ahora?</span></p>
+      <p>La institución financiera está confirmando el pago.
+         Esto puede tardar unos minutos.</p>
+      <p>Tan pronto se confirme, recibirás una notificación
+         por WhatsApp y comenzaremos a preparar tus empanadas. 🫔</p>
+    </div>
+
+    <a class="cta" href="javascript:window.close()">
+      Entendido, volver a WhatsApp
+    </a>
+
+    <p class="footer-note">
+      Si en 24 h no recibes confirmación, escríbenos.
+      ¡Que Chimba te resuelve! 🇨🇴
+    </p>
+  </div>
+</body>
+</html>

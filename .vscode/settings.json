@@ -1,0 +1,12 @@
+{
+  // Asociar todos los .sql del proyecto al dialecto PostgreSQL,
+  // evitando que la extension mssql los valide como T-SQL (SQL Server).
+  "files.associations": {
+    "*.sql": "postgres"
+  },
+  // Deshabilitar el linter de mssql para este workspace
+  "[sql]": {
+    "editor.defaultFormatter": null
+  },
+  "mssql.enableQueryHistoryFeature": false
+}
