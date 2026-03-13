@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Que Chimba Empanadas | Empanadas Colombianas en Ciudad Juárez</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * {
@@ -17,20 +20,24 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Manrope', sans-serif;
             line-height: 1.6;
-            color: #1A1208;
-            background-color: #FFF8F0;
+            color: #111827;
+            background:
+                radial-gradient(circle at 8% 0%, #fef3c7 0%, transparent 24%),
+                radial-gradient(circle at 96% 12%, #d1fae5 0%, transparent 22%),
+                #f8fafc;
         }
 
         /* ========== HEADER & NAV ========== */
         header {
-            background: linear-gradient(135deg, #007F3B 0%, #F5A623 100%);
-            padding: 1rem 0;
+            background: rgba(248, 250, 252, 0.84);
+            backdrop-filter: blur(10px);
+            padding: 0.85rem 0;
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 4px 12px rgba(0, 127, 59, 0.2);
+            border-bottom: 1px solid #e5e7eb;
         }
 
         nav {
@@ -44,11 +51,10 @@
         }
 
         .logo {
-            font-size: 1.8rem;
-            font-weight: 900;
-            color: #1A1208;
-            text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.3);
-            letter-spacing: 2px;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #111827;
+            letter-spacing: 0.5px;
         }
 
         .nav-links {
@@ -59,18 +65,18 @@
         }
 
         .nav-links a {
-            color: #1A1208;
+            color: #374151;
             text-decoration: none;
-            font-weight: 600;
-            font-size: 0.95rem;
+            font-weight: 700;
+            font-size: 0.92rem;
             transition: all 0.3s ease;
             padding: 0.5rem 1rem;
-            border-radius: 5px;
+            border-radius: 999px;
         }
 
         .nav-links a:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
+            background: #e5e7eb;
+            transform: translateY(-1px);
         }
 
         @media (max-width: 768px) {
@@ -90,29 +96,35 @@
             margin: 0 auto;
             padding: 4rem 2rem;
             text-align: center;
-            background: linear-gradient(180deg, #FFF8F0 0%, #FFE4CC 100%);
+            background: transparent;
         }
 
         .hero-logo {
-            font-size: 5rem;
+            font-size: 1rem;
+            letter-spacing: 2px;
+            font-weight: 800;
+            display: inline-block;
+            padding: 0.45rem 0.9rem;
+            border-radius: 999px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            color: #374151;
             margin-bottom: 1rem;
         }
 
         .hero h1 {
-            font-size: 3.5rem;
-            font-weight: 900;
-            color: #CE1126;
+            font-size: 3.2rem;
+            font-weight: 800;
+            color: #111827;
             margin-bottom: 0.5rem;
-            text-shadow: 2px 2px 8px rgba(0, 127, 59, 0.15);
-            letter-spacing: 1px;
+            letter-spacing: -1px;
         }
 
         .hero .tagline {
-            font-size: 1.5rem;
-            color: #007F3B;
+            font-size: 1.2rem;
+            color: #4b5563;
             margin-bottom: 2rem;
-            font-style: italic;
-            font-weight: bold;
+            font-weight: 500;
         }
 
         .hero-buttons {
@@ -125,34 +137,34 @@
         }
 
         .btn-whatsapp {
-            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            background: #111827;
             color: white;
             padding: 1.2rem 2.5rem;
-            font-size: 1.1rem;
-            font-weight: 900;
+            font-size: 1rem;
+            font-weight: 800;
             border: none;
-            border-radius: 50px;
+            border-radius: 14px;
             cursor: pointer;
             transition: all 0.3s ease;
             text-decoration: none;
             display: inline-block;
-            box-shadow: 0 6px 20px rgba(37, 211, 102, 0.3);
+            box-shadow: 0 8px 18px rgba(17, 24, 39, 0.22);
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.6px;
         }
 
         .btn-whatsapp:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(17, 24, 39, 0.3);
         }
 
         .qr-container {
             background: white;
             padding: 1.5rem;
-            border-radius: 15px;
+            border-radius: 14px;
             display: inline-block;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border: 3px solid #F5A623;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+            border: 1px solid #e5e7eb;
         }
 
         #qrcode {
@@ -186,7 +198,7 @@
 
         /* ========== STATISTICS SECTION ========== */
         .stats {
-            background: linear-gradient(135deg, #007F3B 0%, #003A22 100%);
+            background: #111827;
             padding: 4rem 2rem;
             color: white;
         }
@@ -198,9 +210,9 @@
 
         .stats h2 {
             text-align: center;
-            font-size: 2.5rem;
+            font-size: 2rem;
             margin-bottom: 3rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            letter-spacing: 0.2px;
         }
 
         .stats-grid {
@@ -210,24 +222,27 @@
         }
 
         .stat-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
             padding: 2rem;
-            border-radius: 15px;
+            border-radius: 14px;
             text-align: center;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.18);
             transition: all 0.3s ease;
         }
 
         .stat-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.15);
-            border-color: #F5A623;
+            transform: translateY(-3px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.35);
         }
 
         .stat-icon {
-            font-size: 3rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: #d1d5db;
             margin-bottom: 1rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
 
         .stat-number {
@@ -252,8 +267,8 @@
 
         .products h2 {
             text-align: center;
-            font-size: 2.5rem;
-            color: #CE1126;
+            font-size: 2rem;
+            color: #111827;
             margin-bottom: 3rem;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -267,16 +282,16 @@
 
         .product-card {
             background: white;
-            border-radius: 15px;
+            border-radius: 14px;
             overflow: hidden;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
             transition: all 0.3s ease;
-            border: 3px solid #F5A623;
+            border: 1px solid #e5e7eb;
         }
 
         .product-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.14);
         }
 
         .product-image {
@@ -285,8 +300,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 4rem;
-            background: linear-gradient(135deg, #FFE4CC 0%, #F5A623 100%);
+            font-size: 0.92rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #374151;
+            background: linear-gradient(140deg, #f3f4f6 0%, #e5e7eb 100%);
         }
 
         .product-info {
@@ -295,8 +313,8 @@
 
         .product-name {
             font-size: 1.5rem;
-            font-weight: 900;
-            color: #CE1126;
+            font-weight: 800;
+            color: #111827;
             margin-bottom: 0.5rem;
         }
 
@@ -309,14 +327,14 @@
 
         .product-price {
             font-size: 2rem;
-            font-weight: 900;
-            color: #007F3B;
+            font-weight: 800;
+            color: #0f766e;
             margin-top: 1rem;
         }
 
         /* ========== SERVICES SECTION ========== */
         .services {
-            background: linear-gradient(135deg, #FFE4CC 0%, #FFF8F0 100%);
+            background: #f9fafb;
             padding: 4rem 2rem;
         }
 
@@ -327,8 +345,8 @@
 
         .services h2 {
             text-align: center;
-            font-size: 2.5rem;
-            color: #007F3B;
+            font-size: 2rem;
+            color: #111827;
             margin-bottom: 3rem;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -343,14 +361,14 @@
         .service-card {
             background: white;
             padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-left: 6px solid #CE1126;
+            border-radius: 14px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+            border: 1px solid #e5e7eb;
         }
 
         .service-card h3 {
             font-size: 1.5rem;
-            color: #CE1126;
+            color: #111827;
             margin-bottom: 1rem;
             display: flex;
             align-items: center;
@@ -358,7 +376,13 @@
         }
 
         .service-icon {
-            font-size: 2rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: #4b5563;
+            border: 1px solid #d1d5db;
+            border-radius: 999px;
+            padding: 0.18rem 0.48rem;
+            letter-spacing: 0.3px;
         }
 
         .service-card ul {
@@ -389,8 +413,8 @@
 
         .gallery h2 {
             text-align: center;
-            font-size: 2.5rem;
-            color: #CE1126;
+            font-size: 2rem;
+            color: #111827;
             margin-bottom: 3rem;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -403,27 +427,30 @@
         }
 
         .gallery-item {
-            background: linear-gradient(135deg, #F5A623 0%, #CE1126 100%);
-            border-radius: 15px;
+            background: linear-gradient(140deg, #111827 0%, #374151 100%);
+            border-radius: 14px;
             overflow: hidden;
             aspect-ratio: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 4rem;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            font-weight: 700;
+            color: #f9fafb;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
         }
 
         .gallery-item:hover {
-            transform: scale(1.05) rotate(2deg);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
         }
 
         /* ========== TEAM SECTION ========== */
         .team {
-            background: linear-gradient(135deg, #007F3B 0%, #003A22 100%);
+            background: #111827;
             padding: 4rem 2rem;
             color: white;
         }
@@ -435,9 +462,9 @@
 
         .team h2 {
             text-align: center;
-            font-size: 2.5rem;
+            font-size: 2rem;
             margin-bottom: 3rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            letter-spacing: 0.2px;
         }
 
         .team-grid {
@@ -447,12 +474,11 @@
         }
 
         .team-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
             padding: 2rem;
-            border-radius: 15px;
+            border-radius: 14px;
             text-align: center;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             transition: all 0.3s ease;
         }
 
@@ -462,15 +488,25 @@
         }
 
         .team-avatar {
-            font-size: 4rem;
+            font-size: 0.95rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            width: 3.2rem;
+            height: 3.2rem;
+            margin: 0 auto 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 1rem;
         }
 
         .team-name {
             font-size: 1.3rem;
-            font-weight: 900;
+            font-weight: 800;
             margin-bottom: 0.5rem;
-            color: #F5A623;
+            color: #f3f4f6;
         }
 
         .team-role {
@@ -487,8 +523,8 @@
 
         .reviews h2 {
             text-align: center;
-            font-size: 2.5rem;
-            color: #CE1126;
+            font-size: 2rem;
+            color: #111827;
             margin-bottom: 3rem;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -503,16 +539,17 @@
         .review-card {
             background: white;
             padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-top: 4px solid #F5A623;
+            border-radius: 14px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+            border: 1px solid #e5e7eb;
         }
 
         .review-stars {
-            color: #F5A623;
-            font-size: 1.2rem;
+            color: #0f766e;
+            font-size: 1rem;
+            font-weight: 700;
             margin-bottom: 1rem;
-            letter-spacing: 2px;
+            letter-spacing: 0.2px;
         }
 
         .review-text {
@@ -523,8 +560,8 @@
         }
 
         .review-author {
-            font-weight: 900;
-            color: #CE1126;
+            font-weight: 800;
+            color: #111827;
         }
 
         .review-loading {
@@ -535,7 +572,7 @@
 
         /* ========== SOCIALS SECTION ========== */
         .socials {
-            background: linear-gradient(135deg, #FFE4CC 0%, #FFF8F0 100%);
+            background: #f9fafb;
             padding: 3rem 2rem;
             text-align: center;
         }
@@ -547,7 +584,7 @@
 
         .socials h3 {
             font-size: 1.8rem;
-            color: #007F3B;
+            color: #111827;
             margin-bottom: 2rem;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -564,25 +601,26 @@
             width: 60px;
             height: 60px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #F5A623 0%, #CE1126 100%);
+            background: #111827;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 0.92rem;
+            font-weight: 800;
             color: white;
             text-decoration: none;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(206, 17, 38, 0.2);
+            box-shadow: 0 8px 18px rgba(17, 24, 39, 0.2);
         }
 
         .social-link:hover {
-            transform: translateY(-5px) scale(1.1);
-            box-shadow: 0 8px 20px rgba(206, 17, 38, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(17, 24, 39, 0.28);
         }
 
         /* ========== CONTACT SECTION ========== */
         .contact {
-            background: linear-gradient(135deg, #007F3B 0%, #003A22 100%);
+            background: #111827;
             padding: 4rem 2rem;
             color: white;
         }
@@ -594,9 +632,8 @@
 
         .contact h2 {
             text-align: center;
-            font-size: 2.5rem;
+            font-size: 2rem;
             margin-bottom: 3rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -609,11 +646,10 @@
         }
 
         .contact-info {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
             padding: 2rem;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .contact-info h3 {
@@ -634,11 +670,10 @@
         }
 
         .form-section {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
             padding: 2rem;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .form-section h3 {
@@ -687,12 +722,12 @@
         .btn-submit {
             width: 100%;
             padding: 1rem;
-            background: linear-gradient(135deg, #F5A623 0%, #CE1126 100%);
-            color: white;
+            background: #f59e0b;
+            color: #111827;
             border: none;
             border-radius: 8px;
             font-size: 1rem;
-            font-weight: 900;
+            font-weight: 800;
             cursor: pointer;
             transition: all 0.3s ease;
             text-transform: uppercase;
@@ -700,8 +735,8 @@
         }
 
         .btn-submit:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(245, 166, 35, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(245, 158, 11, 0.24);
         }
 
         .btn-submit:disabled {
@@ -732,20 +767,15 @@
 
         /* ========== FOOTER ========== */
         footer {
-            background: #1A1208;
+            background: #0f172a;
             padding: 2rem;
             text-align: center;
-            color: #FFE4CC;
-            border-top: 3px solid #F5A623;
+            color: #e5e7eb;
+            border-top: 1px solid #374151;
         }
 
         footer p {
             margin-bottom: 0.5rem;
-        }
-
-        .footer-emoji {
-            font-size: 1.5rem;
-            margin: 1rem 0;
         }
 
         /* ========== UTILITIES ========== */
@@ -797,13 +827,206 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Bricolage+Grotesque:wght@600;700;800&display=swap');
+
+        :root {
+            --ink-900: #151515;
+            --ink-700: #2f2f2f;
+            --paper-1: #faf7ef;
+            --paper-2: #f4ecda;
+            --line-soft: #e6dbc4;
+            --amber: #e89b2f;
+            --green: #0f7a4b;
+            --card-shadow: 0 14px 32px rgba(37, 28, 15, 0.12);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            color: var(--ink-900);
+            background:
+                radial-gradient(circle at 4% 2%, #ffe6b8 0%, transparent 28%),
+                radial-gradient(circle at 96% 18%, #cdeedc 0%, transparent 24%),
+                linear-gradient(180deg, var(--paper-1) 0%, var(--paper-2) 100%);
+        }
+
+        h1, h2, h3, .logo, .hero-logo {
+            font-family: 'Bricolage Grotesque', sans-serif;
+        }
+
+        header {
+            background: rgba(250, 247, 239, 0.78);
+            border-bottom: 1px solid var(--line-soft);
+        }
+
+        .nav-links a {
+            border: 1px solid transparent;
+        }
+
+        .nav-links a:hover {
+            background: #fff6e3;
+            border-color: #e8d2a8;
+        }
+
+        .hero {
+            padding-top: 5rem;
+            animation: heroIn 0.45s ease;
+        }
+
+        .hero-logo {
+            border-color: #e7d8bb;
+            background: #fff9ef;
+            color: #513f1f;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.2rem, 5vw, 4rem);
+            line-height: 1.02;
+            letter-spacing: -0.04em;
+        }
+
+        .btn-whatsapp {
+            background: linear-gradient(140deg, #111111 0%, #2c2c2c 100%);
+            border-radius: 12px;
+            text-transform: none;
+        }
+
+        .qr-container,
+        .product-card,
+        .service-card,
+        .review-card,
+        .contact-info,
+        .form-section,
+        .stat-card,
+        .team-card {
+            border-radius: 18px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .stats,
+        .team,
+        .contact {
+            background: linear-gradient(180deg, #191919 0%, #101010 100%);
+        }
+
+        .stat-number,
+        .contact-info h3,
+        .form-section h3 {
+            color: var(--amber);
+        }
+
+        .product-price,
+        .service-card li:before,
+        .review-stars {
+            color: var(--green);
+        }
+
+        .gallery-item {
+            border-radius: 18px;
+            background: linear-gradient(140deg, #1f1f1f 0%, #3a3123 100%);
+        }
+
+        .btn-submit {
+            background: linear-gradient(140deg, #f2b349 0%, #e89b2f 100%);
+            border-radius: 12px;
+        }
+
+        footer {
+            background: #0d0d0d;
+        }
+
+        @keyframes heroIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        section {
+            position: relative;
+        }
+
+        .products h2,
+        .services h2,
+        .gallery h2,
+        .reviews h2,
+        .contact h2 {
+            letter-spacing: -0.03em;
+            text-transform: none;
+            font-size: clamp(1.7rem, 3.5vw, 2.5rem);
+        }
+
+        .service-card,
+        .review-card,
+        .product-card {
+            border: 1px solid #eadfc8;
+        }
+
+        .product-image {
+            background: linear-gradient(145deg, #f8f1e3 0%, #eee0c2 100%);
+            color: #45341d;
+        }
+
+        .social-link {
+            background: linear-gradient(140deg, #1b1b1b 0%, #332f28 100%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+        }
+
+        .social-link:hover {
+            transform: translateY(-3px) scale(1.02);
+        }
+
+        .contact-info,
+        .form-section {
+            backdrop-filter: blur(3px);
+        }
+
+        .container,
+        .hero,
+        .products,
+        .gallery,
+        .reviews {
+            padding-left: clamp(1rem, 2.8vw, 2.2rem);
+            padding-right: clamp(1rem, 2.8vw, 2.2rem);
+        }
+
+        @media (max-width: 768px) {
+            .hero {
+                padding-top: 3.4rem;
+            }
+
+            .qr-container {
+                width: 100%;
+                max-width: 280px;
+            }
+
+            .social-links {
+                gap: 0.9rem;
+            }
+
+            .social-link {
+                width: 54px;
+                height: 54px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- ========== HEADER ========== -->
     <header>
         <nav>
-            <div class="logo">🙌 Que Chimba</div>
+            <div class="logo">Que Chimba</div>
             <ul class="nav-links">
                 <li><a href="#productos">Productos</a></li>
                 <li><a href="#servicios">Servicios</a></li>
@@ -816,13 +1039,13 @@
 
     <!-- ========== HERO SECTION ========== -->
     <section class="hero">
-        <div class="hero-logo">🫔</div>
+        <div class="hero-logo">HECHO EN CASA</div>
         <h1>QUE CHIMBA EMPANADAS</h1>
-        <p class="tagline">¡Ay qué sabroso, parce! Empanadas colombianas que te dejan con ganas de más.</p>
+        <p class="tagline">Empanadas colombianas artesanales con entrega en Ciudad Juárez.</p>
         
         <div class="hero-buttons">
-            <a href="https://wa.me/+52NUMERO?text=Hola%20Que%20Chimba%2C%20quiero%20pedir%20unas%20empanadas" class="btn-whatsapp">
-                📱 Pedir por WhatsApp
+            <a href="{{ whatsapp_url }}" class="btn-whatsapp" target="_blank" rel="noopener noreferrer">
+                Pedir por WhatsApp
             </a>
             <div class="qr-container">
                 <div id="qrcode"></div>
@@ -834,20 +1057,20 @@
     <!-- ========== STATISTICS SECTION ========== -->
     <section class="stats">
         <div class="stats-container">
-            <h2>📊 Estamos que nos Explotan</h2>
+            <h2>Indicadores en tiempo real</h2>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-icon">🫔</div>
+                    <div class="stat-icon">Metrica 1</div>
                     <div class="stat-number" id="stat-empanadas">-</div>
                     <div class="stat-label">Empanadas Vendidas</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">😋</div>
+                    <div class="stat-icon">Metrica 2</div>
                     <div class="stat-number" id="stat-clientes">-</div>
                     <div class="stat-label">Clientes Felices</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">🎉</div>
+                    <div class="stat-icon">Metrica 3</div>
                     <div class="stat-number" id="stat-eventos">-</div>
                     <div class="stat-label">Eventos Realizados</div>
                 </div>
@@ -869,7 +1092,7 @@
             <h2>Nuestros Servicios</h2>
             <div class="services-grid">
                 <div class="service-card">
-                    <h3><span class="service-icon">📦</span> Órdenes Individuales</h3>
+                    <h3><span class="service-icon">SERVICIO A</span> Órdenes Individuales</h3>
                     <ul>
                         <li>Venta por unidad</li>
                         <li>Entrega rápida a domicilio</li>
@@ -879,7 +1102,7 @@
                     <p style="margin-top: 1rem; color: #CE1126; font-weight: bold;">Consulta precios en WhatsApp</p>
                 </div>
                 <div class="service-card">
-                    <h3><span class="service-icon">🎊</span> Eventos y Catering</h3>
+                    <h3><span class="service-icon">SERVICIO B</span> Eventos y Catering</h3>
                     <ul>
                         <li>Cotización personalizada</li>
                         <li>Cantidad mínima: 50 unidades</li>
@@ -896,12 +1119,12 @@
     <section class="gallery" id="galeria">
         <h2>Nuestra Galería</h2>
         <div class="gallery-grid">
-            <div class="gallery-item">🫔</div>
-            <div class="gallery-item">😋</div>
-            <div class="gallery-item">🤤</div>
-            <div class="gallery-item">🇨🇴</div>
-            <div class="gallery-item">✨</div>
-            <div class="gallery-item">🔥</div>
+            <div class="gallery-item">CARNE</div>
+            <div class="gallery-item">POLLO</div>
+            <div class="gallery-item">CRUJIENTE</div>
+            <div class="gallery-item">EVENTOS</div>
+            <div class="gallery-item">CATERING</div>
+            <div class="gallery-item">ENTREGA</div>
         </div>
     </section>
 
@@ -911,21 +1134,21 @@
             <h2>Conoce Nuestro Equipo</h2>
             <div class="team-grid">
                 <div class="team-card">
-                    <div class="team-avatar">👨‍🍳</div>
+                    <div class="team-avatar">CC</div>
                     <div class="team-name">Chef Colombiano</div>
                     <div class="team-role">Maestro Empanadas</div>
                     <p style="color: #FFE4CC; font-size: 0.9rem;">Recetas auténticas de la región andina</p>
                 </div>
                 <div class="team-card">
-                    <div class="team-avatar">👩‍💼</div>
+                    <div class="team-avatar">GC</div>
                     <div class="team-name">Gestora de Calidad</div>
                     <div class="team-role">Control QA</div>
                     <p style="color: #FFE4CC; font-size: 0.9rem;">Garantiza el mejor sabor en cada orden</p>
                 </div>
                 <div class="team-card">
-                    <div class="team-avatar">🚴</div>
+                    <div class="team-avatar">RD</div>
                     <div class="team-name">Red de Repartidores</div>
-                    <div class="team-role">Entrega Rápida 🚀</div>
+                    <div class="team-role">Entrega Rápida</div>
                     <p style="color: #FFE4CC; font-size: 0.9rem;">Tus empanadas, calientes a domicilio</p>
                 </div>
             </div>
@@ -949,8 +1172,8 @@
             <h3>Síguenos en Redes</h3>
             <div class="social-links">
                 <a href="#" class="social-link" title="Facebook">f</a>
-                <a href="#" class="social-link" title="Instagram">📷</a>
-                <a href="#" class="social-link" title="TikTok">🎵</a>
+                <a href="#" class="social-link" title="Instagram">IG</a>
+                <a href="#" class="social-link" title="TikTok">TT</a>
                 <a href="#" class="social-link" title="X (Twitter)">𝕏</a>
             </div>
         </div>
@@ -963,21 +1186,21 @@
             
             <div class="contact-content">
                 <div class="contact-info">
-                    <h3>📱 WhatsApp</h3>
-                    <a href="https://wa.me/+52NUMERO">+52 XXX XXX XXXX</a>
+                    <h3>WhatsApp</h3>
+                    <a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer">{{ whatsapp_display }}</a>
                 </div>
                 <div class="contact-info">
-                    <h3>📧 Email</h3>
+                    <h3>Email</h3>
                     <a href="mailto:info@quechimba.com">info@quechimba.com</a>
                 </div>
                 <div class="contact-info">
-                    <h3>📍 Ubicación</h3>
+                    <h3>Ubicación</h3>
                     <p>Ciudad Juárez, Chihuahua, México</p>
                 </div>
             </div>
 
             <div class="form-section">
-                <h3>📋 Cotización para Eventos</h3>
+                <h3>Cotización para Eventos</h3>
                 <form id="quotation-form">
                     <div class="form-group">
                         <label for="name">Nombre Completo *</label>
@@ -1013,8 +1236,7 @@
     <!-- ========== FOOTER ========== -->
     <footer>
         <p>© 2026 Que Chimba Empanadas. Todos los derechos reservados.</p>
-        <p>Hecho con ❤️ en Ciudad Juárez, Chihuahua 🇲🇽</p>
-        <div class="footer-emoji">🫔 😋 🇨🇴 ✨</div>
+        <p>Hecho con dedicación en Ciudad Juárez, Chihuahua, México.</p>
         <p style="font-size: 0.9rem; margin-top: 1rem;"><em>"Ay qué chimba" - Made with love for Colombia and México</em></p>
     </footer>
 
@@ -1022,7 +1244,7 @@
         // ========== QR CODE GENERATION ==========
         document.addEventListener('DOMContentLoaded', function() {
             // Generate QR Code
-            const whatsappUrl = "https://wa.me/+52NUMERO?text=Hola%20Que%20Chimba%2C%20quiero%20pedir%20unas%20empanadas";
+            const whatsappUrl = "{{ whatsapp_url }}";
             new QRCode(document.getElementById('qrcode'), {
                 text: whatsappUrl,
                 width: 200,
@@ -1059,9 +1281,9 @@
                 })
                 .catch(error => {
                     console.error('Error cargando estadísticas:', error);
-                    document.getElementById('stat-empanadas').textContent = '∞';
-                    document.getElementById('stat-clientes').textContent = '∞';
-                    document.getElementById('stat-eventos').textContent = '∞';
+                    document.getElementById('stat-empanadas').textContent = 'N/D';
+                    document.getElementById('stat-clientes').textContent = 'N/D';
+                    document.getElementById('stat-eventos').textContent = 'N/D';
                 });
         }
 
@@ -1074,11 +1296,11 @@
                     grid.innerHTML = '';
                     
                     data.forEach(product => {
-                        const emoji = product.tipo === 'carne' ? '🥩' : '🍗';
+                        const tipoTag = product.tipo === 'carne' ? 'CARNE' : 'POLLO';
                         const card = document.createElement('div');
                         card.className = 'product-card';
                         card.innerHTML = `
-                            <div class="product-image">${emoji}</div>
+                            <div class="product-image">${tipoTag}</div>
                             <div class="product-info">
                                 <div class="product-name">Empanada de ${product.tipo.toUpperCase()}</div>
                                 <div class="product-description">${product.descripcion || 'Relleno sabroso y delicioso'}</div>
@@ -1093,7 +1315,7 @@
                     const grid = document.getElementById('products-grid');
                     grid.innerHTML = `
                         <div class="product-card">
-                            <div class="product-image">🥩</div>
+                            <div class="product-image">CARNE</div>
                             <div class="product-info">
                                 <div class="product-name">Empanada de CARNE</div>
                                 <div class="product-description">Relleno de carne molida con especias colombianas</div>
@@ -1101,7 +1323,7 @@
                             </div>
                         </div>
                         <div class="product-card">
-                            <div class="product-image">🍗</div>
+                            <div class="product-image">POLLO</div>
                             <div class="product-info">
                                 <div class="product-name">Empanada de POLLO</div>
                                 <div class="product-description">Relleno de pollo desmenuzado y cremoso</div>
@@ -1126,11 +1348,11 @@
                     }
                     
                     data.forEach(review => {
-                        const stars = '⭐'.repeat(review.calificacion);
+                        const rating = `${Number(review.calificacion || 0)}/5`;
                         const card = document.createElement('div');
                         card.className = 'review-card';
                         card.innerHTML = `
-                            <div class="review-stars">${stars}</div>
+                            <div class="review-stars">Calificación: ${rating}</div>
                             <div class="review-text">"${review.comentario}"</div>
                             <div class="review-author">- ${review.nombre_cliente}</div>
                         `;
@@ -1142,12 +1364,12 @@
                     const grid = document.getElementById('reviews-grid');
                     grid.innerHTML = `
                         <div class="review-card">
-                            <div class="review-stars">⭐⭐⭐⭐⭐</div>
+                            <div class="review-stars">Calificación: 5/5</div>
                             <div class="review-text">"¡Ay qué chimba! Las empanadas más sabrosas que he probado."</div>
                             <div class="review-author">- Cliente Feliz</div>
                         </div>
                         <div class="review-card">
-                            <div class="review-stars">⭐⭐⭐⭐⭐</div>
+                            <div class="review-stars">Calificación: 5/5</div>
                             <div class="review-text">"Entrega rápida y calidad garantizada. Muy recomendado."</div>
                             <div class="review-author">- Cliente Satisfecho</div>
                         </div>
@@ -1188,15 +1410,15 @@
                     
                     if (response.ok) {
                         messageDiv.className = 'form-message success';
-                        messageDiv.textContent = '✅ ¡Cotización enviada! Te contactaremos pronto.';
+                        messageDiv.textContent = 'Cotización enviada. Te contactaremos pronto.';
                         form.reset();
                     } else {
                         messageDiv.className = 'form-message error';
-                        messageDiv.textContent = '❌ Error al enviar. Intenta de nuevo.';
+                        messageDiv.textContent = 'Error al enviar. Intenta de nuevo.';
                     }
                 } catch (error) {
                     messageDiv.className = 'form-message error';
-                    messageDiv.textContent = '❌ Error de conexión. Intenta de nuevo.';
+                    messageDiv.textContent = 'Error de conexión. Intenta de nuevo.';
                     console.error('Error:', error);
                 } finally {
                     submitBtn.disabled = false;

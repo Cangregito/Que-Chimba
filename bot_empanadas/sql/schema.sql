@@ -140,6 +140,110 @@ CREATE TABLE IF NOT EXISTS empleados (
     activo      BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+-- Usuarios del sistema (login web por roles)
+CREATE TABLE IF NOT EXISTS usuarios_sistema (
+    usuario_id         BIGSERIAL PRIMARY KEY,
+    username           VARCHAR(80) NOT NULL UNIQUE,
+    password_hash      VARCHAR(255) NOT NULL,
+    rol                VARCHAR(30) NOT NULL,
+    nombre_mostrar     VARCHAR(120) NOT NULL,
+    telefono           VARCHAR(30),
+    activo             BOOLEAN NOT NULL DEFAULT TRUE,
+    intentos_fallidos  SMALLINT NOT NULL DEFAULT 0,
+    bloqueado_hasta    TIMESTAMP,
+    ultimo_login       TIMESTAMP,
+    creado_en          TIMESTAMP NOT NULL DEFAULT NOW(),
+    actualizado_en     TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_usuarios_sistema_rol CHECK (rol IN ('admin', 'cocina', 'repartidor')),
+    CONSTRAINT chk_usuarios_sistema_hash_len CHECK (char_length(password_hash) >= 20)
+);
+CREATE INDEX IF NOT EXISTS idx_usuarios_sistema_rol_activo
+    ON usuarios_sistema (rol, activo);
+
+-- Auditoria de seguridad (accesos y cambios administrativos)
+CREATE TABLE IF NOT EXISTS auditoria_seguridad (
+    auditoria_id        BIGSERIAL PRIMARY KEY,
+    tipo_evento         VARCHAR(50) NOT NULL,
+    severidad           VARCHAR(15) NOT NULL DEFAULT 'info',
+    actor_usuario_id    BIGINT,
+    actor_username      VARCHAR(80),
+    actor_rol           VARCHAR(30),
+    objetivo_usuario_id BIGINT,
+    objetivo_username   VARCHAR(80),
+    direccion_ip        VARCHAR(64),
+    detalle             JSONB NOT NULL DEFAULT '{}'::jsonb,
+    creado_en           TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_auditoria_seguridad_severidad CHECK (severidad IN ('info', 'warning', 'critical'))
+);
+CREATE INDEX IF NOT EXISTS idx_auditoria_seguridad_creado_en
+    ON auditoria_seguridad (creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_auditoria_seguridad_tipo_evento
+    ON auditoria_seguridad (tipo_evento, creado_en DESC);
+
+-- Auditoria de negocio (operaciones criticas sobre pedidos, pagos e inventario)
+CREATE TABLE IF NOT EXISTS auditoria_negocio (
+    auditoria_negocio_id BIGSERIAL PRIMARY KEY,
+    tabla_objetivo       VARCHAR(60) NOT NULL,
+    operacion            VARCHAR(10) NOT NULL,
+    registro_id          VARCHAR(120),
+    actor_username       VARCHAR(80),
+    actor_rol            VARCHAR(30),
+    detalle              JSONB NOT NULL DEFAULT '{}'::jsonb,
+    creado_en            TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_auditoria_negocio_operacion CHECK (operacion IN ('INSERT', 'UPDATE', 'DELETE'))
+);
+CREATE INDEX IF NOT EXISTS idx_auditoria_negocio_fecha
+    ON auditoria_negocio (creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_auditoria_negocio_tabla
+    ON auditoria_negocio (tabla_objetivo, creado_en DESC);
+
+CREATE OR REPLACE FUNCTION fn_auditoria_negocio_generic()
+RETURNS TRIGGER AS $$
+DECLARE
+    actor_name TEXT := NULLIF(current_setting('app.current_user', true), '');
+    actor_role TEXT := NULLIF(current_setting('app.current_role', true), '');
+    source_row JSONB;
+    row_id TEXT;
+    payload JSONB;
+BEGIN
+    source_row := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+    row_id := COALESCE(
+        source_row->>'pedido_id',
+        source_row->>'pago_id',
+        source_row->>'compra_id',
+        source_row->>'insumo_id',
+        source_row->>'detalle_id',
+        'N/A'
+    );
+
+    IF TG_OP = 'INSERT' THEN
+        payload := jsonb_build_object('new', to_jsonb(NEW));
+    ELSIF TG_OP = 'UPDATE' THEN
+        payload := jsonb_build_object('old', to_jsonb(OLD), 'new', to_jsonb(NEW));
+    ELSE
+        payload := jsonb_build_object('old', to_jsonb(OLD));
+    END IF;
+
+    INSERT INTO auditoria_negocio (tabla_objetivo, operacion, registro_id, actor_username, actor_rol, detalle)
+    VALUES (TG_TABLE_NAME, TG_OP, row_id, actor_name, actor_role, payload);
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_auditoria_negocio_pedidos ON pedidos;
+CREATE TRIGGER trg_auditoria_negocio_pedidos
+AFTER INSERT OR UPDATE OR DELETE ON pedidos
+FOR EACH ROW EXECUTE FUNCTION fn_auditoria_negocio_generic();
+
+DROP TRIGGER IF EXISTS trg_auditoria_negocio_pagos ON pagos;
+CREATE TRIGGER trg_auditoria_negocio_pagos
+AFTER INSERT OR UPDATE OR DELETE ON pagos
+FOR EACH ROW EXECUTE FUNCTION fn_auditoria_negocio_generic();
+
 -- Log de notificaciones enviadas por n8n
 CREATE TABLE IF NOT EXISTS log_notificaciones (
     log_id     BIGSERIAL PRIMARY KEY,
@@ -154,6 +258,61 @@ CREATE TABLE IF NOT EXISTS log_notificaciones (
 );
 CREATE INDEX IF NOT EXISTS idx_log_notificaciones_pedido_id ON log_notificaciones (pedido_id);
 
+-- Compras de inventario
+CREATE TABLE IF NOT EXISTS compras_insumos (
+    compra_id    BIGSERIAL PRIMARY KEY,
+    insumo_id    BIGINT NOT NULL REFERENCES insumos(insumo_id),
+    cantidad     NUMERIC(12,3) NOT NULL,
+    costo_total  NUMERIC(10,2),
+    proveedor    VARCHAR(120),
+    creado_por   VARCHAR(80),
+    creado_en    TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_compras_insumos_insumo_id ON compras_insumos (insumo_id);
+
+-- Recetas por producto (consumo de insumos por unidad vendida)
+CREATE TABLE IF NOT EXISTS recetas_producto_insumo (
+    receta_id             BIGSERIAL PRIMARY KEY,
+    producto_id           BIGINT NOT NULL REFERENCES productos(producto_id),
+    insumo_id             BIGINT NOT NULL REFERENCES insumos(insumo_id),
+    cantidad_por_unidad   NUMERIC(12,3) NOT NULL,
+    activo                BOOLEAN NOT NULL DEFAULT TRUE,
+    creado_en             TIMESTAMP NOT NULL DEFAULT NOW(),
+    actualizado_en        TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_recetas_cantidad_pos CHECK (cantidad_por_unidad > 0)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_recetas_producto_insumo_activo
+    ON recetas_producto_insumo (producto_id, insumo_id);
+
+-- Movimientos de inventario (kardex)
+CREATE TABLE IF NOT EXISTS movimientos_inventario (
+    movimiento_id        BIGSERIAL PRIMARY KEY,
+    insumo_id            BIGINT NOT NULL REFERENCES insumos(insumo_id),
+    tipo                 VARCHAR(30) NOT NULL,
+    cantidad_movimiento  NUMERIC(12,3) NOT NULL,
+    stock_antes          NUMERIC(12,3) NOT NULL,
+    stock_despues        NUMERIC(12,3) NOT NULL,
+    referencia_tipo      VARCHAR(30),
+    referencia_id        BIGINT,
+    detalle              JSONB NOT NULL DEFAULT '{}'::jsonb,
+    actor_username       VARCHAR(80),
+    actor_rol            VARCHAR(30),
+    creado_en            TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_movimientos_tipo CHECK (tipo IN ('compra', 'consumo_pedido', 'ajuste_entrada', 'ajuste_salida'))
+);
+CREATE INDEX IF NOT EXISTS idx_movimientos_inventario_insumo
+    ON movimientos_inventario (insumo_id, creado_en DESC);
+
+DROP TRIGGER IF EXISTS trg_auditoria_negocio_insumos ON insumos;
+CREATE TRIGGER trg_auditoria_negocio_insumos
+AFTER INSERT OR UPDATE OR DELETE ON insumos
+FOR EACH ROW EXECUTE FUNCTION fn_auditoria_negocio_generic();
+
+DROP TRIGGER IF EXISTS trg_auditoria_negocio_compras_insumos ON compras_insumos;
+CREATE TRIGGER trg_auditoria_negocio_compras_insumos
+AFTER INSERT OR UPDATE OR DELETE ON compras_insumos
+FOR EACH ROW EXECUTE FUNCTION fn_auditoria_negocio_generic();
+
 -- ================================================================
 -- Seeds mínimos para poder crear un pedido de prueba
 -- ================================================================
@@ -165,6 +324,38 @@ VALUES
     ('Combo x6 Carne',     'Familiar', 85.00, TRUE),
     ('Empanada Especial',  'Grande',  25.00, TRUE)
 ON CONFLICT DO NOTHING;
+
+INSERT INTO insumos (nombre, unidad_medida, stock_actual, stock_minimo)
+VALUES
+    ('Masa de maiz', 'kg', 30.000, 8.000),
+    ('Carne molida', 'kg', 18.000, 6.000),
+    ('Pollo deshebrado', 'kg', 14.000, 5.000),
+    ('Queso', 'kg', 12.000, 4.000),
+    ('Aceite', 'lt', 25.000, 6.000)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO recetas_producto_insumo (producto_id, insumo_id, cantidad_por_unidad, activo)
+SELECT p.producto_id, i.insumo_id, x.cantidad_por_unidad, TRUE
+FROM (
+    VALUES
+        ('Empanada de Carne', 'Masa de maiz', 0.080::NUMERIC),
+        ('Empanada de Carne', 'Carne molida', 0.070::NUMERIC),
+        ('Empanada de Pollo', 'Masa de maiz', 0.080::NUMERIC),
+        ('Empanada de Pollo', 'Pollo deshebrado', 0.070::NUMERIC),
+        ('Empanada de Queso', 'Masa de maiz', 0.080::NUMERIC),
+        ('Empanada de Queso', 'Queso', 0.060::NUMERIC),
+        ('Empanada Especial', 'Masa de maiz', 0.110::NUMERIC),
+        ('Empanada Especial', 'Queso', 0.050::NUMERIC),
+        ('Combo x6 Carne', 'Masa de maiz', 0.480::NUMERIC),
+        ('Combo x6 Carne', 'Carne molida', 0.420::NUMERIC)
+) AS x(producto_nombre, insumo_nombre, cantidad_por_unidad)
+JOIN productos p ON p.nombre = x.producto_nombre
+JOIN insumos i ON i.nombre = x.insumo_nombre
+ON CONFLICT (producto_id, insumo_id)
+DO UPDATE SET
+    cantidad_por_unidad = EXCLUDED.cantidad_por_unidad,
+    activo = TRUE,
+    actualizado_en = NOW();
 
 INSERT INTO empleados (nombre, apellidos, rol, telefono, activo)
 VALUES

@@ -1,10 +1,11 @@
 param(
     [string]$FlaskBaseUrl = "http://localhost:5000",
     [string]$N8nBaseUrl = "http://localhost:5678",
-    [switch]$UseTestWebhook = $true
+    [Nullable[bool]]$UseTestWebhook
 )
 
 $ErrorActionPreference = "Stop"
+$useTestWebhookEnabled = if ($null -eq $UseTestWebhook) { $true } else { [bool]$UseTestWebhook }
 
 function Write-Step {
     param([string]$Message)
@@ -35,7 +36,7 @@ function Assert-TcpPort {
 
 Write-Step "0) Pre-flight de conectividad local"
 Assert-TcpPort -HostName "localhost" -Port 5000 -ServiceName "Flask"
-if (-not $UseTestWebhook) {
+if (-not $useTestWebhookEnabled) {
     Assert-TcpPort -HostName "localhost" -Port 5678 -ServiceName "n8n"
 }
 
@@ -104,7 +105,7 @@ $total = $pedidoResp.data.total
 Write-Host "Pedido creado correctamente. pedido_id=$pedidoId total=$total" -ForegroundColor Green
 
 Write-Step "5) (Opcional) Disparo manual al webhook de n8n para validar conectividad"
-$webhookPath = if ($UseTestWebhook) { "webhook-test/pedido-alerta" } else { "webhook/pedido-alerta" }
+$webhookPath = if ($useTestWebhookEnabled) { "webhook-test/pedido-alerta" } else { "webhook/pedido-alerta" }
 $n8nWebhookUrl = "$N8nBaseUrl/$webhookPath"
 
 $n8nPayload = @{
@@ -126,5 +127,5 @@ catch {
 }
 
 Write-Step "6) Resultado"
-Write-Host "Si el workflow de n8n esta activo y con credenciales Twilio, ya debio enviarse alerta a cocina y admin (por tipo=evento)." -ForegroundColor Magenta
+Write-Host "Si el workflow de n8n esta activo y BAILEYS_BRIDGE_URL esta correcto, ya debio enviarse alerta a cocina y admin (por tipo=evento)." -ForegroundColor Magenta
 Write-Host "Tambien debes ver registros en la tabla log_notificaciones." -ForegroundColor Magenta

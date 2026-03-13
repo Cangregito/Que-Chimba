@@ -1,19 +1,61 @@
 import json
 import importlib
+import logging
 import os
+import csv
+import io
 from datetime import date, datetime
 from decimal import Decimal
 from functools import wraps
+from urllib.parse import quote
+from xml.sax.saxutils import escape as xml_escape
 
-from flask import Flask, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for
-from twilio.twiml.messaging_response import MessagingResponse
+import requests
+from flask import Flask, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for, make_response
+from jinja2 import BaseLoader, ChoiceLoader, FileSystemLoader
+
+class _FallbackMessage:
+    def __init__(self):
+        self._body = ""
+        self._media = []
+
+    def body(self, text):
+        self._body = str(text)
+
+    def media(self, url):
+        self._media.append(str(url))
+
+    def _to_xml(self):
+        media_xml = "".join(f"<Media>{xml_escape(m)}</Media>" for m in self._media)
+        body_xml = f"<Body>{xml_escape(self._body)}</Body>" if self._body else ""
+        return f"<Message>{body_xml}{media_xml}</Message>"
+
+
+class MessagingResponse:
+    def __init__(self):
+        self._messages = []
+
+    def message(self):
+        msg = _FallbackMessage()
+        self._messages.append(msg)
+        return msg
+
+    def __str__(self):
+        return "<Response>" + "".join(m._to_xml() for m in self._messages) + "</Response>"
 
 import db
 
 try:
     _bot_module = importlib.import_module("bot")
-    procesar_mensaje_whatsapp = _bot_module.procesar_mensaje_whatsapp
 except Exception:
+    try:
+        _bot_module = importlib.import_module("bot_empanadas.bot")
+    except Exception:
+        _bot_module = None
+
+if _bot_module is not None:
+    procesar_mensaje_whatsapp = _bot_module.procesar_mensaje_whatsapp
+else:
     def procesar_mensaje_whatsapp(
         whatsapp_id,
         mensaje,
@@ -34,8 +76,25 @@ app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET", "cambia-esta-clave-en-produ
 app.config["JSON_SORT_KEYS"] = False
 app.config["AUDIO_DIR"] = os.path.join(os.path.dirname(__file__), "audios_temp")
 app.config["PUBLIC_BASE_URL"] = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+app.config["N8N_PEDIDO_WEBHOOK_URL"] = os.getenv("N8N_PEDIDO_WEBHOOK_URL", "").strip()
+
+root_templates_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "templates"))
+if os.path.isdir(root_templates_dir):
+    jinja_loaders: list[BaseLoader] = [FileSystemLoader(root_templates_dir)]
+    if app.jinja_loader is not None:
+        jinja_loaders.insert(0, app.jinja_loader)
+    app.jinja_loader = ChoiceLoader(jinja_loaders)  # type: ignore[assignment]
 
 os.makedirs(app.config["AUDIO_DIR"], exist_ok=True)
+
+_log_level_name = (os.getenv("LOG_LEVEL", "INFO") or "INFO").upper()
+_log_level = getattr(logging, _log_level_name, logging.INFO)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=_log_level,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+app.logger.setLevel(_log_level)
 
 
 ESTADOS_VALIDOS_PEDIDO = {
@@ -45,13 +104,6 @@ ESTADOS_VALIDOS_PEDIDO = {
     "en_camino",
     "entregado",
     "cancelado",
-}
-
-
-USUARIOS_DEMO = {
-    "admin": {"password": "admin123", "rol": "admin"},
-    "cocina": {"password": "cocina123", "rol": "cocina"},
-    "repartidor": {"password": "repartidor123", "rol": "repartidor"},
 }
 
 
@@ -73,6 +125,54 @@ def _ok(data, status=200):
 
 def _error(message, status=400):
     return jsonify({"ok": False, "error": message}), status
+
+
+def _normalizar_whatsapp_id(raw_value):
+    raw = (raw_value or "").strip()
+    if raw.startswith("whatsapp:"):
+        raw = raw.replace("whatsapp:", "", 1)
+    return raw
+
+
+def _client_ip():
+    forwarded = request.headers.get("X-Forwarded-For", "").strip()
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return (request.remote_addr or "").strip() or None
+
+
+def _resumen_items_para_alerta(items):
+    if not isinstance(items, list) or not items:
+        return "sin productos"
+
+    parts = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        producto = item.get("producto") or item.get("nombre") or f"producto_id={item.get('producto_id', '?')}"
+        cantidad = item.get("cantidad", 1)
+        parts.append(f"{producto} x{cantidad}")
+
+    return ", ".join(parts) if parts else "sin productos"
+
+
+def _notificar_n8n_nuevo_pedido(created, payload):
+    webhook_url = app.config.get("N8N_PEDIDO_WEBHOOK_URL", "")
+    if not webhook_url:
+        return
+
+    body = {
+        "id": created.get("pedido_id"),
+        "productos": payload.get("productos") or _resumen_items_para_alerta(payload.get("items", [])),
+        "total": float(created.get("total", 0) or 0),
+        "direccion": payload.get("direccion") or payload.get("direccion_texto") or f"direccion_id={payload.get('direccion_id', 'N/A')}",
+        "tipo": payload.get("tipo", "individual"),
+    }
+
+    try:
+        requests.post(webhook_url, json=body, timeout=5)
+    except Exception as exc:
+        app.logger.warning("No se pudo notificar a n8n para pedido %s: %s", body["id"], exc)
 
 
 def login_required(roles=None):
@@ -101,7 +201,18 @@ def health():
 
 @app.get("/")
 def landing():
-    return render_template("index.html")
+    raw_number = os.getenv("WHATSAPP_PUBLIC_NUMBER", "14155238886")
+    message = os.getenv("WHATSAPP_PUBLIC_MESSAGE", "Hola Que Chimba, quiero pedir unas empanadas")
+
+    wa_number = "".join(ch for ch in str(raw_number) if ch.isdigit())
+    whatsapp_url = f"https://wa.me/{wa_number}?text={quote(message)}"
+    whatsapp_display = f"+{wa_number}" if wa_number else "WhatsApp"
+
+    return render_template(
+        "index.html",
+        whatsapp_url=whatsapp_url,
+        whatsapp_display=whatsapp_display,
+    )
 
 
 @app.get("/login")
@@ -115,16 +226,34 @@ def login_post():
     username = payload.get("username")
     password = payload.get("password")
 
-    user = USUARIOS_DEMO.get(username)
-    if not user or user["password"] != password:
+    if not isinstance(username, str) or not isinstance(password, str):
         return _error("Credenciales invalidas", 401)
 
-    session["user"] = {"username": username, "rol": user["rol"]}
-    return _ok({"username": username, "rol": user["rol"]})
+    user = db.autenticar_usuario(username=username, password=password, direccion_ip=_client_ip())
+    if isinstance(user, dict) and user.get("error"):
+        return _error(user["error"], int(user.get("status", 401)))
+
+    session["user"] = {
+        "usuario_id": user.get("usuario_id"),
+        "username": user.get("username"),
+        "rol": user.get("rol"),
+        "nombre_mostrar": user.get("nombre_mostrar"),
+    }
+    return _ok(session["user"])
 
 
 @app.post("/logout")
 def logout():
+    actor = session.get("user", {})
+    if actor:
+        db.registrar_evento_seguridad(
+            tipo_evento="logout_success",
+            severidad="info",
+            actor_usuario_id=actor.get("usuario_id"),
+            actor_username=actor.get("username"),
+            actor_rol=actor.get("rol"),
+            direccion_ip=_client_ip(),
+        )
     session.clear()
     return _ok({"message": "Sesion cerrada"})
 
@@ -154,7 +283,9 @@ def servir_audio(filename):
 
 @app.get("/api/productos")
 def api_productos():
-    data = db.obtener_productos()
+    solo_pedibles_raw = (request.args.get("solo_pedibles") or "1").strip().lower()
+    solo_pedibles = solo_pedibles_raw not in {"0", "false", "no", "off"}
+    data = db.obtener_productos(solo_pedibles=solo_pedibles)
     if isinstance(data, dict) and data.get("error"):
         return _error(data["error"], 500)
     return _ok(data)
@@ -162,7 +293,11 @@ def api_productos():
 
 @app.get("/api/pedidos")
 def api_pedidos():
-    estado = request.args.get("estado")
+    estado_raw = request.args.get("estado")
+    estado = None
+    if estado_raw:
+        estados = [part.strip() for part in estado_raw.split(",") if part.strip()]
+        estado = estados if len(estados) > 1 else estados[0]
     fecha = request.args.get("fecha")
 
     data = db.obtener_pedidos(estado=estado, fecha=fecha)
@@ -174,6 +309,7 @@ def api_pedidos():
 @app.post("/api/pedidos")
 def api_crear_pedido():
     payload = request.get_json(silent=True) or {}
+    actor = session.get("user", {})
 
     cliente_id = payload.get("cliente_id")
     whatsapp_id = payload.get("whatsapp_id")
@@ -189,9 +325,34 @@ def api_crear_pedido():
             return _error(cliente["error"], 500)
         cliente_id = cliente["cliente_id"]
 
-    created = db.crear_pedido(cliente_id, items, direccion_id, metodo_pago)
+    created = db.crear_pedido(
+        cliente_id,
+        items,
+        direccion_id,
+        metodo_pago,
+        actor_usuario=actor.get("username") or whatsapp_id or "bot_whatsapp",
+        actor_rol=actor.get("rol") or "cliente",
+    )
     if isinstance(created, dict) and created.get("error"):
         return _error(created["error"], 500)
+
+    _notificar_n8n_nuevo_pedido(created, payload)
+    return _ok(created, 201)
+
+
+@app.post("/api/logs")
+def api_crear_log_notificacion():
+    payload = request.get_json(silent=True) or {}
+
+    required = ["pedido_id", "canal", "destino", "tipo", "mensaje"]
+    faltantes = [field for field in required if payload.get(field) in (None, "")]
+    if faltantes:
+        return _error(f"Campos obligatorios faltantes: {', '.join(faltantes)}", 400)
+
+    created = db.crear_log_notificacion(payload)
+    if isinstance(created, dict) and created.get("error"):
+        return _error(created["error"], 500)
+
     return _ok(created, 201)
 
 
@@ -199,15 +360,146 @@ def api_crear_pedido():
 def api_actualizar_estado_pedido(pedido_id):
     payload = request.get_json(silent=True) or {}
     nuevo_estado = payload.get("estado")
+    motivo = payload.get("motivo")
 
     if nuevo_estado not in ESTADOS_VALIDOS_PEDIDO:
         return _error("Estado no valido", 400)
 
-    updated = db.actualizar_estado_pedido(pedido_id, nuevo_estado)
+    actor = session.get("user", {})
+    updated = db.actualizar_estado_pedido(
+        pedido_id,
+        nuevo_estado,
+        actor_usuario=actor.get("username", "sistema"),
+        rol_actor=actor.get("rol", "sistema"),
+        motivo=motivo,
+    )
     if isinstance(updated, dict) and updated.get("error"):
-        status = 404 if "no encontrado" in updated["error"].lower() else 500
+        msg = updated["error"].lower()
+        if "no encontrado" in msg:
+            status = 404
+        elif "transicion no permitida" in msg or "estado no valido" in msg:
+            status = 400
+        else:
+            status = 500
         return _error(updated["error"], status)
     return _ok(updated)
+
+
+@app.get("/api/repartidor/pedidos")
+@login_required(roles=["admin", "repartidor"])
+def api_repartidor_pedidos():
+    user = session.get("user", {})
+    repartidor_usuario = None if user.get("rol") == "admin" else user.get("username")
+
+    data = db.obtener_pedidos_repartidor(repartidor_usuario=repartidor_usuario)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+
+    pedidos = []
+    rows = data if isinstance(data, list) else []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        productos = []
+        for item in row.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            nombre = item.get("producto") or item.get("nombre") or "Producto"
+            variante = item.get("variante") or ""
+            cantidad = item.get("cantidad") or 1
+            label = f"{cantidad} x {nombre} {variante}".strip()
+            productos.append(label)
+
+        pedidos.append(
+            {
+                "pedido_id": row.get("pedido_id"),
+                "estado": row.get("estado"),
+                "cliente_nombre": " ".join(
+                    [part for part in [row.get("nombre"), row.get("apellidos")] if part]
+                ).strip()
+                or "Cliente",
+                "direccion_entrega": row.get("direccion_entrega") or "Sin direccion",
+                "codigo_postal": row.get("codigo_postal") or "00000",
+                "productos": productos,
+            }
+        )
+
+    return _ok(pedidos)
+
+
+@app.post("/api/pedidos/<int:pedido_id>/confirmar")
+@login_required(roles=["admin", "repartidor"])
+def api_confirmar_entrega_pedido(pedido_id):
+    payload = request.get_json(silent=True) or {}
+    codigo_entrega = payload.get("codigo_entrega")
+
+    updated = db.confirmar_entrega_pedido(pedido_id=pedido_id, codigo_entrega=codigo_entrega)
+    if isinstance(updated, dict) and updated.get("error"):
+        msg = updated["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(updated["error"], status)
+    return _ok(updated)
+
+
+@app.post("/api/repartidor/asignaciones")
+@login_required(roles=["admin"])
+def api_asignar_pedido_repartidor():
+    payload = request.get_json(silent=True) or {}
+    pedido_id = payload.get("pedido_id")
+    repartidor_usuario = payload.get("repartidor_usuario")
+
+    if not pedido_id or not repartidor_usuario:
+        return _error("pedido_id y repartidor_usuario son obligatorios", 400)
+
+    created = db.asignar_pedido_repartidor(
+        pedido_id=pedido_id,
+        repartidor_usuario=repartidor_usuario,
+        asignado_por=session.get("user", {}).get("username", "admin"),
+    )
+    if isinstance(created, dict) and created.get("error"):
+        msg = created["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(created["error"], status)
+    return _ok(created, 201)
+
+
+@app.get("/api/pedidos/<int:pedido_id>/bitacora")
+@login_required(roles=["admin", "cocina", "repartidor"])
+def api_bitacora_pedido(pedido_id):
+    limit = request.args.get("limit", "50")
+    try:
+        limit_int = max(1, min(200, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_bitacora_pedido(pedido_id=pedido_id, limit=limit_int)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.post("/api/pedidos/<int:pedido_id>/reenviar-codigo")
+@login_required(roles=["admin", "repartidor"])
+def api_reenviar_codigo_pedido(pedido_id):
+    # En entorno demo local sin proveedor transaccional, registramos intento exitoso.
+    return _ok({"pedido_id": pedido_id, "message": "Codigo reenviado al cliente (demo)."})
+
+
+@app.post("/api/evaluaciones/programar")
+@login_required(roles=["admin", "repartidor"])
+def api_programar_evaluacion_entrega():
+    payload = request.get_json(silent=True) or {}
+    pedido_id = payload.get("pedido_id")
+    retraso_minutos = payload.get("retraso_minutos", 15)
+    if not pedido_id:
+        return _error("pedido_id es obligatorio", 400)
+    return _ok(
+        {
+            "pedido_id": pedido_id,
+            "retraso_minutos": retraso_minutos,
+            "message": "Evaluacion programada (demo).",
+        }
+    )
 
 
 @app.get("/api/clientes/top20")
@@ -250,6 +542,443 @@ def api_alertas_inventario():
     return _ok(data)
 
 
+@app.get("/api/inventario")
+@login_required(roles=["admin"])
+def api_inventario():
+    data = db.obtener_inventario()
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.post("/api/inventario/compras")
+@login_required(roles=["admin"])
+def api_inventario_compras():
+    payload = request.get_json(silent=True) or {}
+
+    insumo = payload.get("insumo")
+    cantidad = payload.get("cantidad")
+    proveedor = payload.get("proveedor")
+    costo_total = payload.get("costo_total")
+
+    created = db.registrar_compra_insumo(
+        insumo=insumo,
+        cantidad=cantidad,
+        proveedor=proveedor,
+        costo_total=costo_total,
+        creado_por=session.get("user", {}).get("username"),
+        actor_rol=session.get("user", {}).get("rol", "admin"),
+    )
+    if isinstance(created, dict) and created.get("error"):
+        return _error(created["error"], 400)
+    return _ok(created, 201)
+
+
+@app.get("/api/inventario/compras")
+@login_required(roles=["admin"])
+def api_historial_compras_inventario():
+    limit = request.args.get("limit", "30")
+    try:
+        limit_int = max(1, min(200, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_compras_insumos(limit=limit_int)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/admin/resumen-db")
+@login_required(roles=["admin"])
+def api_admin_resumen_db():
+    data = db.obtener_resumen_db()
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/admin/rentabilidad-productos")
+@login_required(roles=["admin"])
+def api_admin_rentabilidad_productos():
+    limit = request.args.get("limit", "20")
+    try:
+        limit_int = max(1, min(200, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_rentabilidad_productos(limit=limit_int)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.post("/api/admin/productos")
+@login_required(roles=["admin"])
+def api_admin_productos_crear_actualizar():
+    payload = request.get_json(silent=True) or {}
+    created = db.crear_producto_manual(
+        nombre=payload.get("nombre"),
+        variante=payload.get("variante"),
+        precio=payload.get("precio"),
+        activo=payload.get("activo", True),
+    )
+    if isinstance(created, dict) and created.get("error"):
+        return _error(created["error"], 400)
+    return _ok(created, 201)
+
+
+@app.post("/api/admin/insumos")
+@login_required(roles=["admin"])
+def api_admin_insumos_crear_actualizar():
+    payload = request.get_json(silent=True) or {}
+    actor = session.get("user", {})
+    created = db.crear_insumo_manual(
+        nombre=payload.get("nombre"),
+        unidad_medida=payload.get("unidad_medida"),
+        stock_minimo=payload.get("stock_minimo", 0),
+        stock_inicial=payload.get("stock_inicial", 0),
+        proveedor=payload.get("proveedor"),
+        actor_username=actor.get("username"),
+        actor_rol=actor.get("rol", "admin"),
+    )
+    if isinstance(created, dict) and created.get("error"):
+        return _error(created["error"], 400)
+    return _ok(created, 201)
+
+
+@app.post("/api/admin/recetas-producto")
+@login_required(roles=["admin"])
+def api_admin_recetas_producto_guardar_componente():
+    payload = request.get_json(silent=True) or {}
+    saved = db.guardar_componente_receta(
+        producto_id=payload.get("producto_id"),
+        insumo_id=payload.get("insumo_id"),
+        cantidad_por_unidad=payload.get("cantidad_por_unidad"),
+        activo=payload.get("activo", True),
+    )
+    if isinstance(saved, dict) and saved.get("error"):
+        return _error(saved["error"], 400)
+    return _ok(saved, 201)
+
+
+@app.get("/api/admin/recetas-producto")
+@login_required(roles=["admin"])
+def api_admin_recetas_producto_listar():
+    producto_id = request.args.get("producto_id")
+    pid = None
+    if producto_id not in (None, ""):
+        try:
+            pid = int(producto_id)
+        except ValueError:
+            return _error("Parametro producto_id invalido", 400)
+
+    data = db.obtener_recetas_producto(producto_id=pid)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.patch("/api/admin/recetas-producto/<int:receta_id>")
+@login_required(roles=["admin"])
+def api_admin_recetas_producto_actualizar(receta_id):
+    payload = request.get_json(silent=True) or {}
+    updated = db.actualizar_componente_receta(
+        receta_id=receta_id,
+        activo=payload.get("activo") if "activo" in payload else None,
+        cantidad_por_unidad=payload.get("cantidad_por_unidad") if "cantidad_por_unidad" in payload else None,
+    )
+    if isinstance(updated, dict) and updated.get("error"):
+        msg = updated["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(updated["error"], status)
+    return _ok(updated)
+
+
+@app.get("/api/admin/inventario/movimientos")
+@login_required(roles=["admin"])
+def api_admin_inventario_movimientos():
+    limit = request.args.get("limit", "50")
+    insumo_id = request.args.get("insumo_id")
+    tipo = (request.args.get("tipo") or "").strip() or None
+
+    try:
+        limit_int = max(1, min(500, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    iid = None
+    if insumo_id not in (None, ""):
+        try:
+            iid = int(insumo_id)
+        except ValueError:
+            return _error("Parametro insumo_id invalido", 400)
+
+    data = db.obtener_movimientos_inventario(limit=limit_int, insumo_id=iid, tipo=tipo)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/admin/productos-sin-receta")
+@login_required(roles=["admin"])
+def api_admin_productos_sin_receta():
+    data = db.obtener_productos_sin_receta()
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/admin/usuarios")
+@login_required(roles=["admin"])
+def api_admin_usuarios_listar():
+    data = db.obtener_usuarios_sistema()
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.post("/api/admin/usuarios")
+@login_required(roles=["admin"])
+def api_admin_usuarios_crear():
+    payload = request.get_json(silent=True) or {}
+    actor = session.get("user", {})
+    username = payload.get("username")
+    password = payload.get("password")
+    rol = payload.get("rol")
+    nombre_mostrar = payload.get("nombre_mostrar") or payload.get("nombre")
+    telefono = payload.get("telefono")
+
+    created = db.crear_usuario_sistema(
+        username=username,
+        password=password,
+        rol=rol,
+        nombre_mostrar=nombre_mostrar,
+        telefono=telefono,
+        actor_usuario_id=actor.get("usuario_id"),
+        actor_username=actor.get("username"),
+        actor_rol=actor.get("rol"),
+        direccion_ip=_client_ip(),
+    )
+    if isinstance(created, dict) and created.get("error"):
+        return _error(created["error"], 400)
+    return _ok(created, 201)
+
+
+@app.patch("/api/admin/usuarios/<int:usuario_id>")
+@login_required(roles=["admin"])
+def api_admin_usuarios_actualizar(usuario_id):
+    payload = request.get_json(silent=True) or {}
+    actor = session.get("user", {})
+    updated = db.actualizar_usuario_sistema(
+        usuario_id=usuario_id,
+        rol=payload.get("rol"),
+        nombre_mostrar=payload.get("nombre_mostrar"),
+        telefono=payload.get("telefono"),
+        activo=payload.get("activo") if "activo" in payload else None,
+        nueva_password=payload.get("nueva_password"),
+        actor_usuario_id=actor.get("usuario_id"),
+        actor_username=actor.get("username"),
+        actor_rol=actor.get("rol"),
+        direccion_ip=_client_ip(),
+    )
+    if isinstance(updated, dict) and updated.get("error"):
+        msg = updated["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(updated["error"], status)
+    return _ok(updated)
+
+
+@app.get("/api/admin/auditoria-seguridad")
+@login_required(roles=["admin"])
+def api_admin_auditoria_seguridad():
+    limit = request.args.get("limit", "40")
+    tipo_evento = (request.args.get("tipo_evento") or "").strip() or None
+    severidad = (request.args.get("severidad") or "").strip().lower() or None
+    actor = (request.args.get("actor") or "").strip() or None
+    fecha_desde = (request.args.get("fecha_desde") or "").strip() or None
+    fecha_hasta = (request.args.get("fecha_hasta") or "").strip() or None
+
+    severidades_validas = {"info", "warning", "critical"}
+    if severidad and severidad not in severidades_validas:
+        return _error("Parametro severidad invalido", 400)
+
+    try:
+        limit_int = max(1, min(200, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_auditoria_seguridad(
+        limit=limit_int,
+        tipo_evento=tipo_evento,
+        severidad=severidad,
+        actor_username=actor,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+    )
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/admin/auditoria-seguridad.csv")
+@login_required(roles=["admin"])
+def api_admin_auditoria_seguridad_csv():
+    tipo_evento = (request.args.get("tipo_evento") or "").strip() or None
+    severidad = (request.args.get("severidad") or "").strip().lower() or None
+    actor = (request.args.get("actor") or "").strip() or None
+    fecha_desde = (request.args.get("fecha_desde") or "").strip() or None
+    fecha_hasta = (request.args.get("fecha_hasta") or "").strip() or None
+    limit = request.args.get("limit", "1000")
+
+    severidades_validas = {"info", "warning", "critical"}
+    if severidad and severidad not in severidades_validas:
+        return _error("Parametro severidad invalido", 400)
+
+    try:
+        limit_int = max(1, min(5000, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_auditoria_seguridad(
+        limit=limit_int,
+        tipo_evento=tipo_evento,
+        severidad=severidad,
+        actor_username=actor,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+    )
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow([
+        "auditoria_id",
+        "fecha",
+        "tipo_evento",
+        "severidad",
+        "actor_usuario_id",
+        "actor_username",
+        "actor_rol",
+        "objetivo_usuario_id",
+        "objetivo_username",
+        "direccion_ip",
+        "detalle",
+    ])
+
+    for row in data:
+        writer.writerow([
+            row.get("auditoria_id"),
+            row.get("creado_en"),
+            row.get("tipo_evento"),
+            row.get("severidad"),
+            row.get("actor_usuario_id"),
+            row.get("actor_username"),
+            row.get("actor_rol"),
+            row.get("objetivo_usuario_id"),
+            row.get("objetivo_username"),
+            row.get("direccion_ip"),
+            json.dumps(row.get("detalle") or {}, ensure_ascii=False),
+        ])
+
+    filename = f"auditoria_seguridad_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    response = make_response(buffer.getvalue())
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@app.get("/api/admin/auditoria-negocio")
+@login_required(roles=["admin"])
+def api_admin_auditoria_negocio():
+    limit = request.args.get("limit", "40")
+    tabla = (request.args.get("tabla") or "").strip().lower() or None
+    actor = (request.args.get("actor") or "").strip() or None
+    fecha_desde = (request.args.get("fecha_desde") or "").strip() or None
+    fecha_hasta = (request.args.get("fecha_hasta") or "").strip() or None
+
+    tablas_validas = {"pedidos", "pagos", "insumos", "compras_insumos"}
+    if tabla and tabla not in tablas_validas:
+        return _error("Parametro tabla invalido", 400)
+
+    try:
+        limit_int = max(1, min(200, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_auditoria_negocio(
+        limit=limit_int,
+        tabla_objetivo=tabla,
+        actor_username=actor,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+    )
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/admin/auditoria-negocio.csv")
+@login_required(roles=["admin"])
+def api_admin_auditoria_negocio_csv():
+    tabla = (request.args.get("tabla") or "").strip().lower() or None
+    actor = (request.args.get("actor") or "").strip() or None
+    fecha_desde = (request.args.get("fecha_desde") or "").strip() or None
+    fecha_hasta = (request.args.get("fecha_hasta") or "").strip() or None
+    limit = request.args.get("limit", "1000")
+
+    tablas_validas = {"pedidos", "pagos", "insumos", "compras_insumos"}
+    if tabla and tabla not in tablas_validas:
+        return _error("Parametro tabla invalido", 400)
+
+    try:
+        limit_int = max(1, min(5000, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_auditoria_negocio(
+        limit=limit_int,
+        tabla_objetivo=tabla,
+        actor_username=actor,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+    )
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow([
+        "auditoria_negocio_id",
+        "fecha",
+        "tabla_objetivo",
+        "operacion",
+        "registro_id",
+        "actor_username",
+        "actor_rol",
+        "detalle",
+    ])
+
+    for row in data:
+        writer.writerow([
+            row.get("auditoria_negocio_id"),
+            row.get("creado_en"),
+            row.get("tabla_objetivo"),
+            row.get("operacion"),
+            row.get("registro_id"),
+            row.get("actor_username"),
+            row.get("actor_rol"),
+            json.dumps(row.get("detalle") or {}, ensure_ascii=False),
+        ])
+
+    filename = f"auditoria_negocio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    response = make_response(buffer.getvalue())
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
 @app.post("/api/campanias")
 @login_required(roles=["admin"])
 def api_campanias():
@@ -283,20 +1012,14 @@ def api_empleados():
 
 @app.post("/webhook")
 def webhook_whatsapp():
-    whatsapp_id = request.values.get("From", "")
-    mensaje = request.values.get("Body", "")
-    media_url = request.values.get("MediaUrl0")
-    media_type = request.values.get("MediaContentType0")
-    latitude = request.values.get("Latitude")
-    longitude = request.values.get("Longitude")
-
+    whatsapp_id = _normalizar_whatsapp_id(request.values.get("From", ""))
     result = procesar_mensaje_whatsapp(
         whatsapp_id=whatsapp_id,
-        mensaje=mensaje,
-        media_url=media_url,
-        media_type=media_type,
-        latitude=latitude,
-        longitude=longitude,
+        mensaje=request.values.get("Body", ""),
+        media_url=request.values.get("MediaUrl0"),
+        media_type=request.values.get("MediaContentType0"),
+        latitude=request.values.get("Latitude"),
+        longitude=request.values.get("Longitude"),
     )
     if not isinstance(result, dict):
         result = {"tipo": "texto", "contenido": str(result)}
@@ -314,7 +1037,59 @@ def webhook_whatsapp():
     else:
         msg.body(result.get("contenido", "Listo parce, mensaje recibido."))
 
-    return str(twiml), 200, {"Content-Type": "application/xml"}
+    return str(twiml), 200, {"Content-Type": "text/xml; charset=utf-8"}
+
+
+@app.post("/webhook/baileys")
+def webhook_baileys():
+    payload = request.get_json(silent=True) or {}
+
+    whatsapp_id = _normalizar_whatsapp_id(payload.get("whatsapp_id") or payload.get("from") or payload.get("jid"))
+    mensaje = payload.get("mensaje") or payload.get("text") or ""
+    media_url = payload.get("media_url") or payload.get("mediaUrl")
+    media_type = payload.get("media_type") or payload.get("mediaType")
+    latitude = payload.get("latitude")
+    longitude = payload.get("longitude")
+
+    app.logger.info(
+        "Webhook Baileys recibido: whatsapp_id=%s has_text=%s media_type=%s has_media_url=%s",
+        whatsapp_id or "",
+        bool(str(mensaje or "").strip()),
+        media_type or "",
+        bool(media_url),
+    )
+
+    if not whatsapp_id:
+        return _error("whatsapp_id es obligatorio", 400)
+
+    result = procesar_mensaje_whatsapp(
+        whatsapp_id=whatsapp_id,
+        mensaje=mensaje,
+        media_url=media_url,
+        media_type=media_type,
+        latitude=latitude,
+        longitude=longitude,
+    )
+    if not isinstance(result, dict):
+        result = {"tipo": "texto", "contenido": str(result)}
+
+    output = {
+        "tipo": result.get("tipo", "texto"),
+        "contenido": result.get("contenido", "Listo parce, mensaje recibido."),
+    }
+
+    if output["tipo"] == "audio" and result.get("audio_filename"):
+        base_url = app.config["PUBLIC_BASE_URL"] or request.url_root.rstrip("/")
+        output["audio_url"] = f"{base_url}/audio/{result['audio_filename']}"
+
+    app.logger.info(
+        "Webhook Baileys respuesta: whatsapp_id=%s tipo=%s has_audio_url=%s",
+        whatsapp_id,
+        output.get("tipo", "texto"),
+        bool(output.get("audio_url")),
+    )
+
+    return _ok(output)
 
 
 @app.errorhandler(403)

@@ -3,15 +3,19 @@ import random
 import tempfile
 import uuid
 import importlib
+import logging
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import requests
 from gtts import gTTS
-from pydub import AudioSegment
 
 AUDIO_TEMP_DIR = Path(__file__).resolve().parent / "audios_temp"
 AUDIO_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger(__name__)
 
 FRASES_COLOMBIANAS = {
     "bienvenida": [
@@ -39,23 +43,45 @@ FRASES_COLOMBIANAS = {
 _WHISPER_MODEL = None
 
 
+def _ensure_ffmpeg_available() -> None:
+    ffmpeg_env = os.getenv("FFMPEG_BINARY", "").strip()
+    ffmpeg_path = ffmpeg_env or shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        raise RuntimeError("FFmpeg no esta disponible en PATH ni en FFMPEG_BINARY.")
+
+
+def _run_ffmpeg(args: list[str]) -> None:
+    ffmpeg_env = os.getenv("FFMPEG_BINARY", "").strip()
+    ffmpeg_path = ffmpeg_env or shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        raise RuntimeError("FFmpeg no esta disponible en PATH ni en FFMPEG_BINARY.")
+
+    cmd = [ffmpeg_path, "-y", *args]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        raise RuntimeError(f"FFmpeg fallo (code={proc.returncode}): {stderr}")
+
+
 def _load_whisper_model():
     global _WHISPER_MODEL
     if _WHISPER_MODEL is None:
+        model_name = (os.getenv("WHISPER_MODEL", "tiny") or "tiny").strip()
         whisper_module = importlib.import_module("whisper")
-        _WHISPER_MODEL = whisper_module.load_model("small")
+        logger.info("Cargando modelo Whisper: %s", model_name)
+        _WHISPER_MODEL = whisper_module.load_model(model_name)
     return _WHISPER_MODEL
 
 
-def _get_twilio_auth() -> tuple[str, str]:
-    account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
-    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
-    if not account_sid or not auth_token:
-        raise ValueError("Faltan TWILIO_ACCOUNT_SID o TWILIO_AUTH_TOKEN en variables de entorno.")
-    return account_sid, auth_token
+def _get_media_auth() -> Optional[tuple[str, str]]:
+    user = os.getenv("WHATSAPP_MEDIA_BASIC_USER", "").strip()
+    password = os.getenv("WHATSAPP_MEDIA_BASIC_PASSWORD", "").strip()
+    if user and password:
+        return user, password
+    return None
 
 
-def _detect_extension(url_twilio: str, content_type: str) -> str:
+def _detect_extension(media_url: str, content_type: str) -> str:
     ct = (content_type or "").lower()
     if "ogg" in ct:
         return ".ogg"
@@ -66,7 +92,7 @@ def _detect_extension(url_twilio: str, content_type: str) -> str:
     if "wav" in ct:
         return ".wav"
 
-    path = Path(url_twilio.split("?")[0])
+    path = Path(media_url.split("?")[0])
     suffix = path.suffix.lower()
     if suffix in {".ogg", ".opus", ".amr", ".mp3", ".wav", ".m4a"}:
         return suffix
@@ -84,33 +110,41 @@ def _safe_format(template: str, datos_dinamicos: Dict[str, Any]) -> str:
 
 
 def _convert_to_wav(input_path: Path, output_path: Path) -> None:
-    audio = AudioSegment.from_file(str(input_path))
-    audio = audio.set_channels(1).set_frame_rate(16000)
-    audio.export(str(output_path), format="wav")
+    _run_ffmpeg([
+        "-i",
+        str(input_path),
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        str(output_path),
+    ])
 
 
-def transcribir_audio(url_twilio: str) -> str:
+def transcribir_audio(media_url: str) -> str:
     """
-    Descarga audio desde Twilio con auth, convierte a WAV y transcribe con Whisper small en espanol.
+    Descarga audio desde URL, convierte a WAV y transcribe con Whisper small en espanol.
     Retorna texto en minusculas y limpia archivos temporales.
     """
-    if not url_twilio:
+    if not media_url:
         return ""
 
-    account_sid, auth_token = _get_twilio_auth()
+    auth = _get_media_auth()
     temp_input_path: Optional[Path] = None
     temp_wav_path: Optional[Path] = None
 
     try:
+        _ensure_ffmpeg_available()
+
         response = requests.get(
-            url_twilio,
-            auth=(account_sid, auth_token),
+            media_url,
+            auth=auth,
             timeout=40,
             allow_redirects=True,
         )
         response.raise_for_status()
 
-        extension = _detect_extension(url_twilio, response.headers.get("Content-Type", ""))
+        extension = _detect_extension(media_url, response.headers.get("Content-Type", ""))
         with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temp_input:
             temp_input.write(response.content)
             temp_input_path = Path(temp_input.name)
@@ -125,7 +159,8 @@ def transcribir_audio(url_twilio: str) -> str:
         text = (result.get("text") or "").strip().lower()
         return " ".join(text.split())
 
-    except Exception:
+    except Exception as exc:
+        logger.exception("Fallo transcribiendo audio desde %s: %s", media_url, exc)
         return ""
 
     finally:
@@ -153,12 +188,21 @@ def generar_audio_colombiano(estado: str, datos_dinamicos: Optional[Dict[str, An
         tts = gTTS(text=texto_final, lang="es", tld="com.mx", slow=False)
         tts.save(str(mp3_path))
 
-        AudioSegment.from_mp3(str(mp3_path)).export(
+        _run_ffmpeg([
+            "-i",
+            str(mp3_path),
+            "-c:a",
+            "libopus",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-b:a",
+            "24k",
+            "-map_metadata",
+            "-1",
             str(ogg_path),
-            format="ogg",
-            codec="libopus",
-            parameters=["-ar", "16000", "-ac", "1", "-b:a", "24k", "-map_metadata", "-1"],
-        )
+        ])
 
         return str(ogg_path)
 
@@ -179,12 +223,21 @@ def _generar_audio_desde_texto(texto: str) -> str:
         tts = gTTS(text=texto, lang="es", tld="com.mx", slow=False)
         tts.save(str(mp3_path))
 
-        AudioSegment.from_mp3(str(mp3_path)).export(
+        _run_ffmpeg([
+            "-i",
+            str(mp3_path),
+            "-c:a",
+            "libopus",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-b:a",
+            "24k",
+            "-map_metadata",
+            "-1",
             str(ogg_path),
-            format="ogg",
-            codec="libopus",
-            parameters=["-ar", "16000", "-ac", "1", "-b:a", "24k", "-map_metadata", "-1"],
-        )
+        ])
         return str(ogg_path)
     finally:
         if mp3_path.exists():
@@ -194,32 +247,32 @@ def _generar_audio_desde_texto(texto: str) -> str:
                 pass
 
 
-def enviar_audio_whatsapp(to: str, ogg_path: str, ngrok_url: str, twilio_client):
+def enviar_audio_whatsapp(to: str, ogg_path: str, _ngrok_url: str = "", _legacy_client=None):
     """
-    Envia una nota de voz por WhatsApp usando Twilio apuntando al audio servido por Flask.
+    Compatibilidad: envia audio usando el puente Baileys via HTTP.
     """
     if not to:
         raise ValueError("El parametro 'to' es obligatorio.")
     if not ogg_path:
         raise ValueError("El parametro 'ogg_path' es obligatorio.")
-    if not ngrok_url:
-        raise ValueError("El parametro 'ngrok_url' es obligatorio.")
 
     ogg_file = Path(ogg_path)
     if not ogg_file.exists():
         raise FileNotFoundError(f"No existe el archivo de audio: {ogg_path}")
 
-    base_url = ngrok_url.rstrip("/")
-    media_url = f"{base_url}/audio/{ogg_file.name}"
-    from_number = os.getenv("TWILIO_NUMBER", "").strip()
-    if not from_number:
-        raise ValueError("Falta TWILIO_NUMBER en variables de entorno.")
+    bridge_url = os.getenv("BAILEYS_BRIDGE_URL", "http://localhost:3001").rstrip("/")
+    base_url = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+    if not base_url:
+        raise ValueError("Falta PUBLIC_BASE_URL para construir URL publica de audio.")
 
-    return twilio_client.messages.create(
-        from_=from_number,
-        to=to,
-        media_url=[media_url],
+    media_url = f"{base_url}/audio/{ogg_file.name}"
+    response = requests.post(
+        f"{bridge_url}/api/send-audio",
+        json={"to": to, "audioUrl": media_url},
+        timeout=20,
     )
+    response.raise_for_status()
+    return response.json()
 
 
 # Compatibilidad con el bot actual.
@@ -231,8 +284,8 @@ def generar_audio_respuesta(texto: str):
     return generar_audio(texto)
 
 
-def transcribir_audio_desde_url(url_twilio: str) -> str:
-    return transcribir_audio(url_twilio)
+def transcribir_audio_desde_url(media_url: str) -> str:
+    return transcribir_audio(media_url)
 
 
 def text_to_speech(texto: str):

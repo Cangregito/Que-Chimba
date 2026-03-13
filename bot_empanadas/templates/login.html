@@ -112,15 +112,83 @@
       font-weight: 700;
       text-decoration: none;
     }
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    body {
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 6% 5%, #ffe4b7 0%, transparent 36%),
+        radial-gradient(circle at 95% 0%, #d8f2e2 0%, transparent 32%),
+        linear-gradient(180deg, #f6f0e3 0%, #f1e9d8 100%);
+    }
+
+    .card {
+      border-radius: 20px;
+      border: 1px solid #e8dbc3;
+      box-shadow: 0 16px 34px rgba(35, 24, 12, 0.12);
+      animation: popIn 0.32s ease;
+    }
+
+    .hint {
+      border-radius: 12px;
+      background: #fff6e3;
+    }
+
+    input,
+    button {
+      border-radius: 12px;
+      font-family: inherit;
+    }
+
+    button {
+      letter-spacing: 0.3px;
+      box-shadow: 0 8px 16px rgba(13, 91, 47, 0.22);
+    }
+
+    @keyframes popIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    h1 {
+      letter-spacing: -0.02em;
+      font-size: clamp(1.45rem, 3.2vw, 1.9rem);
+    }
+
+    p,
+    .hint,
+    .error,
+    .back {
+      line-height: 1.5;
+    }
+
+    input {
+      border-color: #d8ccb3;
+      background: #fffdf9;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
   </style>
 </head>
 <body>
   <main class="card">
     <h1>Ingresar al panel</h1>
-    <p>Usa un usuario demo para entrar.</p>
+    <p>Acceso con credenciales guardadas en PostgreSQL (hash seguro).</p>
 
     <div class="hint">
-      admin/admin123, cocina/cocina123, repartidor/repartidor123
+      Primera ejecucion: admin/admin123, cocina/cocina123, repartidor/repartidor123.
+      Luego puedes administrarlos desde el panel de seguridad.
     </div>
 
     <form id="login-form">

@@ -98,19 +98,68 @@
       font-size: .78rem;
       color: var(--muted);
     }
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    body {
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(66, 195, 124, 0.22) 0%, transparent 54%),
+        linear-gradient(180deg, #0f1419 0%, #121920 100%);
+    }
+
+    .card,
+    .detalle {
+      border-radius: 18px;
+    }
+
+    .card {
+      animation: revealCard 0.35s ease;
+    }
+
+    .cta {
+      border-radius: 12px;
+      box-shadow: 0 10px 20px rgba(57, 201, 125, 0.22);
+    }
+
+    @keyframes revealCard {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .icon {
+      box-shadow: 0 10px 22px rgba(57, 201, 125, 0.2);
+    }
+
+    .subtitle,
+    .footer-note {
+      line-height: 1.55;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon">✅</div>
+    <div class="icon">OK</div>
 
     <h1>¡Ay qué chimba, parce!</h1>
     <p class="subtitle">
       Tu pago fue aprobado. Ya estamos preparando tus empanadas
-      con todo el amor colombiano. 🫔
+      con todo el amor colombiano.
     </p>
 
-    <div class="pill">🚀 Tu pedido ya está en preparación</div>
+    <div class="pill">Tu pedido ya esta en preparacion</div>
 
     {% if pedido_id %}
     <div class="detalle">
@@ -135,7 +184,7 @@
 
     <p class="footer-note">
       Recibirás una confirmación por WhatsApp en breve.
-      ¡Gracias por elegir Que Chimba! 🇨🇴
+      Gracias por elegir Que Chimba.
     </p>
   </div>
 </body>

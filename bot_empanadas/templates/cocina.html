@@ -109,12 +109,96 @@
       gap: 12px;
     }
 
+    .kanban-board {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .kanban-col {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(10, 13, 17, 0.42);
+      min-height: 320px;
+      padding: 10px;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .kanban-col.drag-over {
+      border-color: var(--accent);
+      background: rgba(255, 166, 43, 0.1);
+    }
+
+    .kanban-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .kanban-title {
+      font-size: 1.02rem;
+      font-weight: 800;
+      color: #f5d6a1;
+    }
+
+    .kanban-count {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .kanban-list {
+      display: grid;
+      gap: 10px;
+    }
+
     .order-card {
       border: 1px solid var(--line);
       border-left: 8px solid var(--accent);
       border-radius: 12px;
       padding: 14px;
       background: rgba(10, 13, 17, 0.52);
+      cursor: grab;
+    }
+
+    .order-card.warn {
+      border-left-color: #ffb020;
+      box-shadow: inset 0 0 0 1px rgba(255, 176, 32, 0.25);
+    }
+
+    .order-card.urgent {
+      border-left-color: #ff6b6b;
+      box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.35);
+      background: rgba(64, 17, 17, 0.35);
+    }
+
+    .age-pill {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+      color: #d9e1e8;
+      background: rgba(99, 116, 135, 0.18);
+    }
+
+    .age-pill.warn {
+      color: #ffe2ad;
+      background: rgba(255, 176, 32, 0.16);
+      border-color: rgba(255, 176, 32, 0.32);
+    }
+
+    .age-pill.urgent {
+      color: #ffc0c0;
+      background: rgba(255, 107, 107, 0.16);
+      border-color: rgba(255, 107, 107, 0.35);
+    }
+
+    .order-card:active {
+      cursor: grabbing;
     }
 
     .order-head {
@@ -289,6 +373,105 @@
       .btn {
         width: 100%;
       }
+
+      .kanban-board {
+        grid-template-columns: 1fr;
+      }
+    }
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    body {
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 7% 0%, rgba(255, 173, 56, 0.18) 0%, transparent 32%),
+        radial-gradient(circle at 95% 12%, rgba(94, 162, 217, 0.2) 0%, transparent 30%),
+        linear-gradient(180deg, #11161b 0%, #131a21 100%);
+    }
+
+    .panel {
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%), #1a222c;
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
+    }
+
+    .kanban-col,
+    .order-card,
+    .zone-card,
+    .empty {
+      border-radius: 14px;
+    }
+
+    .order-card {
+      border-left-width: 6px;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .order-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+    }
+
+    .btn {
+      border-radius: 11px;
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle,
+    .muted,
+    .label {
+      color: #b9c6d1;
+    }
+
+    .layout {
+      animation: fadeSlide 0.35s ease;
+    }
+
+    @keyframes fadeSlide {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .kanban-col {
+      background: linear-gradient(180deg, rgba(8, 11, 15, 0.82) 0%, rgba(16, 21, 27, 0.9) 100%);
+      border-color: #394656;
+    }
+
+    .kanban-head {
+      border-bottom-color: rgba(255, 255, 255, 0.14);
+    }
+
+    .kanban-title {
+      letter-spacing: 0.25px;
+    }
+
+    .order-title {
+      font-size: 1.16rem;
+      letter-spacing: -0.01em;
+    }
+
+    .order-grid p {
+      font-size: 0.95rem;
+    }
+
+    .zone-title {
+      letter-spacing: 0.2px;
+    }
+
+    .btn-dark {
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
     }
   </style>
 </head>
@@ -298,7 +481,7 @@
       <div class="header">
         <div>
           <h1>Panel de Cocina</h1>
-          <p class="subtitle">Pedidos activos: recibidos y en preparacion.</p>
+          <p class="subtitle">Kanban operativo: recibido, en preparacion y listo para salida.</p>
         </div>
         <span class="badge" id="totalBadge">0 pedidos</span>
       </div>
@@ -310,7 +493,31 @@
         <span id="lastUpdate">Sin actualizar</span>
       </div>
 
-      <div class="orders" id="ordersContainer"></div>
+      <div class="kanban-board" id="kanbanBoard">
+        <section class="kanban-col" data-drop-state="recibido">
+          <div class="kanban-head">
+            <h3 class="kanban-title">Recibido</h3>
+            <span class="kanban-count" id="count-recibido">0</span>
+          </div>
+          <div class="kanban-list" id="ordersRecibido"></div>
+        </section>
+
+        <section class="kanban-col" data-drop-state="en_preparacion">
+          <div class="kanban-head">
+            <h3 class="kanban-title">En preparacion</h3>
+            <span class="kanban-count" id="count-prep">0</span>
+          </div>
+          <div class="kanban-list" id="ordersPrep"></div>
+        </section>
+
+        <section class="kanban-col" data-drop-state="listo">
+          <div class="kanban-head">
+            <h3 class="kanban-title">Listo</h3>
+            <span class="kanban-count" id="count-listo">0</span>
+          </div>
+          <div class="kanban-list" id="ordersListo"></div>
+        </section>
+      </div>
       <p class="error" id="errorText"></p>
     </section>
 
@@ -326,17 +533,25 @@
   </div>
 
   <script>
-    const API_QUEUE_URL = "/api/pedidos?estado=recibido,en_preparacion";
+    const API_QUEUE_URL = "/api/pedidos?estado=recibido,en_preparacion,listo";
     const API_STATUS_BASE = "/api/pedidos";
     const REFRESH_MS = 15000;
 
-    const ordersContainer = document.getElementById("ordersContainer");
+    const kanbanBoard = document.getElementById("kanbanBoard");
+    const ordersRecibido = document.getElementById("ordersRecibido");
+    const ordersPrep = document.getElementById("ordersPrep");
+    const ordersListo = document.getElementById("ordersListo");
+    const countRecibido = document.getElementById("count-recibido");
+    const countPrep = document.getElementById("count-prep");
+    const countListo = document.getElementById("count-listo");
     const zoneContainer = document.getElementById("zoneContainer");
     const totalBadge = document.getElementById("totalBadge");
     const lastUpdate = document.getElementById("lastUpdate");
     const errorText = document.getElementById("errorText");
 
     let currentOrders = [];
+    let refreshTimer = null;
+    let isFetching = false;
 
     function getField(obj, keys, fallback = "-") {
       for (const key of keys) {
@@ -376,12 +591,36 @@
       return String(state || "-");
     }
 
+    function minutesSince(value) {
+      if (!value || value === "-") {
+        return null;
+      }
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) {
+        return null;
+      }
+      return Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+    }
+
+    function getPriorityByMinutes(minutes) {
+      if (minutes === null) {
+        return "normal";
+      }
+      if (minutes >= 25) {
+        return "urgent";
+      }
+      if (minutes >= 15) {
+        return "warn";
+      }
+      return "normal";
+    }
+
     function normalizeOrder(raw) {
       const id = getField(raw, ["id", "pedido_id", "numero", "numero_pedido"], "");
       const number = getField(raw, ["numero_pedido", "numero", "folio", "id"], id || "-");
       const customer = getField(raw, ["cliente_nombre", "nombre_cliente", "cliente", "nombre"], "Cliente sin nombre");
       const state = getField(raw, ["estado"], "recibido");
-      const receivedAt = getField(raw, ["hora_recepcion", "recibido_en", "created_at", "fecha_hora"], "-");
+      const receivedAt = getField(raw, ["hora_recepcion", "recibido_en", "creado_en", "created_at", "fecha_hora"], "-");
       const address = getField(raw, ["direccion_entrega", "direccion", "entrega_direccion"], "Direccion no disponible");
       const postalCode = String(getField(raw, ["codigo_postal", "cp"], "00000"));
       const items = asArray(getField(raw, ["productos", "items", "detalle"], []));
@@ -419,12 +658,29 @@
     function buildOrderCard(order) {
       const stateClass = `state-${order.state}`;
       const safeId = String(order.id || order.number);
+      const ageMins = minutesSince(order.receivedAt);
+      const priority = getPriorityByMinutes(ageMins);
+      const ageClass = priority === "normal" ? "" : priority;
+      const cardClass = priority === "normal" ? "" : priority;
+      const ageLabel = ageMins === null ? "Sin hora" : `${ageMins} min`;
+
+      const actions = [];
+      if (order.state === "recibido") {
+        actions.push(`<button class="btn btn-yellow" data-action="prep" data-id="${safeId}">En preparacion</button>`);
+      }
+      if (order.state === "recibido" || order.state === "en_preparacion") {
+        actions.push(`<button class="btn btn-green" data-action="ready" data-id="${safeId}">Listo para entregar</button>`);
+      }
+      actions.push(`<button class="btn btn-dark" data-action="print" data-id="${safeId}">Imprimir etiqueta QR</button>`);
 
       return `
-        <article class="order-card">
+        <article class="order-card ${cardClass}" draggable="true" data-draggable-id="${safeId}">
           <div class="order-head">
             <h3 class="order-title">Pedido #${order.number}</h3>
-            <span class="state-pill ${stateClass}">${formatState(order.state)}</span>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <span class="age-pill ${ageClass}">${ageLabel}</span>
+              <span class="state-pill ${stateClass}">${formatState(order.state)}</span>
+            </div>
           </div>
 
           <div class="order-grid">
@@ -438,21 +694,93 @@
           <ul class="products">${renderProducts(order.items)}</ul>
 
           <div class="actions">
-            <button class="btn btn-yellow" data-action="prep" data-id="${safeId}">En preparacion</button>
-            <button class="btn btn-green" data-action="ready" data-id="${safeId}">Listo para entregar</button>
-            <button class="btn btn-dark" data-action="print" data-id="${safeId}">Imprimir etiqueta QR</button>
+            ${actions.join("")}
           </div>
         </article>
       `;
     }
 
     function renderOrders(orders) {
-      if (!orders.length) {
-        ordersContainer.innerHTML = "<div class='empty'>No hay pedidos en cola.</div>";
-        return;
-      }
+      const byPriorityAndTime = (a, b) => {
+        const pa = getPriorityByMinutes(minutesSince(a.receivedAt));
+        const pb = getPriorityByMinutes(minutesSince(b.receivedAt));
+        const weight = { urgent: 3, warn: 2, normal: 1 };
+        if (weight[pb] !== weight[pa]) {
+          return weight[pb] - weight[pa];
+        }
+        const ta = new Date(a.receivedAt).getTime() || 0;
+        const tb = new Date(b.receivedAt).getTime() || 0;
+        return ta - tb;
+      };
 
-      ordersContainer.innerHTML = orders.map(buildOrderCard).join("");
+      const recibidos = orders.filter((order) => order.state === "recibido").sort(byPriorityAndTime);
+      const prep = orders.filter((order) => order.state === "en_preparacion").sort(byPriorityAndTime);
+      const listos = orders.filter((order) => order.state === "listo").sort(byPriorityAndTime);
+
+      countRecibido.textContent = `${recibidos.length}`;
+      countPrep.textContent = `${prep.length}`;
+      countListo.textContent = `${listos.length}`;
+
+      ordersRecibido.innerHTML = recibidos.length
+        ? recibidos.map(buildOrderCard).join("")
+        : "<div class='empty'>No hay pedidos recibidos.</div>";
+
+      ordersPrep.innerHTML = prep.length
+        ? prep.map(buildOrderCard).join("")
+        : "<div class='empty'>No hay pedidos en preparacion.</div>";
+
+      ordersListo.innerHTML = listos.length
+        ? listos.map(buildOrderCard).join("")
+        : "<div class='empty'>No hay pedidos listos.</div>";
+
+      setUpDragAndDrop();
+    }
+
+    function setUpDragAndDrop() {
+      const draggableCards = document.querySelectorAll(".order-card[draggable='true']");
+      draggableCards.forEach((card) => {
+        card.addEventListener("dragstart", (event) => {
+          const id = card.getAttribute("data-draggable-id");
+          if (!id || !event.dataTransfer) {
+            return;
+          }
+          event.dataTransfer.setData("text/plain", id);
+          event.dataTransfer.effectAllowed = "move";
+        });
+      });
+
+      const columns = document.querySelectorAll(".kanban-col[data-drop-state]");
+      columns.forEach((col) => {
+        col.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          col.classList.add("drag-over");
+          if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+          }
+        });
+
+        col.addEventListener("dragleave", () => {
+          col.classList.remove("drag-over");
+        });
+
+        col.addEventListener("drop", async (event) => {
+          event.preventDefault();
+          col.classList.remove("drag-over");
+
+          const targetState = col.getAttribute("data-drop-state");
+          const orderId = event.dataTransfer ? event.dataTransfer.getData("text/plain") : "";
+          if (!targetState || !orderId) {
+            return;
+          }
+
+          const order = getOrderById(orderId);
+          if (!order || order.state === targetState) {
+            return;
+          }
+
+          await updateOrderStatus(orderId, targetState);
+        });
+      });
     }
 
     function renderZones(orders) {
@@ -494,7 +822,12 @@
       lastUpdate.textContent = `Ultima actualizacion: ${now.toLocaleTimeString("es-MX")}`;
     }
 
-    async function fetchOrders() {
+    async function fetchOrders(force = false) {
+      if (isFetching && !force) {
+        return;
+      }
+
+      isFetching = true;
       try {
         const response = await fetch(API_QUEUE_URL, { headers: { "Accept": "application/json" } });
         if (!response.ok) {
@@ -512,6 +845,8 @@
         stampUpdateTime();
       } catch (error) {
         errorText.textContent = `No se pudo actualizar la cola: ${error.message}`;
+      } finally {
+        isFetching = false;
       }
     }
 
@@ -535,10 +870,42 @@
           throw new Error(`Error ${response.status} al cambiar estado`);
         }
 
-        await fetchOrders();
+        await fetchOrders(true);
       } catch (error) {
         errorText.textContent = `No se pudo actualizar el pedido #${orderId}: ${error.message}`;
       }
+    }
+
+    function scheduleRefresh() {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = setTimeout(async () => {
+        if (!document.hidden) {
+          await fetchOrders();
+        }
+        scheduleRefresh();
+      }, REFRESH_MS);
+    }
+
+    function initPolling() {
+      fetchOrders(true).catch(() => {
+      });
+      scheduleRefresh();
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          fetchOrders(true).catch(() => {
+          });
+        }
+      });
+
+      window.addEventListener("beforeunload", () => {
+        if (refreshTimer) {
+          clearTimeout(refreshTimer);
+        }
+      });
     }
 
     function printOrderLabel(orderId) {
@@ -625,7 +992,7 @@
       printWindow.document.close();
     }
 
-    ordersContainer.addEventListener("click", async (event) => {
+    kanbanBoard.addEventListener("click", async (event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) {
         return;
@@ -640,14 +1007,13 @@
       if (action === "prep") {
         await updateOrderStatus(id, "en_preparacion");
       } else if (action === "ready") {
-        await updateOrderStatus(id, "listo_para_entregar");
+        await updateOrderStatus(id, "listo");
       } else if (action === "print") {
         printOrderLabel(id);
       }
     });
 
-    fetchOrders();
-    setInterval(fetchOrders, REFRESH_MS);
+    initPolling();
   </script>
 </body>
 </html>

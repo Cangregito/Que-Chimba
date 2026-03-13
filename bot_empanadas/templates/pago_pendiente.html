@@ -97,11 +97,61 @@
       font-size: .78rem;
       color: var(--muted);
     }
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    body {
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255, 212, 71, 0.2) 0%, transparent 52%),
+        linear-gradient(180deg, #0f1419 0%, #121920 100%);
+    }
+
+    .card,
+    .info-box {
+      border-radius: 18px;
+    }
+
+    .card {
+      animation: revealCard 0.35s ease;
+    }
+
+    .cta {
+      border-radius: 12px;
+      box-shadow: 0 10px 20px rgba(255, 166, 43, 0.22);
+    }
+
+    @keyframes revealCard {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .icon {
+      box-shadow: 0 10px 22px rgba(255, 212, 71, 0.2);
+    }
+
+    .subtitle,
+    .footer-note,
+    .info-box p {
+      line-height: 1.55;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon">⏳</div>
+    <div class="icon">...</div>
 
     <h1>Listo parce, en proceso</h1>
     <p class="subtitle">
@@ -115,7 +165,7 @@
       <p>La institución financiera está confirmando el pago.
          Esto puede tardar unos minutos.</p>
       <p>Tan pronto se confirme, recibirás una notificación
-         por WhatsApp y comenzaremos a preparar tus empanadas. 🫔</p>
+        por WhatsApp y comenzaremos a preparar tus empanadas.</p>
     </div>
 
     <a class="cta" href="javascript:window.close()">
@@ -124,7 +174,7 @@
 
     <p class="footer-note">
       Si en 24 h no recibes confirmación, escríbenos.
-      ¡Que Chimba te resuelve! 🇨🇴
+      Que Chimba te resuelve.
     </p>
   </div>
 </body>

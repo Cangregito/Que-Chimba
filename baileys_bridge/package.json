@@ -1,0 +1,19 @@
+{
+  "name": "que-chimba-baileys-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Puente WhatsApp Baileys <-> Flask para Que Chimba",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.9",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pino": "^9.6.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

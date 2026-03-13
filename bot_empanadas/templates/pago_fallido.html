@@ -106,11 +106,61 @@
       font-size: .78rem;
       color: var(--muted);
     }
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    body {
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255, 107, 107, 0.2) 0%, transparent 52%),
+        linear-gradient(180deg, #0f1419 0%, #121920 100%);
+    }
+
+    .card,
+    .sugerencias {
+      border-radius: 18px;
+    }
+
+    .card {
+      animation: revealCard 0.35s ease;
+    }
+
+    .cta,
+    .cta-sec {
+      border-radius: 12px;
+    }
+
+    @keyframes revealCard {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .icon {
+      box-shadow: 0 10px 22px rgba(255, 107, 107, 0.2);
+    }
+
+    .subtitle,
+    .footer-note,
+    .sugerencias p {
+      line-height: 1.55;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon">😬</div>
+    <div class="icon">!</div>
 
     <h1>Uy parce, hubo un problema</h1>
     <p class="subtitle">
@@ -135,7 +185,7 @@
 
     <p class="footer-note">
       Tu pedido sigue guardado. Cuando el pago se confirme,
-      empezamos a preparar tus empanadas. 🫔
+      empezamos a preparar tus empanadas.
     </p>
   </div>
 </body>

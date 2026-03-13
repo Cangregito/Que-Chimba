@@ -124,6 +124,35 @@
       color: var(--coffee);
     }
 
+    .badge-cost {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .badge-cost.ok {
+      background: #EAF7EE;
+      color: #196B31;
+      border-color: #B9E0C4;
+    }
+
+    .badge-cost.warn {
+      background: #FFF4DE;
+      color: #8A5A00;
+      border-color: #F0D18C;
+    }
+
+    .badge-cost.danger {
+      background: #FCE8E8;
+      color: #A12A2A;
+      border-color: #E8B2B2;
+    }
+
     .section-card {
       background: var(--card);
       border: 1px solid var(--line);
@@ -210,6 +239,12 @@
       border-radius: 12px;
       padding: 12px;
       min-height: 300px;
+    }
+
+    .chart-box {
+      position: relative;
+      height: 240px;
+      margin-top: 8px;
     }
 
     table {
@@ -389,6 +424,118 @@
       .form-grid {
         grid-template-columns: 1fr;
       }
+
+      .chart-box {
+        height: 220px;
+      }
+    }
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    body {
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 5% 0%, #ffe3ad 0%, transparent 38%),
+        radial-gradient(circle at 98% 20%, #ffeec9 0%, transparent 33%),
+        linear-gradient(180deg, #f8f3e8 0%, #f3ebda 100%);
+    }
+
+    .sidebar {
+      background: linear-gradient(190deg, #201711 0%, #16110d 100%);
+      border-right: 1px solid rgba(245, 166, 35, 0.35);
+    }
+
+    .section-card,
+    .chart-card,
+    .kpi,
+    .modal-card {
+      border-radius: 18px;
+      box-shadow: 0 14px 30px rgba(31, 22, 15, 0.12);
+    }
+
+    .section-card {
+      background: rgba(255, 252, 245, 0.92);
+      backdrop-filter: blur(4px);
+      border: 1px solid #eadcc0;
+      animation: rise 0.35s ease;
+    }
+
+    .btn {
+      border-radius: 12px;
+      letter-spacing: 0.2px;
+      box-shadow: 0 6px 14px rgba(181, 122, 11, 0.2);
+    }
+
+    table {
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fffdf8;
+    }
+
+    th {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .topbar h2 {
+      font-size: clamp(1.3rem, 2.2vw, 1.75rem);
+      letter-spacing: -0.02em;
+    }
+
+    .section-title h3 {
+      font-size: 1.18rem;
+      letter-spacing: -0.01em;
+    }
+
+    .kpi {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi::after {
+      content: "";
+      position: absolute;
+      right: -18px;
+      top: -18px;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245, 166, 35, 0.24) 0%, rgba(245, 166, 35, 0) 75%);
+    }
+
+    tbody tr:nth-child(odd) {
+      background: rgba(255, 252, 245, 0.9);
+    }
+
+    tbody tr:hover {
+      background: #fff5df;
+    }
+
+    .nav a {
+      font-weight: 600;
+      letter-spacing: 0.15px;
+    }
+
+    .badge {
+      box-shadow: 0 4px 12px rgba(130, 96, 41, 0.12);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
     }
   </style>
 </head>
@@ -402,6 +549,8 @@
 
       <nav class="nav">
         <a href="#ventas" class="active">Ventas</a>
+        <a href="#operacion-db">Operacion DB</a>
+        <a href="#seguridad">Seguridad</a>
         <a href="#campanas">Campanas</a>
         <a href="#inventario">Inventario</a>
       </nav>
@@ -439,15 +588,21 @@
         <div class="grid-3">
           <article class="chart-card">
             <h4>Ventas del dia (por hora)</h4>
-            <canvas id="chart-dia"></canvas>
+            <div class="chart-box">
+              <canvas id="chart-dia"></canvas>
+            </div>
           </article>
           <article class="chart-card">
             <h4>Ventas del mes (por dia)</h4>
-            <canvas id="chart-mes"></canvas>
+            <div class="chart-box">
+              <canvas id="chart-mes"></canvas>
+            </div>
           </article>
           <article class="chart-card">
             <h4>Ventas del ano (por mes)</h4>
-            <canvas id="chart-ano"></canvas>
+            <div class="chart-box">
+              <canvas id="chart-ano"></canvas>
+            </div>
           </article>
         </div>
 
@@ -463,6 +618,274 @@
             </thead>
             <tbody id="top-clientes-body">
               <tr><td colspan="3" class="muted">Cargando top clientes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="operacion-db" class="section-card">
+        <div class="section-title">
+          <h3>Control operativo de base de datos</h3>
+          <button id="btn-refrescar-db" class="btn" type="button">Refrescar control DB</button>
+        </div>
+
+        <div class="kpis">
+          <article class="kpi">
+            <h4>Clientes registrados</h4>
+            <div class="value" id="db-clientes">0</div>
+            <div class="muted">Numero unico por WhatsApp</div>
+          </article>
+          <article class="kpi">
+            <h4>Pedidos activos</h4>
+            <div class="value" id="db-pedidos-activos">0</div>
+            <div class="muted">Recibido, preparacion, listo y en camino</div>
+          </article>
+          <article class="kpi">
+            <h4>Ventas hoy</h4>
+            <div class="value" id="db-ventas-hoy">$0.00</div>
+            <div class="muted">Total no cancelado</div>
+          </article>
+          <article class="kpi">
+            <h4>Ventas mes</h4>
+            <div class="value" id="db-ventas-mes">$0.00</div>
+            <div class="muted">Total no cancelado</div>
+          </article>
+          <article class="kpi">
+            <h4>Utilidad estimada hoy</h4>
+            <div class="value" id="db-utilidad-hoy">$0.00</div>
+            <div class="muted" id="db-margen-hoy">Margen estimado: 0%</div>
+          </article>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <h4>Rentabilidad estimada por producto</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Calidad costo</th>
+                <th class="text-right">Precio venta</th>
+                <th class="text-right">Costo estimado</th>
+                <th class="text-right">Margen unitario</th>
+                <th class="text-right">Margen %</th>
+              </tr>
+            </thead>
+            <tbody id="rentabilidad-body">
+              <tr><td colspan="6" class="muted">Cargando rentabilidad...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <h4>Pedidos recientes (gestion de estado)</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>WhatsApp</th>
+                <th class="text-right">Total</th>
+                <th>Estado actual</th>
+                <th>Nuevo estado</th>
+                <th>Accion</th>
+              </tr>
+            </thead>
+            <tbody id="pedidos-admin-body">
+              <tr><td colspan="7" class="muted">Cargando pedidos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <h4>Ultimas compras de inventario (auditoria)</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Insumo</th>
+                <th class="text-right">Cantidad</th>
+                <th class="text-right">Costo total</th>
+                <th>Proveedor</th>
+                <th>Capturado por</th>
+              </tr>
+            </thead>
+            <tbody id="compras-body">
+              <tr><td colspan="6" class="muted">Cargando historial de compras...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="seguridad" class="section-card">
+        <div class="section-title">
+          <h3>Seguridad y accesos</h3>
+          <button id="btn-refrescar-usuarios" class="btn" type="button">Refrescar usuarios</button>
+        </div>
+
+        <div class="form-grid" style="margin-bottom: 14px;">
+          <div class="field">
+            <label for="usuario-username">Usuario</label>
+            <input id="usuario-username" placeholder="nuevo_usuario" maxlength="80" required />
+          </div>
+
+          <div class="field">
+            <label for="usuario-nombre">Nombre visible</label>
+            <input id="usuario-nombre" placeholder="Nombre del operador" maxlength="120" required />
+          </div>
+
+          <div class="field">
+            <label for="usuario-rol">Rol</label>
+            <select id="usuario-rol">
+              <option value="admin">admin</option>
+              <option value="cocina">cocina</option>
+              <option value="repartidor">repartidor</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="usuario-telefono">Telefono</label>
+            <input id="usuario-telefono" placeholder="6561234567" maxlength="30" />
+          </div>
+
+          <div class="field full">
+            <label for="usuario-password">Contrasena temporal (min 8)</label>
+            <input id="usuario-password" type="password" minlength="8" placeholder="Minimo 8 caracteres" required />
+          </div>
+
+          <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button id="btn-crear-usuario" class="btn btn-dark" type="button">Crear usuario</button>
+            <span id="usuarios-status" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="kpis" style="margin-bottom: 14px;">
+          <article class="kpi">
+            <h4>Eventos de seguridad hoy</h4>
+            <div class="value" id="seguridad-eventos-hoy">0</div>
+            <div class="muted">Logins, fallos y cambios de usuarios</div>
+          </article>
+
+          <article class="kpi">
+            <h4>Eventos de negocio hoy</h4>
+            <div class="value" id="negocio-eventos-hoy">0</div>
+            <div class="muted">Pedidos, pagos e inventario auditados desde SQL</div>
+          </article>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Rol</th>
+              <th>Nombre</th>
+              <th>Telefono</th>
+              <th>Ultimo login</th>
+              <th>Estatus</th>
+              <th>Accion</th>
+            </tr>
+          </thead>
+          <tbody id="usuarios-body">
+            <tr><td colspan="7" class="muted">Cargando usuarios del sistema...</td></tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top: 16px;">
+          <h4>Bitacora reciente de seguridad</h4>
+          <div class="form-grid" style="margin-top: 8px; margin-bottom: 10px;">
+            <div class="field">
+              <label for="filtro-seguridad-evento">Evento</label>
+              <input id="filtro-seguridad-evento" placeholder="login_failed" maxlength="50" />
+            </div>
+            <div class="field">
+              <label for="filtro-seguridad-severidad">Severidad</label>
+              <select id="filtro-seguridad-severidad">
+                <option value="">Todas</option>
+                <option value="info">info</option>
+                <option value="warning">warning</option>
+                <option value="critical">critical</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="filtro-seguridad-actor">Actor</label>
+              <input id="filtro-seguridad-actor" placeholder="admin" maxlength="80" />
+            </div>
+            <div class="field">
+              <label for="filtro-seguridad-desde">Desde</label>
+              <input id="filtro-seguridad-desde" type="date" />
+            </div>
+            <div class="field">
+              <label for="filtro-seguridad-hasta">Hasta</label>
+              <input id="filtro-seguridad-hasta" type="date" />
+            </div>
+            <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <button id="btn-aplicar-filtro-seguridad" class="btn btn-dark" type="button">Aplicar filtros</button>
+              <button id="btn-limpiar-filtro-seguridad" class="btn" type="button">Limpiar</button>
+              <button id="btn-exportar-seguridad-csv" class="btn" type="button">Exportar CSV</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Evento</th>
+                <th>Severidad</th>
+                <th>Actor</th>
+                <th>Objetivo</th>
+                <th>IP</th>
+                <th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="auditoria-body">
+              <tr><td colspan="7" class="muted">Cargando auditoria de seguridad...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <h4>Bitacora reciente de negocio</h4>
+          <div class="form-grid" style="margin-top: 8px; margin-bottom: 10px;">
+            <div class="field">
+              <label for="filtro-negocio-tabla">Tabla</label>
+              <select id="filtro-negocio-tabla">
+                <option value="">Todas</option>
+                <option value="pedidos">pedidos</option>
+                <option value="pagos">pagos</option>
+                <option value="insumos">insumos</option>
+                <option value="compras_insumos">compras_insumos</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="filtro-negocio-actor">Actor</label>
+              <input id="filtro-negocio-actor" placeholder="admin" maxlength="80" />
+            </div>
+            <div class="field">
+              <label for="filtro-negocio-desde">Desde</label>
+              <input id="filtro-negocio-desde" type="date" />
+            </div>
+            <div class="field">
+              <label for="filtro-negocio-hasta">Hasta</label>
+              <input id="filtro-negocio-hasta" type="date" />
+            </div>
+            <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <button id="btn-aplicar-filtro-negocio" class="btn btn-dark" type="button">Aplicar filtros</button>
+              <button id="btn-limpiar-filtro-negocio" class="btn" type="button">Limpiar</button>
+              <button id="btn-exportar-negocio-csv" class="btn" type="button">Exportar CSV</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tabla</th>
+                <th>Operacion</th>
+                <th>Registro</th>
+                <th>Actor</th>
+                <th>Rol</th>
+                <th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="auditoria-negocio-body">
+              <tr><td colspan="7" class="muted">Cargando auditoria de negocio...</td></tr>
             </tbody>
           </table>
         </div>
@@ -532,6 +955,111 @@
           <button id="btn-registrar-compra" type="button" class="btn btn-dark">Registrar compra</button>
         </div>
 
+        <div class="form-grid" style="margin-bottom: 14px;">
+          <div class="field">
+            <label for="producto-manual-nombre">Producto (manual)</label>
+            <input id="producto-manual-nombre" placeholder="Empanada de Jamon" />
+          </div>
+          <div class="field">
+            <label for="producto-manual-variante">Variante</label>
+            <input id="producto-manual-variante" placeholder="Normal" />
+          </div>
+          <div class="field">
+            <label for="producto-manual-precio">Precio</label>
+            <input id="producto-manual-precio" type="number" min="0" step="0.01" />
+          </div>
+          <div class="field" style="justify-content:end;">
+            <label style="display:flex; gap:8px; align-items:center; margin-top: 24px;">
+              <input id="producto-manual-activo" type="checkbox" checked /> Activo
+            </label>
+          </div>
+          <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button id="btn-guardar-producto-manual" class="btn" type="button">Guardar producto</button>
+            <span id="producto-manual-status" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="form-grid" style="margin-bottom: 14px;">
+          <div class="field">
+            <label for="insumo-manual-nombre">Insumo (manual)</label>
+            <input id="insumo-manual-nombre" placeholder="Salsa roja" />
+          </div>
+          <div class="field">
+            <label for="insumo-manual-unidad">Unidad</label>
+            <input id="insumo-manual-unidad" placeholder="kg / lt / pieza" />
+          </div>
+          <div class="field">
+            <label for="insumo-manual-stock-minimo">Stock minimo</label>
+            <input id="insumo-manual-stock-minimo" type="number" min="0" step="0.01" value="0" />
+          </div>
+          <div class="field">
+            <label for="insumo-manual-stock-inicial">Stock inicial</label>
+            <input id="insumo-manual-stock-inicial" type="number" min="0" step="0.01" value="0" />
+          </div>
+          <div class="field full">
+            <label for="insumo-manual-proveedor">Proveedor</label>
+            <input id="insumo-manual-proveedor" placeholder="Proveedor local" />
+          </div>
+          <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button id="btn-guardar-insumo-manual" class="btn" type="button">Guardar insumo</button>
+            <span id="insumo-manual-status" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="form-grid" style="margin-bottom: 14px;">
+          <div class="field">
+            <label for="receta-producto-id">Producto</label>
+            <select id="receta-producto-id"></select>
+          </div>
+          <div class="field">
+            <label for="receta-insumo-id">Insumo</label>
+            <select id="receta-insumo-id"></select>
+          </div>
+          <div class="field">
+            <label for="receta-cantidad">Cantidad por unidad vendida</label>
+            <input id="receta-cantidad" type="number" min="0" step="0.001" />
+          </div>
+          <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button id="btn-guardar-receta" class="btn btn-dark" type="button">Guardar componente de receta</button>
+            <span id="receta-status" class="muted"></span>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <h4>Recetas configuradas</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Insumo</th>
+                <th class="text-right">Cantidad por unidad</th>
+                <th>Unidad</th>
+                <th>Estatus</th>
+                <th>Accion</th>
+              </tr>
+            </thead>
+            <tbody id="recetas-body">
+              <tr><td colspan="6" class="muted">Cargando recetas...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <h4>Productos sin receta activa (bloqueados para venta)</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Variante</th>
+                <th class="text-right">Precio</th>
+              </tr>
+            </thead>
+            <tbody id="productos-sin-receta-body">
+              <tr><td colspan="3" class="muted">Cargando validacion de catalogo...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
         <table>
           <thead>
             <tr>
@@ -546,6 +1074,26 @@
             <tr><td colspan="5" class="muted">Cargando inventario...</td></tr>
           </tbody>
         </table>
+
+        <div style="margin-top: 14px;">
+          <h4>Movimientos recientes de inventario</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Insumo</th>
+                <th>Tipo</th>
+                <th class="text-right">Movimiento</th>
+                <th class="text-right">Antes</th>
+                <th class="text-right">Despues</th>
+                <th>Referencia</th>
+              </tr>
+            </thead>
+            <tbody id="movimientos-inventario-body">
+              <tr><td colspan="7" class="muted">Cargando movimientos...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   </div>
@@ -592,8 +1140,20 @@
         dia: null,
         mes: null,
         ano: null
-      }
+      },
+      ventasPollTimer: null,
+      ventasPollInFlight: false,
+      estadosPedido: ["recibido", "en_preparacion", "listo", "en_camino", "entregado", "cancelado"]
     };
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
 
     function mxn(value) {
       return Number(value || 0).toLocaleString("es-MX", {
@@ -632,6 +1192,9 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          animation: {
+            duration: 180
+          },
           plugins: {
             legend: { display: true }
           },
@@ -650,7 +1213,7 @@
     function updateChart(chart, rows) {
       chart.data.labels = rows.map((row) => row.etiqueta || "N/A");
       chart.data.datasets[0].data = rows.map((row) => Number(row.ventas || 0));
-      chart.update();
+      chart.update("none");
     }
 
     function calcTotals(rows) {
@@ -681,6 +1244,40 @@
       updateChart(state.charts.ano, rows);
     }
 
+    async function loadAllVentas() {
+      await Promise.allSettled([
+        loadVentasDia(),
+        loadVentasMes(),
+        loadVentasAno()
+      ]);
+    }
+
+    async function refreshVentasSafely() {
+      if (state.ventasPollInFlight) {
+        return;
+      }
+
+      state.ventasPollInFlight = true;
+      try {
+        await loadAllVentas();
+      } finally {
+        state.ventasPollInFlight = false;
+      }
+    }
+
+    function scheduleVentasRefresh() {
+      if (state.ventasPollTimer) {
+        clearTimeout(state.ventasPollTimer);
+      }
+
+      state.ventasPollTimer = setTimeout(async () => {
+        if (!document.hidden) {
+          await refreshVentasSafely();
+        }
+        scheduleVentasRefresh();
+      }, 5 * 60 * 1000);
+    }
+
     async function loadTopClientes() {
       const tbody = document.getElementById("top-clientes-body");
       try {
@@ -702,6 +1299,402 @@
         }).join("");
       } catch (error) {
         tbody.innerHTML = `<tr><td colspan="3" class="danger-text">${error.message}</td></tr>`;
+      }
+    }
+
+    function renderResumenDb(summary) {
+      document.getElementById("db-clientes").textContent = Number(summary.clientes || 0).toLocaleString("es-MX");
+      document.getElementById("db-pedidos-activos").textContent = Number(summary.pedidos_activos || 0).toLocaleString("es-MX");
+      document.getElementById("db-ventas-hoy").textContent = mxn(summary.ventas_hoy || 0);
+      document.getElementById("db-ventas-mes").textContent = mxn(summary.ventas_mes || 0);
+      document.getElementById("db-utilidad-hoy").textContent = mxn(summary.utilidad_estimada_hoy || 0);
+      document.getElementById("db-margen-hoy").textContent = `Margen estimado: ${Number(summary.margen_estimado_pct_hoy || 0).toLocaleString("es-MX")} %`;
+      document.getElementById("seguridad-eventos-hoy").textContent = Number(summary.eventos_seguridad_hoy || 0).toLocaleString("es-MX");
+      document.getElementById("negocio-eventos-hoy").textContent = Number(summary.eventos_negocio_hoy || 0).toLocaleString("es-MX");
+    }
+
+    async function loadResumenDb() {
+      const summary = await fetchApi("/api/admin/resumen-db");
+      renderResumenDb(summary || {});
+    }
+
+    function renderRentabilidadProductos(rows) {
+      const tbody = document.getElementById("rentabilidad-body");
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin datos de rentabilidad.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map((row) => {
+        const margen = Number(row.margen_unitario || 0);
+        const margenClass = margen < 0 ? "danger-text" : "";
+        const nombre = (row.nombre || "Producto") + (row.variante ? ` - ${row.variante}` : "");
+        const componentesActivos = Number(row.componentes_activos || 0);
+        const componentesSinCosto = Number(row.componentes_sin_costo || 0);
+        let calidadClass = "ok";
+        let calidadLabel = "Costo completo";
+
+        if (row.calidad_costo === "sin_receta") {
+          calidadClass = "danger";
+          calidadLabel = "Sin receta";
+        } else if (row.calidad_costo === "incompleto") {
+          calidadClass = "warn";
+          calidadLabel = `Costo incompleto (${componentesSinCosto}/${componentesActivos})`;
+        }
+
+        return `
+          <tr>
+            <td>${escapeHtml(nombre)}</td>
+            <td><span class="badge-cost ${calidadClass}">${escapeHtml(calidadLabel)}</span></td>
+            <td class="text-right">${mxn(row.precio_venta || 0)}</td>
+            <td class="text-right">${mxn(row.costo_estimado_unitario || 0)}</td>
+            <td class="text-right ${margenClass}">${mxn(row.margen_unitario || 0)}</td>
+            <td class="text-right ${margenClass}">${Number(row.margen_pct || 0).toLocaleString("es-MX")} %</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadRentabilidadProductos() {
+      const rows = await fetchApi("/api/admin/rentabilidad-productos?limit=20");
+      renderRentabilidadProductos(rows || []);
+    }
+
+    function renderUsuariosSistema(rows) {
+      const tbody = document.getElementById("usuarios-body");
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">No hay usuarios registrados.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map((row) => {
+        const activo = Boolean(row.activo);
+        const ultimoLogin = row.ultimo_login ? new Date(row.ultimo_login).toLocaleString("es-MX") : "Nunca";
+        return `
+          <tr>
+            <td>${escapeHtml(row.username || "-")}</td>
+            <td>${escapeHtml(row.rol || "-")}</td>
+            <td>${escapeHtml(row.nombre_mostrar || "-")}</td>
+            <td>${escapeHtml(row.telefono || "-")}</td>
+            <td>${escapeHtml(ultimoLogin)}</td>
+            <td class="${activo ? "" : "danger-text"}">${activo ? "Activo" : "Inactivo"}</td>
+            <td style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-dark" data-action="toggle-usuario" data-usuario-id="${row.usuario_id}" data-next-activo="${activo ? "0" : "1"}" type="button">
+                ${activo ? "Desactivar" : "Activar"}
+              </button>
+              <button class="btn" data-action="reset-password" data-usuario-id="${row.usuario_id}" type="button">Reset pass</button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadUsuariosSistema() {
+      const rows = await fetchApi("/api/admin/usuarios");
+      renderUsuariosSistema(rows || []);
+    }
+
+    function renderAuditoriaSeguridad(rows) {
+      const tbody = document.getElementById("auditoria-body");
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin eventos recientes.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map((row) => {
+        const fecha = row.creado_en ? new Date(row.creado_en).toLocaleString("es-MX") : "-";
+        const detalle = row.detalle && typeof row.detalle === "object"
+          ? Object.entries(row.detalle).map(([key, value]) => `${key}: ${value}`).join(" | ")
+          : "-";
+        const actor = row.actor_username || row.actor_rol || "sistema";
+        const objetivo = row.objetivo_username || "-";
+        const severityClass = row.severidad === "warning" || row.severidad === "critical" ? "danger-text" : "";
+
+        return `
+          <tr>
+            <td>${escapeHtml(fecha)}</td>
+            <td>${escapeHtml(row.tipo_evento || "-")}</td>
+            <td class="${severityClass}">${escapeHtml(row.severidad || "info")}</td>
+            <td>${escapeHtml(actor)}</td>
+            <td>${escapeHtml(objetivo)}</td>
+            <td>${escapeHtml(row.direccion_ip || "-")}</td>
+            <td>${escapeHtml(detalle || "-")}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadAuditoriaSeguridad() {
+      const tipoEvento = (document.getElementById("filtro-seguridad-evento")?.value || "").trim();
+      const severidad = document.getElementById("filtro-seguridad-severidad")?.value || "";
+      const actor = (document.getElementById("filtro-seguridad-actor")?.value || "").trim();
+      const fechaDesde = document.getElementById("filtro-seguridad-desde")?.value || "";
+      const fechaHasta = document.getElementById("filtro-seguridad-hasta")?.value || "";
+
+      const params = new URLSearchParams({ limit: "25" });
+      if (tipoEvento) {
+        params.set("tipo_evento", tipoEvento);
+      }
+      if (severidad) {
+        params.set("severidad", severidad);
+      }
+      if (actor) {
+        params.set("actor", actor);
+      }
+      if (fechaDesde) {
+        params.set("fecha_desde", fechaDesde);
+      }
+      if (fechaHasta) {
+        params.set("fecha_hasta", fechaHasta);
+      }
+
+      const rows = await fetchApi(`/api/admin/auditoria-seguridad?${params.toString()}`);
+      renderAuditoriaSeguridad(rows || []);
+    }
+
+    function exportarAuditoriaSeguridadCsv() {
+      const tipoEvento = (document.getElementById("filtro-seguridad-evento")?.value || "").trim();
+      const severidad = document.getElementById("filtro-seguridad-severidad")?.value || "";
+      const actor = (document.getElementById("filtro-seguridad-actor")?.value || "").trim();
+      const fechaDesde = document.getElementById("filtro-seguridad-desde")?.value || "";
+      const fechaHasta = document.getElementById("filtro-seguridad-hasta")?.value || "";
+
+      const params = new URLSearchParams({ limit: "5000" });
+      if (tipoEvento) {
+        params.set("tipo_evento", tipoEvento);
+      }
+      if (severidad) {
+        params.set("severidad", severidad);
+      }
+      if (actor) {
+        params.set("actor", actor);
+      }
+      if (fechaDesde) {
+        params.set("fecha_desde", fechaDesde);
+      }
+      if (fechaHasta) {
+        params.set("fecha_hasta", fechaHasta);
+      }
+
+      window.location.href = `/api/admin/auditoria-seguridad.csv?${params.toString()}`;
+    }
+
+    function renderAuditoriaNegocio(rows) {
+      const tbody = document.getElementById("auditoria-negocio-body");
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin eventos recientes.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map((row) => {
+        const fecha = row.creado_en ? new Date(row.creado_en).toLocaleString("es-MX") : "-";
+        const detalle = row.detalle && typeof row.detalle === "object"
+          ? JSON.stringify(row.detalle)
+          : "-";
+        const opClass = row.operacion === "DELETE" ? "danger-text" : "";
+
+        return `
+          <tr>
+            <td>${escapeHtml(fecha)}</td>
+            <td>${escapeHtml(row.tabla_objetivo || "-")}</td>
+            <td class="${opClass}">${escapeHtml(row.operacion || "-")}</td>
+            <td>${escapeHtml(row.registro_id || "-")}</td>
+            <td>${escapeHtml(row.actor_username || "sistema")}</td>
+            <td>${escapeHtml(row.actor_rol || "-")}</td>
+            <td>${escapeHtml(detalle)}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadAuditoriaNegocio() {
+      const tabla = document.getElementById("filtro-negocio-tabla")?.value || "";
+      const actor = (document.getElementById("filtro-negocio-actor")?.value || "").trim();
+      const fechaDesde = document.getElementById("filtro-negocio-desde")?.value || "";
+      const fechaHasta = document.getElementById("filtro-negocio-hasta")?.value || "";
+
+      const params = new URLSearchParams({ limit: "25" });
+      if (tabla) {
+        params.set("tabla", tabla);
+      }
+      if (actor) {
+        params.set("actor", actor);
+      }
+      if (fechaDesde) {
+        params.set("fecha_desde", fechaDesde);
+      }
+      if (fechaHasta) {
+        params.set("fecha_hasta", fechaHasta);
+      }
+
+      const rows = await fetchApi(`/api/admin/auditoria-negocio?${params.toString()}`);
+      renderAuditoriaNegocio(rows || []);
+    }
+
+    function exportarAuditoriaNegocioCsv() {
+      const tabla = document.getElementById("filtro-negocio-tabla")?.value || "";
+      const actor = (document.getElementById("filtro-negocio-actor")?.value || "").trim();
+      const fechaDesde = document.getElementById("filtro-negocio-desde")?.value || "";
+      const fechaHasta = document.getElementById("filtro-negocio-hasta")?.value || "";
+
+      const params = new URLSearchParams({ limit: "5000" });
+      if (tabla) {
+        params.set("tabla", tabla);
+      }
+      if (actor) {
+        params.set("actor", actor);
+      }
+      if (fechaDesde) {
+        params.set("fecha_desde", fechaDesde);
+      }
+      if (fechaHasta) {
+        params.set("fecha_hasta", fechaHasta);
+      }
+
+      window.location.href = `/api/admin/auditoria-negocio.csv?${params.toString()}`;
+    }
+
+    async function crearUsuarioSistema() {
+      const status = document.getElementById("usuarios-status");
+      const payload = {
+        username: document.getElementById("usuario-username").value.trim(),
+        nombre_mostrar: document.getElementById("usuario-nombre").value.trim(),
+        rol: document.getElementById("usuario-rol").value,
+        telefono: document.getElementById("usuario-telefono").value.trim(),
+        password: document.getElementById("usuario-password").value
+      };
+
+      if (!payload.username || !payload.nombre_mostrar || !payload.password) {
+        status.textContent = "Usuario, nombre y contrasena son obligatorios.";
+        return;
+      }
+
+      status.textContent = "Creando usuario...";
+      try {
+        await fetchApi("/api/admin/usuarios", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        status.textContent = "Usuario creado correctamente.";
+        document.getElementById("usuario-password").value = "";
+        await Promise.allSettled([loadUsuariosSistema(), loadAuditoriaSeguridad(), loadAuditoriaNegocio(), loadResumenDb()]);
+      } catch (error) {
+        status.textContent = `Error al crear usuario: ${error.message}`;
+      }
+    }
+
+    async function actualizarUsuarioSistema(usuarioId, payload, feedbackText) {
+      const status = document.getElementById("usuarios-status");
+      status.textContent = "Guardando cambios de usuario...";
+      try {
+        await fetchApi(`/api/admin/usuarios/${usuarioId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        status.textContent = feedbackText;
+        await Promise.allSettled([loadUsuariosSistema(), loadAuditoriaSeguridad(), loadAuditoriaNegocio(), loadResumenDb()]);
+      } catch (error) {
+        status.textContent = `Error en usuario: ${error.message}`;
+      }
+    }
+
+    function renderPedidosAdmin(rows) {
+      const tbody = document.getElementById("pedidos-admin-body");
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">No hay pedidos registrados.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map((row) => {
+        const nombre = [row.nombre, row.apellidos].filter(Boolean).join(" ") || "Sin nombre";
+        const selectOptions = state.estadosPedido.map((estado) => {
+          const selected = estado === row.estado ? "selected" : "";
+          return `<option value="${estado}" ${selected}>${estado}</option>`;
+        }).join("");
+
+        return `
+          <tr>
+            <td>#${row.pedido_id}</td>
+            <td>${escapeHtml(nombre)}</td>
+            <td>${escapeHtml(row.whatsapp_id || "-")}</td>
+            <td class="text-right">${mxn(row.total || 0)}</td>
+            <td>${escapeHtml(row.estado || "-")}</td>
+            <td>
+              <select id="estado-pedido-${row.pedido_id}" data-pedido-id="${row.pedido_id}">
+                ${selectOptions}
+              </select>
+            </td>
+            <td>
+              <button class="btn btn-dark" data-action="guardar-estado" data-pedido-id="${row.pedido_id}" type="button">Guardar</button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadPedidosAdmin() {
+      const rows = await fetchApi("/api/pedidos");
+      renderPedidosAdmin(rows || []);
+    }
+
+    async function actualizarEstadoPedido(pedidoId, nuevoEstado, buttonEl) {
+      buttonEl.disabled = true;
+      const originalText = buttonEl.textContent;
+      buttonEl.textContent = "Guardando...";
+
+      try {
+        await fetchApi(`/api/pedidos/${pedidoId}/estado`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ estado: nuevoEstado })
+        });
+
+        buttonEl.textContent = "Listo";
+        await Promise.allSettled([loadPedidosAdmin(), loadResumenDb(), loadAuditoriaNegocio(), refreshVentasSafely()]);
+      } catch (error) {
+        buttonEl.textContent = "Error";
+        alert(`No se pudo actualizar estado: ${error.message}`);
+      } finally {
+        setTimeout(() => {
+          buttonEl.disabled = false;
+          buttonEl.textContent = originalText;
+        }, 900);
+      }
+    }
+
+    async function loadComprasInventario() {
+      const tbody = document.getElementById("compras-body");
+
+      try {
+        const rows = await fetchApi("/api/inventario/compras?limit=20");
+        if (!rows || !rows.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin compras registradas aun.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = rows.map((row) => {
+          const fecha = row.creado_en ? new Date(row.creado_en).toLocaleString("es-MX") : "-";
+          return `
+            <tr>
+              <td>${fecha}</td>
+              <td>${escapeHtml(row.insumo || "-")}</td>
+              <td class="text-right">${Number(row.cantidad || 0).toLocaleString("es-MX")}</td>
+              <td class="text-right">${mxn(row.costo_total || 0)}</td>
+              <td>${escapeHtml(row.proveedor || "-")}</td>
+              <td>${escapeHtml(row.creado_por || "-")}</td>
+            </tr>
+          `;
+        }).join("");
+      } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="6" class="danger-text">${escapeHtml(error.message)}</td></tr>`;
       }
     }
 
@@ -858,6 +1851,200 @@
       }
     }
 
+    async function loadCatalogOptionsInventario() {
+      const [productos, insumos] = await Promise.all([
+        fetchApi("/api/productos?solo_pedibles=0"),
+        fetchApi("/api/inventario")
+      ]);
+
+      const productoSelect = document.getElementById("receta-producto-id");
+      const insumoSelect = document.getElementById("receta-insumo-id");
+
+      productoSelect.innerHTML = (productos || []).map((p) => {
+        const label = `${p.nombre || "Producto"}${p.variante ? " - " + p.variante : ""}`;
+        return `<option value="${p.producto_id}">${escapeHtml(label)}</option>`;
+      }).join("");
+
+      insumoSelect.innerHTML = (insumos || []).map((i) => {
+        return `<option value="${i.insumo_id}">${escapeHtml(i.nombre || "Insumo")}</option>`;
+      }).join("");
+    }
+
+    async function loadProductosSinReceta() {
+      const tbody = document.getElementById("productos-sin-receta-body");
+      try {
+        const rows = await fetchApi("/api/admin/productos-sin-receta");
+        if (!rows || !rows.length) {
+          tbody.innerHTML = '<tr><td colspan="3" class="muted">Perfecto: todos los productos activos tienen receta.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = rows.map((row) => `
+          <tr class="danger-row">
+            <td>${escapeHtml(row.nombre || "-")}</td>
+            <td>${escapeHtml(row.variante || "-")}</td>
+            <td class="text-right danger-text">${mxn(row.precio || 0)}</td>
+          </tr>
+        `).join("");
+      } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="3" class="danger-text">${escapeHtml(error.message)}</td></tr>`;
+      }
+    }
+
+    async function loadRecetasInventario() {
+      const tbody = document.getElementById("recetas-body");
+      try {
+        const rows = await fetchApi("/api/admin/recetas-producto");
+        if (!rows || !rows.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin recetas configuradas.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = rows.map((row) => `
+          <tr>
+            <td>${escapeHtml((row.producto || "-") + (row.variante ? " - " + row.variante : ""))}</td>
+            <td>${escapeHtml(row.insumo || "-")}</td>
+            <td class="text-right">${Number(row.cantidad_por_unidad || 0).toLocaleString("es-MX")}</td>
+            <td>${escapeHtml(row.unidad_medida || "-")}</td>
+            <td class="${row.activo ? "" : "danger-text"}">${row.activo ? "Activa" : "Inactiva"}</td>
+            <td style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-dark" data-action="toggle-receta" data-receta-id="${row.receta_id}" data-next-activo="${row.activo ? "0" : "1"}" type="button">
+                ${row.activo ? "Desactivar" : "Activar"}
+              </button>
+              <button class="btn" data-action="edit-qty-receta" data-receta-id="${row.receta_id}" data-current-qty="${Number(row.cantidad_por_unidad || 0)}" type="button">Editar cantidad</button>
+            </td>
+          </tr>
+        `).join("");
+      } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="6" class="danger-text">${escapeHtml(error.message)}</td></tr>`;
+      }
+    }
+
+    async function actualizarComponenteReceta(recetaId, payload, okMessage) {
+      const status = document.getElementById("receta-status");
+      status.textContent = "Actualizando receta...";
+      try {
+        await fetchApi(`/api/admin/recetas-producto/${recetaId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        status.textContent = okMessage;
+        await Promise.allSettled([loadRecetasInventario(), loadProductosSinReceta(), loadAuditoriaNegocio()]);
+      } catch (error) {
+        status.textContent = `Error al actualizar receta: ${error.message}`;
+      }
+    }
+
+    async function loadMovimientosInventario() {
+      const tbody = document.getElementById("movimientos-inventario-body");
+      try {
+        const rows = await fetchApi("/api/admin/inventario/movimientos?limit=20");
+        if (!rows || !rows.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin movimientos registrados.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = rows.map((row) => {
+          const fecha = row.creado_en ? new Date(row.creado_en).toLocaleString("es-MX") : "-";
+          const mov = Number(row.cantidad_movimiento || 0);
+          const isSalida = mov < 0;
+          const referencia = row.referencia_tipo
+            ? `${row.referencia_tipo}#${row.referencia_id || "-"}`
+            : "-";
+          return `
+            <tr>
+              <td>${escapeHtml(fecha)}</td>
+              <td>${escapeHtml(row.insumo || "-")}</td>
+              <td>${escapeHtml(row.tipo || "-")}</td>
+              <td class="text-right ${isSalida ? "danger-text" : ""}">${mov.toLocaleString("es-MX")}</td>
+              <td class="text-right">${Number(row.stock_antes || 0).toLocaleString("es-MX")}</td>
+              <td class="text-right">${Number(row.stock_despues || 0).toLocaleString("es-MX")}</td>
+              <td>${escapeHtml(referencia)}</td>
+            </tr>
+          `;
+        }).join("");
+      } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="7" class="danger-text">${escapeHtml(error.message)}</td></tr>`;
+      }
+    }
+
+    async function guardarProductoManual() {
+      const status = document.getElementById("producto-manual-status");
+      const payload = {
+        nombre: document.getElementById("producto-manual-nombre").value.trim(),
+        variante: document.getElementById("producto-manual-variante").value.trim(),
+        precio: Number(document.getElementById("producto-manual-precio").value || 0),
+        activo: document.getElementById("producto-manual-activo").checked
+      };
+
+      status.textContent = "Guardando producto...";
+      try {
+        await fetchApi("/api/admin/productos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        status.textContent = "Producto guardado.";
+        await Promise.allSettled([loadCatalogOptionsInventario(), loadRecetasInventario(), loadProductosSinReceta(), loadAuditoriaNegocio()]);
+      } catch (error) {
+        status.textContent = `Error en producto: ${error.message}`;
+      }
+    }
+
+    async function guardarInsumoManual() {
+      const status = document.getElementById("insumo-manual-status");
+      const payload = {
+        nombre: document.getElementById("insumo-manual-nombre").value.trim(),
+        unidad_medida: document.getElementById("insumo-manual-unidad").value.trim(),
+        stock_minimo: Number(document.getElementById("insumo-manual-stock-minimo").value || 0),
+        stock_inicial: Number(document.getElementById("insumo-manual-stock-inicial").value || 0),
+        proveedor: document.getElementById("insumo-manual-proveedor").value.trim()
+      };
+
+      status.textContent = "Guardando insumo...";
+      try {
+        await fetchApi("/api/admin/insumos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        status.textContent = "Insumo guardado.";
+        await Promise.allSettled([
+          loadInventario(),
+          loadCatalogOptionsInventario(),
+          loadMovimientosInventario(),
+          loadResumenDb(),
+          loadAuditoriaNegocio()
+        ]);
+      } catch (error) {
+        status.textContent = `Error en insumo: ${error.message}`;
+      }
+    }
+
+    async function guardarComponenteReceta() {
+      const status = document.getElementById("receta-status");
+      const payload = {
+        producto_id: Number(document.getElementById("receta-producto-id").value || 0),
+        insumo_id: Number(document.getElementById("receta-insumo-id").value || 0),
+        cantidad_por_unidad: Number(document.getElementById("receta-cantidad").value || 0),
+        activo: true
+      };
+
+      status.textContent = "Guardando receta...";
+      try {
+        await fetchApi("/api/admin/recetas-producto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        status.textContent = "Receta guardada.";
+        await Promise.allSettled([loadRecetasInventario(), loadProductosSinReceta(), loadAuditoriaNegocio()]);
+      } catch (error) {
+        status.textContent = `Error en receta: ${error.message}`;
+      }
+    }
+
     async function submitCompra(event) {
       event.preventDefault();
       const status = document.getElementById("compra-status");
@@ -879,9 +2066,9 @@
           body: JSON.stringify(payload)
         });
         status.textContent = "Compra registrada.";
-        await loadInventario();
-      } catch (_error) {
-        status.textContent = "Endpoint /api/inventario/compras aun no implementado en backend.";
+        await Promise.allSettled([loadInventario(), loadComprasInventario(), loadResumenDb(), loadAuditoriaNegocio()]);
+      } catch (error) {
+        status.textContent = `Error al guardar compra: ${error.message}`;
       }
     }
 
@@ -910,25 +2097,151 @@
       state.charts.mes = buildBarChart("chart-mes", "Ventas del mes");
       state.charts.ano = buildBarChart("chart-ano", "Ventas del ano");
 
-      document.getElementById("btn-refrescar-ventas").addEventListener("click", loadVentasDia);
+      document.getElementById("btn-refrescar-ventas").addEventListener("click", refreshVentasSafely);
+      document.getElementById("btn-refrescar-db").addEventListener("click", async () => {
+        await Promise.allSettled([loadResumenDb(), loadRentabilidadProductos(), loadPedidosAdmin(), loadComprasInventario(), loadUsuariosSistema(), loadAuditoriaSeguridad(), loadAuditoriaNegocio()]);
+      });
+      document.getElementById("btn-refrescar-usuarios").addEventListener("click", async () => {
+        await Promise.allSettled([loadUsuariosSistema(), loadAuditoriaSeguridad(), loadAuditoriaNegocio(), loadResumenDb()]);
+      });
+      document.getElementById("btn-aplicar-filtro-seguridad").addEventListener("click", async () => {
+        await loadAuditoriaSeguridad();
+      });
+      document.getElementById("btn-limpiar-filtro-seguridad").addEventListener("click", async () => {
+        document.getElementById("filtro-seguridad-evento").value = "";
+        document.getElementById("filtro-seguridad-severidad").value = "";
+        document.getElementById("filtro-seguridad-actor").value = "";
+        document.getElementById("filtro-seguridad-desde").value = "";
+        document.getElementById("filtro-seguridad-hasta").value = "";
+        await loadAuditoriaSeguridad();
+      });
+      document.getElementById("btn-exportar-seguridad-csv").addEventListener("click", exportarAuditoriaSeguridadCsv);
+      document.getElementById("btn-aplicar-filtro-negocio").addEventListener("click", async () => {
+        await loadAuditoriaNegocio();
+      });
+      document.getElementById("btn-limpiar-filtro-negocio").addEventListener("click", async () => {
+        document.getElementById("filtro-negocio-tabla").value = "";
+        document.getElementById("filtro-negocio-actor").value = "";
+        document.getElementById("filtro-negocio-desde").value = "";
+        document.getElementById("filtro-negocio-hasta").value = "";
+        await loadAuditoriaNegocio();
+      });
+      document.getElementById("btn-exportar-negocio-csv").addEventListener("click", exportarAuditoriaNegocioCsv);
+      document.getElementById("btn-crear-usuario").addEventListener("click", crearUsuarioSistema);
+      document.getElementById("btn-guardar-producto-manual").addEventListener("click", guardarProductoManual);
+      document.getElementById("btn-guardar-insumo-manual").addEventListener("click", guardarInsumoManual);
+      document.getElementById("btn-guardar-receta").addEventListener("click", guardarComponenteReceta);
       document.getElementById("form-campana").addEventListener("submit", submitCampana);
       document.getElementById("form-compra").addEventListener("submit", submitCompra);
+
+      document.getElementById("pedidos-admin-body").addEventListener("click", async (event) => {
+        const button = event.target.closest("button[data-action='guardar-estado']");
+        if (!button) {
+          return;
+        }
+
+        const pedidoId = Number(button.getAttribute("data-pedido-id"));
+        const selector = document.getElementById(`estado-pedido-${pedidoId}`);
+        const nuevoEstado = selector ? selector.value : null;
+        if (!pedidoId || !nuevoEstado) {
+          return;
+        }
+
+        await actualizarEstadoPedido(pedidoId, nuevoEstado, button);
+      });
+
+      document.getElementById("recetas-body").addEventListener("click", async (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) {
+          return;
+        }
+
+        const action = button.getAttribute("data-action");
+        const recetaId = Number(button.getAttribute("data-receta-id"));
+        if (!recetaId) {
+          return;
+        }
+
+        if (action === "toggle-receta") {
+          const nextActivo = button.getAttribute("data-next-activo") === "1";
+          await actualizarComponenteReceta(recetaId, { activo: nextActivo }, nextActivo ? "Componente activado." : "Componente desactivado.");
+          return;
+        }
+
+        if (action === "edit-qty-receta") {
+          const currentQty = Number(button.getAttribute("data-current-qty") || 0);
+          const nextQtyStr = window.prompt("Nueva cantidad por unidad:", String(currentQty));
+          if (!nextQtyStr) {
+            return;
+          }
+          const nextQty = Number(nextQtyStr);
+          if (!Number.isFinite(nextQty) || nextQty <= 0) {
+            alert("Cantidad invalida. Debe ser mayor a 0.");
+            return;
+          }
+          await actualizarComponenteReceta(recetaId, { cantidad_por_unidad: nextQty }, "Cantidad de receta actualizada.");
+        }
+      });
+
+      document.getElementById("usuarios-body").addEventListener("click", async (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) {
+          return;
+        }
+
+        const action = button.getAttribute("data-action");
+        const usuarioId = Number(button.getAttribute("data-usuario-id"));
+        if (!usuarioId) {
+          return;
+        }
+
+        if (action === "toggle-usuario") {
+          const nextActivo = button.getAttribute("data-next-activo") === "1";
+          await actualizarUsuarioSistema(
+            usuarioId,
+            { activo: nextActivo },
+            nextActivo ? "Usuario activado." : "Usuario desactivado."
+          );
+          return;
+        }
+
+        if (action === "reset-password") {
+          const nuevaPassword = window.prompt("Nueva contrasena temporal (minimo 8 caracteres):", "");
+          if (!nuevaPassword) {
+            return;
+          }
+          await actualizarUsuarioSistema(usuarioId, { nueva_password: nuevaPassword }, "Contrasena actualizada.");
+        }
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          refreshVentasSafely().catch(() => {
+          });
+        }
+      });
 
       setUpModal();
 
       await Promise.allSettled([
-        loadVentasDia(),
-        loadVentasMes(),
-        loadVentasAno(),
+        refreshVentasSafely(),
+        loadResumenDb(),
+        loadRentabilidadProductos(),
+        loadPedidosAdmin(),
+        loadComprasInventario(),
+        loadCatalogOptionsInventario(),
+        loadUsuariosSistema(),
+        loadAuditoriaSeguridad(),
+        loadAuditoriaNegocio(),
         loadTopClientes(),
         loadCampanas(),
-        loadInventario()
+        loadInventario(),
+        loadRecetasInventario(),
+        loadProductosSinReceta(),
+        loadMovimientosInventario()
       ]);
 
-      setInterval(() => {
-        loadVentasDia().catch(() => {
-        });
-      }, 60 * 60 * 1000);
+      scheduleVentasRefresh();
     }
 
     initialLoad();

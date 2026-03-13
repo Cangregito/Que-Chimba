@@ -12,9 +12,7 @@ Variables de entorno requeridas:
   PUBLIC_BASE_URL       URL pública ngrok, p.ej. https://abc123.ngrok.io
 
 Variables de entorno opcionales (notificaciones WhatsApp post-pago):
-  TWILIO_ACCOUNT_SID
-  TWILIO_AUTH_TOKEN
-  TWILIO_WHATSAPP_FROM  p.ej. whatsapp:+14155238886
+    BAILEYS_BRIDGE_URL  p.ej. http://localhost:3001
 """
 
 import logging
@@ -219,27 +217,27 @@ def verificar_pago_mp(payment_id: str) -> dict:
 
 def enviar_whatsapp_pago(whatsapp_id: str, pedido_id: int, estado_mp: str) -> None:
     """
-    Envía al cliente una notificación de WhatsApp con el resultado del pago.
-    Usa la Twilio Messaging REST API (mensaje saliente, no TwiML).
+    Envia al cliente una notificacion de WhatsApp con el resultado del pago.
+    Usa el puente Baileys por HTTP.
 
     estado_mp: 'approved' | 'rejected' | 'pending' | 'cancelled'
     """
     mensajes = {
         "approved": (
-            f"✅ ¡Ay qué chimba, parce! Tu pago del pedido #{pedido_id} fue aprobado. "
-            "¡Ya estamos preparando tus empanadas con todo el amor colombiano! 🫔 Buena nota."
+            f"Ay que chimba, parce. Tu pago del pedido #{pedido_id} fue aprobado. "
+            "Ya estamos preparando tus empanadas con todo el amor colombiano. Buena nota."
         ),
         "rejected": (
-            f"😬 Uy parce, el pago del pedido #{pedido_id} no pasó. "
-            "Intenta con otra tarjeta o escríbenos para ayudarte. ¡Dale que sí!"
+            f"Uy parce, el pago del pedido #{pedido_id} no paso. "
+            "Intenta con otra tarjeta o escribenos para ayudarte. Dale que si."
         ),
         "cancelled": (
-            f"❌ Parce, el pago del pedido #{pedido_id} fue cancelado. "
-            "Si fue un error, vuelve a intentar. ¡Aquí estamos, mi rey!"
+            f"Parce, el pago del pedido #{pedido_id} fue cancelado. "
+            "Si fue un error, vuelve a intentar. Aqui estamos, mi rey."
         ),
         "pending": (
-            f"⏳ Listo parce, el pago del pedido #{pedido_id} está en proceso. "
-            "Te avisamos en cuanto se confirme. ¡Tranquilo mi rey, vas a comer rico!"
+            f"Listo parce, el pago del pedido #{pedido_id} esta en proceso. "
+            "Te avisamos en cuanto se confirme. Tranquilo mi rey, vas a comer rico."
         ),
     }
 
@@ -248,27 +246,22 @@ def enviar_whatsapp_pago(whatsapp_id: str, pedido_id: int, estado_mp: str) -> No
         f"Novedad en tu pedido #{pedido_id}: estado de pago actualizado a '{estado_mp}'.",
     )
 
-    account_sid  = os.getenv("TWILIO_ACCOUNT_SID",    "").strip()
-    auth_token   = os.getenv("TWILIO_AUTH_TOKEN",      "").strip()
-    from_number  = os.getenv("TWILIO_WHATSAPP_FROM",   "whatsapp:+14155238886").strip()
-
-    if not account_sid or not auth_token:
-        logger.warning(
-            "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN no configurados. "
-            "No se enviará notificación WA post-pago para pedido %s.",
-            pedido_id,
-        )
+    bridge_url = os.getenv("BAILEYS_BRIDGE_URL", "http://localhost:3001").strip().rstrip("/")
+    if not bridge_url:
+        logger.warning("BAILEYS_BRIDGE_URL no configurado. Se omite notificacion de pago para pedido %s.", pedido_id)
         return
 
-    to = whatsapp_id if whatsapp_id.startswith("whatsapp:") else f"whatsapp:{whatsapp_id}"
+    to = (whatsapp_id or "").replace("whatsapp:", "").strip()
+    if not to:
+        logger.warning("whatsapp_id vacio para pedido %s. No se envia notificacion de pago.", pedido_id)
+        return
 
     try:
         http.post(
-            f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
-            data={"From": from_number, "To": to, "Body": body},
-            auth=(account_sid, auth_token),
+            f"{bridge_url}/api/send-text",
+            json={"to": to, "text": body},
             timeout=10,
-        )
+        ).raise_for_status()
         logger.info("Notificación WA enviada a %s (pedido %s, estado %s)", to, pedido_id, estado_mp)
     except Exception as exc:
         logger.error("enviar_whatsapp_pago(%s): %s", whatsapp_id, exc)

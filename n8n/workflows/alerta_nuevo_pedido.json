@@ -67,23 +67,18 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.twilio.com/2010-04-01/Accounts/' + $env.TWILIO_ACCOUNT_SID + '/Messages.json' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "httpBasicAuth",
+        "url": "={{ $env.BAILEYS_BRIDGE_URL + '/api/send-text' }}",
         "sendBody": true,
-        "contentType": "form-urlencoded",
+        "contentType": "json",
+        "specifyBody": "json",
         "bodyParameters": {
           "parameters": [
             {
-              "name": "From",
-              "value": "={{ $env.TWILIO_WHATSAPP_FROM }}"
-            },
-            {
-              "name": "To",
+              "name": "to",
               "value": "={{ $env.WHATSAPP_COCINA }}"
             },
             {
-              "name": "Body",
+              "name": "text",
               "value": "={{ $json.msg_cocina }}"
             }
           ]
@@ -91,7 +86,7 @@
         "options": {}
       },
       "id": "3",
-      "name": "Twilio Cocina",
+      "name": "WhatsApp Cocina",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -122,23 +117,18 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.twilio.com/2010-04-01/Accounts/' + $env.TWILIO_ACCOUNT_SID + '/Messages.json' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "httpBasicAuth",
+        "url": "={{ $env.BAILEYS_BRIDGE_URL + '/api/send-text' }}",
         "sendBody": true,
-        "contentType": "form-urlencoded",
+        "contentType": "json",
+        "specifyBody": "json",
         "bodyParameters": {
           "parameters": [
             {
-              "name": "From",
-              "value": "={{ $env.TWILIO_WHATSAPP_FROM }}"
-            },
-            {
-              "name": "To",
+              "name": "to",
               "value": "={{ $env.WHATSAPP_ADMIN }}"
             },
             {
-              "name": "Body",
+              "name": "text",
               "value": "={{ $json.msg_admin }}"
             }
           ]
@@ -146,7 +136,7 @@
         "options": {}
       },
       "id": "5",
-      "name": "Twilio Admin Evento",
+      "name": "WhatsApp Admin Evento",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -188,14 +178,14 @@
       "main": [
         [
           {
-            "node": "Twilio Cocina",
+            "node": "WhatsApp Cocina",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Twilio Cocina": {
+    "WhatsApp Cocina": {
       "main": [
         [
           {
@@ -215,7 +205,7 @@
       "main": [
         [
           {
-            "node": "Twilio Admin Evento",
+            "node": "WhatsApp Admin Evento",
             "type": "main",
             "index": 0
           }

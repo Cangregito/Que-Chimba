@@ -431,6 +431,91 @@
         grid-template-columns: 1fr;
       }
     }
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    body {
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(255, 173, 50, 0.18) 0%, transparent 34%),
+        radial-gradient(circle at 92% 16%, rgba(69, 167, 245, 0.2) 0%, transparent 30%),
+        linear-gradient(180deg, #0f151b 0%, #111922 100%);
+    }
+
+    .panel,
+    .order-card,
+    .route-item,
+    .confirm-box,
+    .empty {
+      border-radius: 14px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%), #18212b;
+    }
+
+    .order-card {
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .order-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.32);
+    }
+
+    .btn,
+    .inline-btn {
+      border-radius: 11px;
+      letter-spacing: 0.2px;
+    }
+
+    .layout {
+      animation: riseIn 0.35s ease;
+    }
+
+    @keyframes riseIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .title h1 {
+      font-size: clamp(1.7rem, 3vw, 2.2rem);
+      letter-spacing: -0.02em;
+    }
+
+    .order-id {
+      letter-spacing: -0.01em;
+    }
+
+    .order-card {
+      background: linear-gradient(180deg, rgba(12, 18, 24, 0.95) 0%, rgba(20, 28, 36, 0.86) 100%);
+    }
+
+    .route-item {
+      background: linear-gradient(180deg, rgba(14, 21, 28, 0.9) 0%, rgba(20, 30, 39, 0.76) 100%);
+    }
+
+    .status {
+      font-size: 0.78rem;
+      letter-spacing: 0.8px;
+    }
+
+    .confirm-row input {
+      font-family: inherit;
+      font-weight: 600;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -484,6 +569,8 @@
 
   <script>
     let allPedidos = [];
+    let refreshTimer = null;
+    let isLoadingPedidos = false;
 
     const ordersContainer = document.getElementById("orders-container");
     const routeContainer = document.getElementById("route-container");
@@ -499,8 +586,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("btn-refresh").addEventListener("click", loadPedidos);
-      loadPedidos();
-      setInterval(loadPedidos, REFRESH_MS);
+      initPolling();
     });
 
     function normalizePayload(payload) {
@@ -546,7 +632,12 @@
       return pedidos.filter((p) => p.estado === "listo");
     }
 
-    async function loadPedidos() {
+    async function loadPedidos(force = false) {
+      if (isLoadingPedidos && !force) {
+        return;
+      }
+
+      isLoadingPedidos = true;
       hideMessages();
       try {
         const res = await fetch("/api/repartidor/pedidos", { method: "GET" });
@@ -566,7 +657,41 @@
         allPedidos = [];
         render();
         showError("Error de conexion al cargar pedidos de repartidor.");
+      } finally {
+        isLoadingPedidos = false;
       }
+    }
+
+    function scheduleRefresh() {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = setTimeout(async () => {
+        if (!document.hidden) {
+          await loadPedidos();
+        }
+        scheduleRefresh();
+      }, REFRESH_MS);
+    }
+
+    function initPolling() {
+      loadPedidos(true).catch(() => {
+      });
+      scheduleRefresh();
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          loadPedidos(true).catch(() => {
+          });
+        }
+      });
+
+      window.addEventListener("beforeunload", () => {
+        if (refreshTimer) {
+          clearTimeout(refreshTimer);
+        }
+      });
     }
 
     function render() {
@@ -723,7 +848,7 @@
         }
 
         closeConfirm(pedidoId);
-        await loadPedidos();
+        await loadPedidos(true);
       } catch (_err) {
         showError("No fue posible confirmar la entrega en este momento.");
       }
