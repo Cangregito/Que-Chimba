@@ -224,11 +224,20 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=que_chimba
 DB_USER=postgres
-DB_PASSWORD=postgres
+DB_PASSWORD=
+FLASK_SECRET=
 PORT=5000
+FLASK_DEBUG=0
+SESSION_COOKIE_SECURE=1
+SESSION_COOKIE_SAMESITE=Lax
 PUBLIC_BASE_URL=
 N8N_PEDIDO_WEBHOOK_URL=http://localhost:5678/webhook/pedido-alerta
 BAILEYS_BRIDGE_URL=http://localhost:3001
+BAILEYS_BRIDGE_API_TOKEN=
+BAILEYS_WEBHOOK_TOKEN=
+ADMIN_DEFAULT_PASSWORD=
+COCINA_DEFAULT_PASSWORD=
+REPARTIDOR_DEFAULT_PASSWORD=
 MP_ACCESS_TOKEN=
 MP_SANDBOX=true
 WHISPER_MODEL=tiny
@@ -259,7 +268,13 @@ $env:DB_HOST='localhost'
 $env:DB_PORT='5432'
 $env:DB_NAME='que_chimba'
 $env:DB_USER='postgres'
-$env:DB_PASSWORD='postgres'
+$env:DB_PASSWORD='<tu-password-seguro>'
+$env:FLASK_SECRET='<clave-larga-aleatoria>'
+$env:ADMIN_DEFAULT_PASSWORD='<password-admin>'
+$env:COCINA_DEFAULT_PASSWORD='<password-cocina>'
+$env:REPARTIDOR_DEFAULT_PASSWORD='<password-repartidor>'
+$env:BAILEYS_BRIDGE_API_TOKEN='<token-bridge>'
+$env:BAILEYS_WEBHOOK_TOKEN='<token-webhook>'
 $env:N8N_PEDIDO_WEBHOOK_URL='http://localhost:5678/webhook/pedido-alerta'
 .\.venv\Scripts\python.exe bot_empanadas\app.py
 ```
@@ -278,11 +293,11 @@ docker-compose up -d
 
 ## Credenciales demo
 
-Los usuarios base se crean automaticamente si no existen:
+Los usuarios base se crean automaticamente si no existen, usando estas variables:
 
-- `admin / admin123`
-- `cocina / cocina123`
-- `repartidor / repartidor123`
+- `ADMIN_DEFAULT_PASSWORD`
+- `COCINA_DEFAULT_PASSWORD`
+- `REPARTIDOR_DEFAULT_PASSWORD`
 
 ## Flujo de demo sugerido
 

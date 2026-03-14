@@ -17,6 +17,9 @@ AUDIO_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
+TTS_LANG = (os.getenv("TTS_LANG", "es") or "es").strip().lower()
+TTS_TLD = (os.getenv("TTS_TLD", "com.co") or "com.co").strip().lower()
+
 FRASES_COLOMBIANAS = {
     "bienvenida": [
         "Ey parce, que mas. Bienvenido a Que Chimba empanadas. Hagamosle con tu pedido.",
@@ -185,7 +188,7 @@ def generar_audio_colombiano(estado: str, datos_dinamicos: Optional[Dict[str, An
     ogg_path = AUDIO_TEMP_DIR / f"{unique_id}.ogg"
 
     try:
-        tts = gTTS(text=texto_final, lang="es", tld="com.mx", slow=False)
+        tts = gTTS(text=texto_final, lang=TTS_LANG, tld=TTS_TLD, slow=False)
         tts.save(str(mp3_path))
 
         _run_ffmpeg([
@@ -220,7 +223,7 @@ def _generar_audio_desde_texto(texto: str) -> str:
     ogg_path = AUDIO_TEMP_DIR / f"{unique_id}.ogg"
 
     try:
-        tts = gTTS(text=texto, lang="es", tld="com.mx", slow=False)
+        tts = gTTS(text=texto, lang=TTS_LANG, tld=TTS_TLD, slow=False)
         tts.save(str(mp3_path))
 
         _run_ffmpeg([

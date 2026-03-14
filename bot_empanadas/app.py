@@ -4,6 +4,7 @@ import logging
 import os
 import csv
 import io
+import secrets
 from datetime import date, datetime
 from decimal import Decimal
 from functools import wraps
@@ -72,11 +73,20 @@ else:
 
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET", "cambia-esta-clave-en-produccion")
+_flask_secret = (os.getenv("FLASK_SECRET", "") or "").strip()
+if not _flask_secret:
+    _flask_secret = secrets.token_hex(32)
+app.config["SECRET_KEY"] = _flask_secret
 app.config["JSON_SORT_KEYS"] = False
 app.config["AUDIO_DIR"] = os.path.join(os.path.dirname(__file__), "audios_temp")
 app.config["PUBLIC_BASE_URL"] = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 app.config["N8N_PEDIDO_WEBHOOK_URL"] = os.getenv("N8N_PEDIDO_WEBHOOK_URL", "").strip()
+app.config["BAILEYS_BRIDGE_URL"] = (os.getenv("BAILEYS_BRIDGE_URL", "http://localhost:3001") or "http://localhost:3001").rstrip("/")
+app.config["BAILEYS_BRIDGE_API_TOKEN"] = (os.getenv("BAILEYS_BRIDGE_API_TOKEN", "") or "").strip()
+app.config["BAILEYS_WEBHOOK_TOKEN"] = (os.getenv("BAILEYS_WEBHOOK_TOKEN", "") or "").strip()
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = (os.getenv("SESSION_COOKIE_SAMESITE", "Lax") or "Lax").strip()
+app.config["SESSION_COOKIE_SECURE"] = (os.getenv("SESSION_COOKIE_SECURE", "0") or "0").strip().lower() in {"1", "true", "yes", "on"}
 
 root_templates_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "templates"))
 if os.path.isdir(root_templates_dir):
@@ -95,6 +105,9 @@ if not logging.getLogger().handlers:
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
 app.logger.setLevel(_log_level)
+
+if not (os.getenv("FLASK_SECRET", "") or "").strip():
+    app.logger.warning("FLASK_SECRET no esta configurado. Se usa una clave aleatoria temporal para esta ejecucion.")
 
 
 ESTADOS_VALIDOS_PEDIDO = {
@@ -141,6 +154,35 @@ def _client_ip():
     return (request.remote_addr or "").strip() or None
 
 
+def _es_origen_valido() -> bool:
+    expected = request.host_url.rstrip("/").lower()
+    origin = (request.headers.get("Origin") or "").strip().lower()
+    referer = (request.headers.get("Referer") or "").strip().lower()
+
+    if origin:
+        return origin.startswith(expected)
+    if referer:
+        return referer.startswith(expected)
+    return True
+
+
+@app.before_request
+def _hardening_before_request():
+    method = request.method.upper()
+    if method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return None
+
+    path = request.path or ""
+    if path.startswith("/webhook") or path in {"/login"}:
+        return None
+
+    if path.startswith("/api/") and session.get("user"):
+        if not _es_origen_valido():
+            return _error("Origen no autorizado", 403)
+
+    return None
+
+
 def _resumen_items_para_alerta(items):
     if not isinstance(items, list) or not items:
         return "sin productos"
@@ -175,6 +217,38 @@ def _notificar_n8n_nuevo_pedido(created, payload):
         app.logger.warning("No se pudo notificar a n8n para pedido %s: %s", body["id"], exc)
 
 
+def _enviar_texto_whatsapp(destino, texto):
+    bridge_url = app.config.get("BAILEYS_BRIDGE_URL", "")
+    if not bridge_url:
+        return {"error": "BAILEYS_BRIDGE_URL no configurado."}
+
+    bridge_token = app.config.get("BAILEYS_BRIDGE_API_TOKEN", "")
+    headers = {"Content-Type": "application/json"}
+    if bridge_token:
+        headers["x-bridge-token"] = bridge_token
+
+    try:
+        resp = requests.post(
+            f"{bridge_url}/api/send-text",
+            json={"to": destino, "text": texto},
+            timeout=10,
+            headers=headers,
+        )
+    except Exception as exc:
+        return {"error": f"No se pudo conectar al bridge de WhatsApp: {exc}"}
+
+    try:
+        payload = resp.json()
+    except Exception:
+        payload = {}
+
+    if not resp.ok or payload.get("ok") is not True:
+        msg = payload.get("error") or f"Bridge respondio HTTP {resp.status_code}"
+        return {"error": str(msg)}
+
+    return {"ok": True}
+
+
 def login_required(roles=None):
     roles = roles or []
 
@@ -201,7 +275,7 @@ def health():
 
 @app.get("/")
 def landing():
-    raw_number = os.getenv("WHATSAPP_PUBLIC_NUMBER", "14155238886")
+    raw_number = os.getenv("WHATSAPP_PUBLIC_NUMBER", "526567751166")
     message = os.getenv("WHATSAPP_PUBLIC_MESSAGE", "Hola Que Chimba, quiero pedir unas empanadas")
 
     wa_number = "".join(ch for ch in str(raw_number) if ch.isdigit())
@@ -238,6 +312,7 @@ def login_post():
         "username": user.get("username"),
         "rol": user.get("rol"),
         "nombre_mostrar": user.get("nombre_mostrar"),
+        "area_entrega": user.get("area_entrega"),
     }
     return _ok(session["user"])
 
@@ -390,8 +465,12 @@ def api_actualizar_estado_pedido(pedido_id):
 def api_repartidor_pedidos():
     user = session.get("user", {})
     repartidor_usuario = None if user.get("rol") == "admin" else user.get("username")
+    area_entrega = None if user.get("rol") == "admin" else user.get("area_entrega")
 
-    data = db.obtener_pedidos_repartidor(repartidor_usuario=repartidor_usuario)
+    data = db.obtener_pedidos_repartidor(
+        repartidor_usuario=repartidor_usuario,
+        area_entrega=area_entrega,
+    )
     if isinstance(data, dict) and data.get("error"):
         return _error(data["error"], 500)
 
@@ -420,6 +499,7 @@ def api_repartidor_pedidos():
                 or "Cliente",
                 "direccion_entrega": row.get("direccion_entrega") or "Sin direccion",
                 "codigo_postal": row.get("codigo_postal") or "00000",
+                "area_entrega": row.get("area_entrega") or row.get("codigo_postal") or "N/A",
                 "productos": productos,
             }
         )
@@ -432,8 +512,14 @@ def api_repartidor_pedidos():
 def api_confirmar_entrega_pedido(pedido_id):
     payload = request.get_json(silent=True) or {}
     codigo_entrega = payload.get("codigo_entrega")
+    actor = session.get("user", {})
 
-    updated = db.confirmar_entrega_pedido(pedido_id=pedido_id, codigo_entrega=codigo_entrega)
+    updated = db.confirmar_entrega_pedido(
+        pedido_id=pedido_id,
+        codigo_entrega=codigo_entrega,
+        actor_usuario=actor.get("username"),
+        rol_actor=actor.get("rol"),
+    )
     if isinstance(updated, dict) and updated.get("error"):
         msg = updated["error"].lower()
         status = 404 if "no encontrado" in msg else 400
@@ -448,8 +534,14 @@ def api_asignar_pedido_repartidor():
     pedido_id = payload.get("pedido_id")
     repartidor_usuario = payload.get("repartidor_usuario")
 
-    if not pedido_id or not repartidor_usuario:
-        return _error("pedido_id y repartidor_usuario son obligatorios", 400)
+    if not pedido_id:
+        return _error("pedido_id es obligatorio", 400)
+
+    if not repartidor_usuario:
+        return _error(
+            "repartidor_usuario es obligatorio. Usa un usuario de rol repartidor con area_entrega configurada.",
+            400,
+        )
 
     created = db.asignar_pedido_repartidor(
         pedido_id=pedido_id,
@@ -481,8 +573,49 @@ def api_bitacora_pedido(pedido_id):
 @app.post("/api/pedidos/<int:pedido_id>/reenviar-codigo")
 @login_required(roles=["admin", "repartidor"])
 def api_reenviar_codigo_pedido(pedido_id):
-    # En entorno demo local sin proveedor transaccional, registramos intento exitoso.
-    return _ok({"pedido_id": pedido_id, "message": "Codigo reenviado al cliente (demo)."})
+    data = db.obtener_o_generar_codigo_entrega_pedido(pedido_id=pedido_id)
+    if isinstance(data, dict) and data.get("error"):
+        msg = data["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(data["error"], status)
+
+    destino_data = db.obtener_destino_whatsapp_por_pedido(pedido_id=pedido_id)
+    if isinstance(destino_data, dict) and destino_data.get("error"):
+        msg = destino_data["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(destino_data["error"], status)
+
+    codigo = data.get("codigo_entrega")
+    destino = _normalizar_whatsapp_id(destino_data.get("whatsapp_id"))
+    mensaje = (
+        f"Buena nota, tu codigo de entrega para el pedido #{pedido_id} es: {codigo}. "
+        "Compartelo al repartidor para liberar el pedido."
+    )
+
+    enviado = _enviar_texto_whatsapp(destino=destino, texto=mensaje)
+    if isinstance(enviado, dict) and enviado.get("error"):
+        return _error(f"No se pudo reenviar el codigo por WhatsApp: {enviado['error']}", 502)
+
+    db.crear_log_notificacion(
+        {
+            "pedido_id": pedido_id,
+            "canal": "whatsapp",
+            "destino": destino,
+            "tipo": "codigo_entrega",
+            "mensaje": mensaje,
+            "total": None,
+            "direccion": None,
+        }
+    )
+
+    return _ok(
+        {
+            "pedido_id": pedido_id,
+            "codigo_entrega": codigo,
+            "destino": destino,
+            "message": "Codigo reenviado por WhatsApp al cliente.",
+        }
+    )
 
 
 @app.post("/api/evaluaciones/programar")
@@ -732,7 +865,10 @@ def api_admin_productos_sin_receta():
 @app.get("/api/admin/usuarios")
 @login_required(roles=["admin"])
 def api_admin_usuarios_listar():
-    data = db.obtener_usuarios_sistema()
+    rol = (request.args.get("rol") or "").strip() or None
+    area_entrega = (request.args.get("area_entrega") or "").strip() or None
+
+    data = db.obtener_usuarios_sistema(rol=rol, area_entrega=area_entrega)
     if isinstance(data, dict) and data.get("error"):
         return _error(data["error"], 500)
     return _ok(data)
@@ -748,6 +884,7 @@ def api_admin_usuarios_crear():
     rol = payload.get("rol")
     nombre_mostrar = payload.get("nombre_mostrar") or payload.get("nombre")
     telefono = payload.get("telefono")
+    area_entrega = payload.get("area_entrega")
 
     created = db.crear_usuario_sistema(
         username=username,
@@ -755,6 +892,7 @@ def api_admin_usuarios_crear():
         rol=rol,
         nombre_mostrar=nombre_mostrar,
         telefono=telefono,
+        area_entrega=area_entrega,
         actor_usuario_id=actor.get("usuario_id"),
         actor_username=actor.get("username"),
         actor_rol=actor.get("rol"),
@@ -775,6 +913,7 @@ def api_admin_usuarios_actualizar(usuario_id):
         rol=payload.get("rol"),
         nombre_mostrar=payload.get("nombre_mostrar"),
         telefono=payload.get("telefono"),
+        area_entrega=payload.get("area_entrega") if "area_entrega" in payload else None,
         activo=payload.get("activo") if "activo" in payload else None,
         nueva_password=payload.get("nueva_password"),
         actor_usuario_id=actor.get("usuario_id"),
@@ -1042,6 +1181,12 @@ def webhook_whatsapp():
 
 @app.post("/webhook/baileys")
 def webhook_baileys():
+    expected_token = app.config.get("BAILEYS_WEBHOOK_TOKEN", "")
+    if expected_token:
+        incoming_token = (request.headers.get("x-bridge-token") or "").strip()
+        if incoming_token != expected_token:
+            return _error("Token de bridge invalido", 401)
+
     payload = request.get_json(silent=True) or {}
 
     whatsapp_id = _normalizar_whatsapp_id(payload.get("whatsapp_id") or payload.get("from") or payload.get("jid"))
@@ -1109,4 +1254,5 @@ def server_error(_err):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    debug_enabled = (os.getenv("FLASK_DEBUG", "0") or "0").strip().lower() in {"1", "true", "yes", "on"}
+    app.run(host="0.0.0.0", port=port, debug=debug_enabled)

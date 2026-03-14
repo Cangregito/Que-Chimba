@@ -1,5 +1,7 @@
 import json
 import os
+import random
+import string
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -9,13 +11,16 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 
 def _db_config():
-    return {
+    cfg = {
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", "5432")),
         "dbname": os.getenv("DB_NAME", "que_chimba"),
         "user": os.getenv("DB_USER", "postgres"),
-        "password": os.getenv("DB_PASSWORD", "postgres"),
     }
+    db_password = os.getenv("DB_PASSWORD")
+    if db_password is not None and db_password != "":
+        cfg["password"] = db_password
+    return cfg
 
 
 def get_connection():
@@ -69,6 +74,143 @@ TRANSICIONES_PEDIDO_VALIDAS = {
 }
 
 
+def _normalizar_area_entrega(value):
+    return (str(value or "").strip() or None)
+
+
+def _score_area_cercania(area_pedido, area_repartidor):
+    pedido = (_normalizar_area_entrega(area_pedido) or "").lower()
+    repartidor = (_normalizar_area_entrega(area_repartidor) or "").lower()
+    if not pedido or not repartidor:
+        return -1
+
+    if pedido == repartidor:
+        return 10000
+
+    if pedido.isdigit() and repartidor.isdigit() and len(pedido) == 5 and len(repartidor) == 5:
+        return max(0, 8000 - abs(int(pedido) - int(repartidor)))
+
+    common = 0
+    for cp, cr in zip(pedido, repartidor):
+        if cp != cr:
+            break
+        common += 1
+
+    return common * 100
+
+
+def _seleccionar_repartidor_para_area_cur(cur, area_pedido):
+    cur.execute(
+        """
+        SELECT
+            u.username,
+            u.area_entrega,
+            COALESCE(
+                (
+                    SELECT COUNT(1)
+                    FROM asignaciones_reparto ar
+                    JOIN pedidos p ON p.pedido_id = ar.pedido_id
+                    WHERE ar.repartidor_usuario = u.username
+                      AND ar.activo = TRUE
+                      AND p.estado IN ('listo', 'en_camino')
+                ),
+                0
+            )::INT AS carga_activa
+        FROM usuarios_sistema u
+        WHERE u.rol = 'repartidor'
+          AND u.activo = TRUE
+          AND COALESCE(NULLIF(TRIM(u.area_entrega), ''), '') <> ''
+        """
+    )
+    candidatos = cur.fetchall() or []
+    if not candidatos:
+        return None
+
+    scoreados = []
+    for cand in candidatos:
+        score = _score_area_cercania(area_pedido, cand.get("area_entrega"))
+        if score < 0:
+            continue
+        scoreados.append(
+            {
+                "username": cand.get("username"),
+                "area_entrega": cand.get("area_entrega"),
+                "carga_activa": int(cand.get("carga_activa") or 0),
+                "score_area": int(score),
+            }
+        )
+
+    if not scoreados:
+        return None
+
+    scoreados.sort(key=lambda x: (-x["score_area"], x["carga_activa"], str(x["username"] or "")))
+    return scoreados[0]
+
+
+def _auto_asignar_repartidor_pedido_cur(cur, pedido_id, asignado_por="sistema_auto"):
+    cur.execute(
+        """
+        SELECT ar.asignacion_id, ar.pedido_id, ar.repartidor_usuario, ar.asignado_por, ar.asignado_en, ar.activo
+        FROM asignaciones_reparto ar
+        WHERE ar.pedido_id = %s AND ar.activo = TRUE
+        LIMIT 1
+        """,
+        (pedido_id,),
+    )
+    ya_asignado = cur.fetchone()
+    if ya_asignado:
+        return ya_asignado
+
+    cur.execute(
+        """
+        SELECT
+            p.pedido_id,
+            p.estado,
+            COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000')) AS area_entrega
+        FROM pedidos p
+        LEFT JOIN direcciones_cliente dc ON dc.direccion_id = p.direccion_id
+        WHERE p.pedido_id = %s
+        LIMIT 1
+        """,
+        (pedido_id,),
+    )
+    pedido = cur.fetchone()
+    if not pedido:
+        return None
+
+    estado = (pedido.get("estado") or "").strip().lower()
+    if estado not in {"listo", "en_camino"}:
+        return None
+
+    seleccionado = _seleccionar_repartidor_para_area_cur(cur, pedido.get("area_entrega"))
+    if not seleccionado:
+        return None
+
+    cur.execute(
+        """
+        UPDATE asignaciones_reparto
+        SET activo = FALSE
+        WHERE pedido_id = %s AND activo = TRUE
+        """,
+        (pedido_id,),
+    )
+
+    cur.execute(
+        """
+        INSERT INTO asignaciones_reparto (pedido_id, repartidor_usuario, asignado_por, activo)
+        VALUES (%s, %s, %s, TRUE)
+        RETURNING asignacion_id, pedido_id, repartidor_usuario, asignado_por, asignado_en, activo
+        """,
+        (pedido_id, seleccionado.get("username"), asignado_por),
+    )
+    nueva = cur.fetchone()
+    if nueva is not None:
+        nueva["area_entrega"] = seleccionado.get("area_entrega")
+        nueva["score_area"] = seleccionado.get("score_area")
+        nueva["carga_activa"] = seleccionado.get("carga_activa")
+    return nueva
+
+
 def _asegurar_tabla_usuarios_sistema(conn):
     with conn.cursor() as cur:
         cur.execute(
@@ -80,6 +222,7 @@ def _asegurar_tabla_usuarios_sistema(conn):
                 rol VARCHAR(30) NOT NULL,
                 nombre_mostrar VARCHAR(120) NOT NULL,
                 telefono VARCHAR(30),
+                area_entrega VARCHAR(80),
                 activo BOOLEAN NOT NULL DEFAULT TRUE,
                 intentos_fallidos SMALLINT NOT NULL DEFAULT 0,
                 bloqueado_hasta TIMESTAMP,
@@ -117,8 +260,21 @@ def _asegurar_tabla_usuarios_sistema(conn):
         )
         cur.execute(
             """
+            ALTER TABLE usuarios_sistema
+            ADD COLUMN IF NOT EXISTS area_entrega VARCHAR(80)
+            """
+        )
+        cur.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_usuarios_sistema_rol_activo
                 ON usuarios_sistema (rol, activo)
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_usuarios_sistema_reparto_area
+                ON usuarios_sistema (rol, area_entrega)
+                WHERE activo = TRUE
             """
         )
 
@@ -127,18 +283,19 @@ def _bootstrap_usuarios_por_rol(conn):
     defaults = {
         "admin": {
             "username": os.getenv("ADMIN_DEFAULT_USERNAME", "admin").strip() or "admin",
-            "password": os.getenv("ADMIN_DEFAULT_PASSWORD", "admin123"),
+            "password": (os.getenv("ADMIN_DEFAULT_PASSWORD", "") or "").strip(),
             "nombre": os.getenv("ADMIN_DEFAULT_NAME", "Administrador"),
         },
         "cocina": {
             "username": os.getenv("COCINA_DEFAULT_USERNAME", "cocina").strip() or "cocina",
-            "password": os.getenv("COCINA_DEFAULT_PASSWORD", "cocina123"),
+            "password": (os.getenv("COCINA_DEFAULT_PASSWORD", "") or "").strip(),
             "nombre": os.getenv("COCINA_DEFAULT_NAME", "Operador Cocina"),
         },
         "repartidor": {
             "username": os.getenv("REPARTIDOR_DEFAULT_USERNAME", "repartidor").strip() or "repartidor",
-            "password": os.getenv("REPARTIDOR_DEFAULT_PASSWORD", "repartidor123"),
+            "password": (os.getenv("REPARTIDOR_DEFAULT_PASSWORD", "") or "").strip(),
             "nombre": os.getenv("REPARTIDOR_DEFAULT_NAME", "Operador Reparto"),
+            "area_entrega": _normalizar_area_entrega(os.getenv("REPARTIDOR_DEFAULT_AREA", "juarez-centro")),
         },
     }
 
@@ -156,10 +313,15 @@ def _bootstrap_usuarios_por_rol(conn):
             if cur.fetchone():
                 continue
 
+            if not data["password"]:
+                raise RuntimeError(
+                    f"Falta {rol.upper()}_DEFAULT_PASSWORD para crear el usuario inicial de rol '{rol}'."
+                )
+
             cur.execute(
                 """
-                INSERT INTO usuarios_sistema (username, password_hash, rol, nombre_mostrar, activo)
-                VALUES (%s, %s, %s, %s, TRUE)
+                INSERT INTO usuarios_sistema (username, password_hash, rol, nombre_mostrar, area_entrega, activo)
+                VALUES (%s, %s, %s, %s, %s, TRUE)
                 ON CONFLICT (username) DO NOTHING
                 """,
                 (
@@ -167,6 +329,7 @@ def _bootstrap_usuarios_por_rol(conn):
                     generate_password_hash(data["password"]),
                     rol,
                     data["nombre"],
+                    data.get("area_entrega") if rol == "repartidor" else None,
                 ),
             )
 
@@ -520,6 +683,7 @@ def autenticar_usuario(username, password, direccion_ip=None):
                     password_hash,
                     rol,
                     nombre_mostrar,
+                    area_entrega,
                     activo,
                     intentos_fallidos,
                     bloqueado_hasta
@@ -630,6 +794,7 @@ def autenticar_usuario(username, password, direccion_ip=None):
                 "username": row["username"],
                 "rol": row["rol"],
                 "nombre_mostrar": row["nombre_mostrar"],
+                "area_entrega": row.get("area_entrega"),
             }
     except Exception as exc:
         if conn:
@@ -640,28 +805,48 @@ def autenticar_usuario(username, password, direccion_ip=None):
             conn.close()
 
 
-def obtener_usuarios_sistema():
+def obtener_usuarios_sistema(rol=None, area_entrega=None):
     conn = None
     try:
         conn = get_connection()
         _asegurar_tabla_usuarios_sistema(conn)
         _bootstrap_usuarios_por_rol(conn)
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            filtros = []
+            params = []
+
+            rol_val = (rol or "").strip().lower()
+            if rol_val:
+                filtros.append("rol = %s")
+                params.append(rol_val)
+
+            area = _normalizar_area_entrega(area_entrega)
+            if area:
+                filtros.append("LOWER(COALESCE(area_entrega, '')) = LOWER(%s)")
+                params.append(area)
+
+            where_sql = ""
+            if filtros:
+                where_sql = "WHERE " + " AND ".join(filtros)
+
             cur.execute(
-                """
+                f"""
                 SELECT
                     usuario_id,
                     username,
                     rol,
                     nombre_mostrar,
                     telefono,
+                    area_entrega,
                     activo,
                     ultimo_login,
                     creado_en,
                     actualizado_en
                 FROM usuarios_sistema
+                {where_sql}
                 ORDER BY rol, username
-                """
+                """,
+                tuple(params),
             )
             return cur.fetchall()
     except Exception as exc:
@@ -677,6 +862,7 @@ def crear_usuario_sistema(
     rol,
     nombre_mostrar,
     telefono=None,
+    area_entrega=None,
     actor_usuario_id=None,
     actor_username=None,
     actor_rol=None,
@@ -689,6 +875,7 @@ def crear_usuario_sistema(
         rol_val = (rol or "").strip().lower()
         nombre = (nombre_mostrar or "").strip()
         tel = (telefono or "").strip() or None
+        area = _normalizar_area_entrega(area_entrega)
 
         if not usuario or not nombre:
             return {"error": "username y nombre_mostrar son obligatorios"}
@@ -696,6 +883,10 @@ def crear_usuario_sistema(
             return {"error": "La contrasena debe tener al menos 8 caracteres"}
         if rol_val not in ROLES_USUARIO_SISTEMA:
             return {"error": "Rol invalido"}
+        if rol_val == "repartidor" and not area:
+            return {"error": "Para rol repartidor debes definir area_entrega"}
+        if rol_val != "repartidor":
+            area = None
 
         conn = get_connection()
         _asegurar_tabla_usuarios_sistema(conn)
@@ -705,20 +896,21 @@ def crear_usuario_sistema(
             cur.execute(
                 """
                 INSERT INTO usuarios_sistema
-                    (username, password_hash, rol, nombre_mostrar, telefono, activo)
-                VALUES (%s, %s, %s, %s, %s, TRUE)
+                    (username, password_hash, rol, nombre_mostrar, telefono, area_entrega, activo)
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE)
                 RETURNING
                     usuario_id,
                     username,
                     rol,
                     nombre_mostrar,
                     telefono,
+                    area_entrega,
                     activo,
                     ultimo_login,
                     creado_en,
                     actualizado_en
                 """,
-                (usuario, generate_password_hash(secret), rol_val, nombre, tel),
+                (usuario, generate_password_hash(secret), rol_val, nombre, tel, area),
             )
             row = cur.fetchone()
             _registrar_auditoria_seguridad_cur(
@@ -731,7 +923,11 @@ def crear_usuario_sistema(
                 objetivo_usuario_id=row.get("usuario_id"),
                 objetivo_username=row.get("username"),
                 direccion_ip=direccion_ip,
-                detalle={"rol": row.get("rol"), "telefono": row.get("telefono")},
+                detalle={
+                    "rol": row.get("rol"),
+                    "telefono": row.get("telefono"),
+                    "area_entrega": row.get("area_entrega"),
+                },
             )
             conn.commit()
             return row
@@ -753,6 +949,7 @@ def actualizar_usuario_sistema(
     rol=None,
     nombre_mostrar=None,
     telefono=None,
+    area_entrega=None,
     activo=None,
     nueva_password=None,
     actor_usuario_id=None,
@@ -766,6 +963,7 @@ def actualizar_usuario_sistema(
         cambios = []
         params = []
         detalle_auditoria = {}
+        rol_objetivo = None
 
         if rol is not None:
             rol_val = str(rol).strip().lower()
@@ -774,6 +972,7 @@ def actualizar_usuario_sistema(
             cambios.append("rol = %s")
             params.append(rol_val)
             detalle_auditoria["rol"] = rol_val
+            rol_objetivo = rol_val
 
         if nombre_mostrar is not None:
             nombre = str(nombre_mostrar).strip()
@@ -788,6 +987,12 @@ def actualizar_usuario_sistema(
             cambios.append("telefono = %s")
             params.append(tel)
             detalle_auditoria["telefono"] = tel
+
+        if area_entrega is not None:
+            area = _normalizar_area_entrega(area_entrega)
+            cambios.append("area_entrega = %s")
+            params.append(area)
+            detalle_auditoria["area_entrega"] = area
 
         if activo is not None:
             cambios.append("activo = %s")
@@ -812,6 +1017,27 @@ def actualizar_usuario_sistema(
         _asegurar_tabla_auditoria_seguridad(conn)
 
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if rol_objetivo is None:
+                cur.execute(
+                    """
+                    SELECT rol
+                    FROM usuarios_sistema
+                    WHERE usuario_id = %s
+                    LIMIT 1
+                    """,
+                    (user_id,),
+                )
+                existente = cur.fetchone()
+                if not existente:
+                    return {"error": "Usuario no encontrado"}
+                rol_objetivo = existente.get("rol")
+
+            if rol_objetivo != "repartidor":
+                cambios.append("area_entrega = NULL")
+                detalle_auditoria["area_entrega"] = None
+            elif "area_entrega" in detalle_auditoria and not detalle_auditoria.get("area_entrega"):
+                return {"error": "Para rol repartidor debes definir area_entrega"}
+
             query = f"""
                 UPDATE usuarios_sistema
                 SET
@@ -824,6 +1050,7 @@ def actualizar_usuario_sistema(
                     rol,
                     nombre_mostrar,
                     telefono,
+                    area_entrega,
                     activo,
                     ultimo_login,
                     creado_en,
@@ -867,6 +1094,19 @@ def actualizar_usuario_sistema(
 
 def _asegurar_tablas_operacion_pedidos(conn):
     with conn.cursor() as cur:
+        cur.execute(
+            """
+            ALTER TABLE pedidos
+            ADD COLUMN IF NOT EXISTS codigo_entrega VARCHAR(12)
+            """
+        )
+        cur.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_pedidos_codigo_entrega
+                ON pedidos(codigo_entrega)
+                WHERE codigo_entrega IS NOT NULL
+            """
+        )
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS asignaciones_reparto (
@@ -917,6 +1157,16 @@ def _registrar_bitacora_estado(cur, pedido_id, estado_anterior, estado_nuevo, ac
         """,
         (pedido_id, estado_anterior, estado_nuevo, actor_usuario, rol_actor, motivo),
     )
+
+
+def _generar_codigo_entrega_db(cur, length=6):
+    chars = string.ascii_uppercase + string.digits
+    for _ in range(40):
+        code = "".join(random.choices(chars, k=length))
+        cur.execute("SELECT 1 FROM pedidos WHERE codigo_entrega = %s LIMIT 1", (code,))
+        if not cur.fetchone():
+            return code
+    return "".join(random.choices(chars, k=length))
 
 
 def obtener_productos(solo_pedibles=False):
@@ -989,10 +1239,11 @@ def obtener_o_crear_cliente(whatsapp_id):
     conn = None
     try:
         conn = get_connection()
+        _asegurar_columnas_clientes_y_direcciones(conn)
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT cliente_id, whatsapp_id, nombre, apellidos
+                SELECT cliente_id, whatsapp_id, nombre, apellidos, genero_trato
                 FROM clientes
                 WHERE whatsapp_id = %s
                 LIMIT 1
@@ -1006,15 +1257,82 @@ def obtener_o_crear_cliente(whatsapp_id):
 
             cur.execute(
                 """
-                INSERT INTO clientes (whatsapp_id, nombre, apellidos)
-                VALUES (%s, %s, %s)
-                RETURNING cliente_id, whatsapp_id, nombre, apellidos
+                INSERT INTO clientes (whatsapp_id, nombre, apellidos, genero_trato)
+                VALUES (%s, %s, %s, %s)
+                RETURNING cliente_id, whatsapp_id, nombre, apellidos, genero_trato
                 """,
-                (whatsapp_id, "Cliente", "WhatsApp"),
+                (whatsapp_id, "Cliente", "WhatsApp", "neutro"),
             )
             nuevo = cur.fetchone()
             conn.commit()
             return nuevo
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def _asegurar_columnas_clientes_y_direcciones(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            ALTER TABLE clientes
+            ADD COLUMN IF NOT EXISTS genero_trato VARCHAR(10) NOT NULL DEFAULT 'neutro'
+            """
+        )
+        cur.execute(
+            """
+            ALTER TABLE direcciones_cliente
+            ADD COLUMN IF NOT EXISTS codigo_postal VARCHAR(5)
+            """
+        )
+
+
+def actualizar_cliente_basico(cliente_id, nombre=None, apellidos=None, genero_trato=None):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_columnas_clientes_y_direcciones(conn)
+        updates = []
+        params = []
+
+        if nombre is not None:
+            nombre_clean = str(nombre).strip()
+            if nombre_clean:
+                updates.append("nombre = %s")
+                params.append(nombre_clean)
+
+        if apellidos is not None:
+            apellidos_clean = str(apellidos).strip()
+            updates.append("apellidos = %s")
+            params.append(apellidos_clean)
+
+        if genero_trato is not None:
+            genero = str(genero_trato).strip().lower()
+            if genero in {"hombre", "mujer", "neutro"}:
+                updates.append("genero_trato = %s")
+                params.append(genero)
+
+        if not updates:
+            return {"ok": True, "actualizado": False}
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            params.append(int(cliente_id))
+            cur.execute(
+                f"""
+                UPDATE clientes
+                SET {', '.join(updates)}
+                WHERE cliente_id = %s
+                RETURNING cliente_id, whatsapp_id, nombre, apellidos, genero_trato
+                """,
+                tuple(params),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return row if row else {"error": "Cliente no encontrado"}
     except Exception as exc:
         if conn:
             conn.rollback()
@@ -1076,16 +1394,28 @@ def crear_pedido(cliente_id, items, direccion_id, metodo_pago, actor_usuario="si
                 )
 
             total = sum(float(item["cantidad"]) * float(item["precio_unitario"]) for item in items_normalizados)
+            has_codigo = _tabla_tiene_columna(conn, "pedidos", "codigo_entrega")
+            codigo_entrega = _generar_codigo_entrega_db(cur) if has_codigo else None
 
             _set_audit_actor(cur, actor_username=actor_usuario, actor_rol=actor_rol)
-            cur.execute(
-                """
-                INSERT INTO pedidos (cliente_id, direccion_id, metodo_pago, total, estado)
-                VALUES (%s, %s, %s, %s, 'recibido')
-                RETURNING pedido_id, cliente_id, direccion_id, metodo_pago, total, estado, creado_en
-                """,
-                (cliente_id, direccion_id, metodo_pago, total),
-            )
+            if has_codigo:
+                cur.execute(
+                    """
+                    INSERT INTO pedidos (cliente_id, direccion_id, metodo_pago, total, estado, codigo_entrega)
+                    VALUES (%s, %s, %s, %s, 'recibido', %s)
+                    RETURNING pedido_id, cliente_id, direccion_id, metodo_pago, total, estado, creado_en, codigo_entrega
+                    """,
+                    (cliente_id, direccion_id, metodo_pago, total, codigo_entrega),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO pedidos (cliente_id, direccion_id, metodo_pago, total, estado)
+                    VALUES (%s, %s, %s, %s, 'recibido')
+                    RETURNING pedido_id, cliente_id, direccion_id, metodo_pago, total, estado, creado_en
+                    """,
+                    (cliente_id, direccion_id, metodo_pago, total),
+                )
             pedido = cur.fetchone()
 
             for item in items_normalizados:
@@ -1195,6 +1525,15 @@ def actualizar_estado_pedido(pedido_id, nuevo_estado, actor_usuario=None, rol_ac
                 motivo=motivo,
             )
 
+            asignacion_auto = None
+            if nuevo in {"listo", "en_camino"}:
+                _asegurar_tabla_usuarios_sistema(conn)
+                asignacion_auto = _auto_asignar_repartidor_pedido_cur(
+                    cur,
+                    pedido_id=pedido_id,
+                    asignado_por=actor_usuario or "sistema_auto",
+                )
+
             if nuevo in {"entregado", "cancelado"}:
                 cur.execute(
                     """
@@ -1206,6 +1545,8 @@ def actualizar_estado_pedido(pedido_id, nuevo_estado, actor_usuario=None, rol_ac
                 )
 
             conn.commit()
+            if asignacion_auto:
+                actualizado["asignacion_reparto"] = asignacion_auto
             return actualizado
     except Exception as exc:
         if conn:
@@ -1318,14 +1659,20 @@ def obtener_pedidos(estado=None, fecha=None):
             conn.close()
 
 
-def confirmar_entrega_pedido(pedido_id, codigo_entrega=None):
+def confirmar_entrega_pedido(pedido_id, codigo_entrega=None, actor_usuario=None, rol_actor=None):
     conn = None
     try:
         conn = get_connection()
         _asegurar_tablas_operacion_pedidos(conn)
+        _asegurar_auditoria_negocio(conn)
         has_codigo = _tabla_tiene_columna(conn, "pedidos", "codigo_entrega")
 
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _set_audit_actor(
+                cur,
+                actor_username=actor_usuario or "repartidor",
+                actor_rol=rol_actor or "repartidor",
+            )
             if has_codigo:
                 cur.execute(
                     """
@@ -1355,21 +1702,43 @@ def confirmar_entrega_pedido(pedido_id, codigo_entrega=None):
             if estado_actual not in {"listo", "en_camino"}:
                 return {"error": "Solo se puede confirmar entrega para pedidos en estado listo o en_camino."}
 
-            if has_codigo:
-                codigo_db = (row.get("codigo_entrega") or "").strip().upper()
-                codigo_in = (codigo_entrega or "").strip().upper()
-                if codigo_db and codigo_db != codigo_in:
-                    return {"error": "Codigo de entrega incorrecto."}
+            codigo_in = (codigo_entrega or "").strip().upper()
+            if not codigo_in:
+                return {"error": "Debes ingresar el codigo de entrega para liberar el pedido."}
 
-            updated = actualizar_estado_pedido(
+            if not has_codigo:
+                return {"error": "La base de datos no tiene columna codigo_entrega. Ejecuta migracion/arranque nuevamente."}
+
+            codigo_db = (row.get("codigo_entrega") or "").strip().upper()
+            if not codigo_db:
+                return {"error": "Este pedido no tiene codigo de entrega asignado. Reenvia o genera un codigo primero."}
+
+            if codigo_db != codigo_in:
+                return {"error": "Codigo de entrega incorrecto."}
+
+            cur.execute(
+                """
+                UPDATE pedidos
+                SET estado = 'entregado'
+                WHERE pedido_id = %s
+                  AND estado IN ('listo', 'en_camino')
+                RETURNING pedido_id, estado, creado_en
+                """,
+                (pedido_id,),
+            )
+            updated = cur.fetchone()
+            if not updated:
+                return {"error": "No se pudo liberar el pedido desde el estado actual."}
+
+            _registrar_bitacora_estado(
+                cur,
                 pedido_id=pedido_id,
-                nuevo_estado="entregado",
-                actor_usuario="repartidor",
-                rol_actor="repartidor",
+                estado_anterior=estado_actual,
+                estado_nuevo="entregado",
+                actor_usuario=actor_usuario or "repartidor",
+                rol_actor=rol_actor or "repartidor",
                 motivo="Confirmacion de entrega con codigo",
             )
-            if isinstance(updated, dict) and updated.get("error"):
-                return updated
 
             cur.execute(
                 """
@@ -1390,6 +1759,79 @@ def confirmar_entrega_pedido(pedido_id, codigo_entrega=None):
             conn.close()
 
 
+def obtener_o_generar_codigo_entrega_pedido(pedido_id):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tablas_operacion_pedidos(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT pedido_id, codigo_entrega
+                FROM pedidos
+                WHERE pedido_id = %s
+                LIMIT 1
+                """,
+                (pedido_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": "Pedido no encontrado."}
+
+            codigo = (row.get("codigo_entrega") or "").strip().upper()
+            if not codigo:
+                codigo = _generar_codigo_entrega_db(cur)
+                cur.execute(
+                    """
+                    UPDATE pedidos
+                    SET codigo_entrega = %s
+                    WHERE pedido_id = %s
+                    """,
+                    (codigo, pedido_id),
+                )
+
+            conn.commit()
+            return {"pedido_id": pedido_id, "codigo_entrega": codigo}
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_destino_whatsapp_por_pedido(pedido_id):
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT p.pedido_id, c.whatsapp_id
+                FROM pedidos p
+                JOIN clientes c ON c.cliente_id = p.cliente_id
+                WHERE p.pedido_id = %s
+                LIMIT 1
+                """,
+                (pedido_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": "Pedido no encontrado."}
+
+            whatsapp_id = (row.get("whatsapp_id") or "").strip()
+            if not whatsapp_id:
+                return {"error": "El pedido no tiene WhatsApp asociado."}
+
+            return {"pedido_id": row.get("pedido_id"), "whatsapp_id": whatsapp_id}
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
 def asignar_pedido_repartidor(pedido_id, repartidor_usuario, asignado_por=None):
     conn = None
     try:
@@ -1399,12 +1841,18 @@ def asignar_pedido_repartidor(pedido_id, repartidor_usuario, asignado_por=None):
         conn = get_connection()
         _asegurar_tablas_operacion_pedidos(conn)
 
+        area_expr = "COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000'))"
+
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT pedido_id, estado
-                FROM pedidos
-                WHERE pedido_id = %s
+                SELECT
+                    p.pedido_id,
+                    p.estado,
+                    COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000')) AS area_entrega
+                FROM pedidos p
+                LEFT JOIN direcciones_cliente dc ON dc.direccion_id = p.direccion_id
+                WHERE p.pedido_id = %s
                 LIMIT 1
                 """,
                 (pedido_id,),
@@ -1415,6 +1863,30 @@ def asignar_pedido_repartidor(pedido_id, repartidor_usuario, asignado_por=None):
 
             if (pedido.get("estado") or "").strip().lower() not in {"listo", "en_camino"}:
                 return {"error": "Solo se pueden asignar pedidos en estado listo o en_camino."}
+
+            cur.execute(
+                """
+                SELECT usuario_id, username, rol, activo, area_entrega
+                FROM usuarios_sistema
+                WHERE LOWER(username) = LOWER(%s)
+                LIMIT 1
+                """,
+                (repartidor_usuario,),
+            )
+            repartidor = cur.fetchone()
+            if not repartidor:
+                return {"error": "Repartidor no encontrado."}
+            if not repartidor.get("activo"):
+                return {"error": "El repartidor esta inactivo."}
+            if (repartidor.get("rol") or "").strip().lower() != "repartidor":
+                return {"error": "El usuario indicado no tiene rol repartidor."}
+
+            area_pedido = _normalizar_area_entrega(pedido.get("area_entrega"))
+            area_repartidor = _normalizar_area_entrega(repartidor.get("area_entrega"))
+            if not area_repartidor:
+                return {"error": "El repartidor no tiene area_entrega configurada."}
+            if area_pedido and area_repartidor.lower() != area_pedido.lower():
+                return {"error": f"El pedido pertenece al area '{area_pedido}' y el repartidor cubre '{area_repartidor}'."}
 
             cur.execute(
                 """
@@ -1431,9 +1903,11 @@ def asignar_pedido_repartidor(pedido_id, repartidor_usuario, asignado_por=None):
                 VALUES (%s, %s, %s, TRUE)
                 RETURNING asignacion_id, pedido_id, repartidor_usuario, asignado_por, asignado_en, activo
                 """,
-                (pedido_id, repartidor_usuario, asignado_por),
+                (pedido_id, repartidor.get("username"), asignado_por),
             )
             row = cur.fetchone()
+            if row is not None:
+                row["area_entrega"] = area_repartidor
             conn.commit()
             return row
     except Exception as exc:
@@ -1445,17 +1919,29 @@ def asignar_pedido_repartidor(pedido_id, repartidor_usuario, asignado_por=None):
             conn.close()
 
 
-def obtener_pedidos_repartidor(repartidor_usuario=None):
+def obtener_pedidos_repartidor(repartidor_usuario=None, area_entrega=None):
     conn = None
     try:
         conn = get_connection()
         _asegurar_tablas_operacion_pedidos(conn)
 
         params = ["listo", "en_camino"]
+        area_expr = "COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000'))"
         where_assignment = ""
+        area_filter = _normalizar_area_entrega(area_entrega)
         if repartidor_usuario:
-            where_assignment = " AND (ar.repartidor_usuario = %s OR ar.repartidor_usuario IS NULL)"
+            where_assignment = f"""
+            AND (
+                ar.repartidor_usuario = %s
+                OR (
+                    ar.repartidor_usuario IS NULL
+                    AND (%s IS NULL OR LOWER({area_expr}) = LOWER(%s))
+                )
+            )
+            """
             params.append(repartidor_usuario)
+            params.append(area_filter)
+            params.append(area_filter)
 
         query = f"""
             SELECT
@@ -1468,6 +1954,7 @@ def obtener_pedidos_repartidor(repartidor_usuario=None):
                 c.whatsapp_id,
                 COALESCE(dc.direccion_texto, 'Sin direccion') AS direccion_entrega,
                 COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{{5}})'), ''), '00000') AS codigo_postal,
+                {area_expr} AS area_entrega,
                 ar.repartidor_usuario,
                 COALESCE(
                     json_agg(
@@ -1487,7 +1974,7 @@ def obtener_pedidos_repartidor(repartidor_usuario=None):
             LEFT JOIN asignaciones_reparto ar ON ar.pedido_id = p.pedido_id AND ar.activo = TRUE
             WHERE p.estado IN (%s, %s)
             {where_assignment}
-            GROUP BY p.pedido_id, p.estado, p.total, p.creado_en, c.nombre, c.apellidos, c.whatsapp_id, dc.direccion_texto, ar.repartidor_usuario
+            GROUP BY p.pedido_id, p.estado, p.total, p.creado_en, c.nombre, c.apellidos, c.whatsapp_id, dc.direccion_texto, dc.alias, dc.codigo_postal, ar.repartidor_usuario
             ORDER BY p.creado_en ASC
         """
 

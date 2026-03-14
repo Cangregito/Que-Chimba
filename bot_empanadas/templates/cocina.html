@@ -3,1017 +3,796 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Que Chimba - Panel de Cocina</title>
+  <title>Que Chimba | Cocina</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     :root {
-      --bg: #101316;
-      --bg-soft: #171b20;
-      --card: #1f252c;
-      --line: #313a44;
-      --text: #f2f4f7;
-      --muted: #b8c2cc;
-      --accent: #ffa62b;
-      --yellow: #ffd447;
-      --yellow-ink: #2f2500;
-      --green: #39c97d;
-      --green-ink: #05240f;
-      --danger: #ff6b6b;
-      --radius: 16px;
-      --shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+      --bg: #FFFFFF;
+      --surface: #F8F8F7;
+      --line: #E5E5E3;
+      --text: #1A1A1A;
+      --text-2: #6B6B6B;
+      --text-3: #9B9B9B;
+      --accent: #1F2328;
+      --blue-bg: #E6F1FB;
+      --blue-fg: #0C447C;
+      --green-bg: #EAF3DE;
+      --green-fg: #27500A;
+      --amber-bg: #FAEEDA;
+      --amber-fg: #633806;
+      --red-bg: #FCEBEB;
+      --red-fg: #791F1F;
+      --r-sm: 8px;
+      --r-lg: 12px;
+      --t: 120ms ease;
     }
 
-    * {
-      box-sizing: border-box;
+    * { box-sizing: border-box; }
+
+    html,
+    body {
       margin: 0;
       padding: 0;
-    }
-
-    body {
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100%;
+      background: var(--bg);
       color: var(--text);
-      background:
-        radial-gradient(circle at 10% 0%, #2a2f36 0%, transparent 35%),
-        radial-gradient(circle at 90% 20%, #1d2730 0%, transparent 36%),
-        linear-gradient(180deg, #0e1115 0%, #12171c 100%);
-      min-height: 100vh;
-      padding: 22px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 400;
     }
 
-    .layout {
-      max-width: 1450px;
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    .main {
+      max-width: 1440px;
       margin: 0 auto;
+      padding: 16px;
       display: grid;
+      gap: 12px;
       grid-template-columns: 2fr 1fr;
-      gap: 18px;
+    }
+
+    .top {
+      grid-column: 1 / -1;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--surface);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .top h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .sub {
+      color: var(--text-2);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
+    .kpi {
+      background: var(--bg);
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 10px;
+    }
+
+    .kpi p {
+      margin: 0;
+      color: var(--text-2);
+      font-size: 12px;
+    }
+
+    .kpi h2 {
+      margin: 6px 0 0;
+      font-size: 22px;
+      font-weight: 500;
     }
 
     .panel {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%), var(--bg-soft);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 18px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--bg);
+      padding: 12px;
     }
 
-    .header {
+    .head {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-    }
-
-    h1 {
-      font-size: 2rem;
-      letter-spacing: 0.2px;
-    }
-
-    .subtitle {
-      color: var(--muted);
-      font-size: 1.05rem;
-      margin-top: 4px;
-    }
-
-    .badge {
-      background: rgba(255, 166, 43, 0.15);
-      color: #ffdca8;
-      border: 1px solid rgba(255, 166, 43, 0.35);
-      border-radius: 999px;
-      padding: 8px 14px;
-      font-size: 1rem;
-      font-weight: 700;
-    }
-
-    .meta {
-      display: flex;
       gap: 8px;
-      align-items: center;
+      margin-bottom: 10px;
       flex-wrap: wrap;
-      color: var(--muted);
-      margin-bottom: 14px;
-      font-size: 0.98rem;
     }
 
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 0 4px rgba(57, 201, 125, 0.22);
+    .head h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 500;
     }
 
-    .orders {
-      display: grid;
-      gap: 12px;
+    .btn {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 12px;
+      min-height: 34px;
+      cursor: pointer;
+      transition: background var(--t), opacity var(--t);
     }
 
-    .kanban-board {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 12px;
-    }
+    .btn:hover { background: #EFEFEE; }
 
-    .kanban-col {
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(10, 13, 17, 0.42);
-      min-height: 320px;
-      padding: 10px;
-      transition: border-color 0.15s ease, background 0.15s ease;
-    }
-
-    .kanban-col.drag-over {
+    .btn.primary {
+      background: var(--accent);
       border-color: var(--accent);
-      background: rgba(255, 166, 43, 0.1);
+      color: #FFFFFF;
     }
 
-    .kanban-head {
+    .btn:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid rgba(12, 68, 124, 0.35);
+      outline-offset: 1px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 0.5px solid transparent;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .chip.blue { background: var(--blue-bg); color: var(--blue-fg); }
+    .chip.green { background: var(--green-bg); color: var(--green-fg); }
+    .chip.amber { background: var(--amber-bg); color: var(--amber-fg); }
+    .chip.red { background: var(--red-bg); color: var(--red-fg); }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(210px, 1fr));
+      gap: 8px;
+    }
+
+    .col {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      min-height: 360px;
+      padding: 8px;
+      transition: background var(--t), opacity var(--t);
+    }
+
+    .col.drag-over {
+      background: #ECECEB;
+    }
+
+    .col-title {
+      margin: 0 0 8px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
-      gap: 8px;
-      padding-bottom: 6px;
-      border-bottom: 1px dashed var(--line);
+      font-size: 13px;
+      font-weight: 500;
     }
 
-    .kanban-title {
-      font-size: 1.02rem;
-      font-weight: 800;
-      color: #f5d6a1;
-    }
-
-    .kanban-count {
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
-
-    .kanban-list {
+    .list {
       display: grid;
-      gap: 10px;
+      gap: 8px;
     }
 
-    .order-card {
-      border: 1px solid var(--line);
-      border-left: 8px solid var(--accent);
-      border-radius: 12px;
-      padding: 14px;
-      background: rgba(10, 13, 17, 0.52);
+    .card {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      padding: 10px;
       cursor: grab;
     }
 
-    .order-card.warn {
-      border-left-color: #ffb020;
-      box-shadow: inset 0 0 0 1px rgba(255, 176, 32, 0.25);
-    }
+    .card.warn { border-color: #DABB8D; }
+    .card.urgent { border-color: #D4AAAA; background: #FFF8F8; }
+    .card:active { cursor: grabbing; }
 
-    .order-card.urgent {
-      border-left-color: #ff6b6b;
-      box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.35);
-      background: rgba(64, 17, 17, 0.35);
-    }
-
-    .age-pill {
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 0.84rem;
-      font-weight: 700;
-      border: 1px solid transparent;
-      color: #d9e1e8;
-      background: rgba(99, 116, 135, 0.18);
-    }
-
-    .age-pill.warn {
-      color: #ffe2ad;
-      background: rgba(255, 176, 32, 0.16);
-      border-color: rgba(255, 176, 32, 0.32);
-    }
-
-    .age-pill.urgent {
-      color: #ffc0c0;
-      background: rgba(255, 107, 107, 0.16);
-      border-color: rgba(255, 107, 107, 0.35);
-    }
-
-    .order-card:active {
-      cursor: grabbing;
-    }
-
-    .order-head {
+    .card-head {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 10px;
+      justify-content: space-between;
+      gap: 8px;
       flex-wrap: wrap;
       margin-bottom: 8px;
     }
 
-    .order-title {
-      font-size: 1.3rem;
-      font-weight: 800;
+    .card-head h4 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 500;
     }
 
-    .state-pill {
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 0.93rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      border: 1px solid transparent;
-    }
-
-    .state-recibido {
-      color: #ffe3ab;
-      background: rgba(255, 179, 0, 0.14);
-      border-color: rgba(255, 179, 0, 0.35);
-    }
-
-    .state-en_preparacion {
-      color: #cde6ff;
-      background: rgba(44, 148, 255, 0.14);
-      border-color: rgba(44, 148, 255, 0.35);
-    }
-
-    .order-grid {
+    .meta {
       display: grid;
-      grid-template-columns: repeat(2, minmax(180px, 1fr));
-      gap: 8px 14px;
-      margin-top: 8px;
-      margin-bottom: 12px;
-      font-size: 1.08rem;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+      font-size: 12px;
+      color: var(--text-2);
+      margin-bottom: 8px;
     }
 
-    .label {
-      color: var(--muted);
-      margin-right: 6px;
-      font-weight: 600;
-    }
+    .meta strong { color: var(--text); font-weight: 500; }
 
     .products {
-      margin-top: 4px;
-      padding-left: 16px;
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-2);
+      font-size: 12px;
       line-height: 1.5;
-      font-size: 1.05rem;
     }
 
     .actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .btn {
-      border: none;
-      border-radius: 12px;
-      padding: 12px 18px;
-      font-size: 1.02rem;
-      font-weight: 800;
-      cursor: pointer;
-      min-height: 50px;
-      min-width: 180px;
-      transition: transform 0.1s ease, filter 0.15s ease;
-    }
-
-    .btn:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.02);
-    }
-
-    .btn:active {
-      transform: translateY(0);
-    }
-
-    .btn-yellow {
-      background: linear-gradient(180deg, #ffe685 0%, var(--yellow) 100%);
-      color: var(--yellow-ink);
-    }
-
-    .btn-green {
-      background: linear-gradient(180deg, #8ef0ba 0%, var(--green) 100%);
-      color: var(--green-ink);
-    }
-
-    .btn-dark {
-      background: linear-gradient(180deg, #38414b 0%, #28313a 100%);
-      color: #f3f6fa;
-      border: 1px solid #465362;
-      min-width: 220px;
-    }
-
-    .group-list {
-      display: grid;
-      gap: 10px;
-      margin-top: 6px;
-    }
-
-    .zone-card {
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(16, 22, 28, 0.72);
-      padding: 12px;
-    }
-
-    .zone-title {
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: #ffcf88;
-      margin-bottom: 8px;
-    }
-
-    .zone-items {
-      list-style: none;
-      display: grid;
       gap: 6px;
-      font-size: 1rem;
-    }
-
-    .muted {
-      color: var(--muted);
+      margin-top: 8px;
     }
 
     .empty {
-      border: 1px dashed var(--line);
-      border-radius: 12px;
-      padding: 18px;
-      color: var(--muted);
+      border: 0.5px dashed var(--line);
+      border-radius: var(--r-sm);
+      color: var(--text-3);
+      font-size: 12px;
       text-align: center;
-      font-size: 1.1rem;
+      padding: 12px;
+      background: var(--bg);
+    }
+
+    .zones {
+      display: grid;
+      gap: 8px;
+      max-height: 600px;
+      overflow: auto;
+    }
+
+    .zone {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      padding: 8px;
+    }
+
+    .zone h4 {
+      margin: 0 0 6px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .zone ul {
+      margin: 0;
+      padding-left: 16px;
+      color: var(--text-2);
+      font-size: 12px;
+      line-height: 1.45;
     }
 
     .error {
-      color: var(--danger);
-      font-weight: 700;
-      margin-top: 6px;
-      min-height: 22px;
+      margin-top: 8px;
+      color: var(--red-fg);
+      background: var(--red-bg);
+      border: 0.5px solid #E3C3C3;
+      border-radius: var(--r-sm);
+      padding: 8px;
+      font-size: 12px;
+      display: none;
     }
 
-    @media (max-width: 1080px) {
-      .layout {
+    .error.show { display: block; }
+
+    .skeleton {
+      display: grid;
+      gap: 6px;
+    }
+
+    .s-line {
+      height: 9px;
+      border-radius: 999px;
+      background: #ECECEB;
+      animation: pulse 1.2s ease infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.55; }
+      100% { opacity: 1; }
+    }
+
+    @media (max-width: 1150px) {
+      .main {
         grid-template-columns: 1fr;
       }
-    }
 
-    @media (max-width: 640px) {
-      body {
-        padding: 14px;
-      }
-
-      h1 {
-        font-size: 1.6rem;
-      }
-
-      .order-grid {
+      .board {
         grid-template-columns: 1fr;
       }
 
-      .btn {
-        width: 100%;
+      .kpis {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
       }
+    }
 
-      .kanban-board {
+    @media (max-width: 700px) {
+      .kpis {
         grid-template-columns: 1fr;
       }
-    }
-    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
 
-    body {
-      font-family: "Space Grotesk", "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at 7% 0%, rgba(255, 173, 56, 0.18) 0%, transparent 32%),
-        radial-gradient(circle at 95% 12%, rgba(94, 162, 217, 0.2) 0%, transparent 30%),
-        linear-gradient(180deg, #11161b 0%, #131a21 100%);
-    }
-
-    .panel {
-      border-radius: 20px;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%), #1a222c;
-      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
-    }
-
-    .kanban-col,
-    .order-card,
-    .zone-card,
-    .empty {
-      border-radius: 14px;
-    }
-
-    .order-card {
-      border-left-width: 6px;
-      transition: transform 0.12s ease, box-shadow 0.12s ease;
-    }
-
-    .order-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
-    }
-
-    .btn {
-      border-radius: 11px;
-      letter-spacing: 0.2px;
-    }
-
-    .subtitle,
-    .muted,
-    .label {
-      color: #b9c6d1;
-    }
-
-    .layout {
-      animation: fadeSlide 0.35s ease;
-    }
-
-    @keyframes fadeSlide {
-      from {
-        opacity: 0;
-        transform: translateY(8px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .kanban-col {
-      background: linear-gradient(180deg, rgba(8, 11, 15, 0.82) 0%, rgba(16, 21, 27, 0.9) 100%);
-      border-color: #394656;
-    }
-
-    .kanban-head {
-      border-bottom-color: rgba(255, 255, 255, 0.14);
-    }
-
-    .kanban-title {
-      letter-spacing: 0.25px;
-    }
-
-    .order-title {
-      font-size: 1.16rem;
-      letter-spacing: -0.01em;
-    }
-
-    .order-grid p {
-      font-size: 0.95rem;
-    }
-
-    .zone-title {
-      letter-spacing: 0.2px;
-    }
-
-    .btn-dark {
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation: none !important;
-        transition: none !important;
+      .meta {
+        grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
-  <div class="layout">
+  <main class="main">
+    <header class="top">
+      <div>
+        <h1>Panel de Cocina</h1>
+        <div class="sub" id="lastUpdate">Ultima actualizacion: -</div>
+      </div>
+      <div class="kpis">
+        <article class="kpi"><p>Total en cola</p><h2 id="kpi-total">0</h2></article>
+        <article class="kpi"><p>Recibidos</p><h2 id="kpi-recibidos">0</h2></article>
+        <article class="kpi"><p>En preparacion</p><h2 id="kpi-prep">0</h2></article>
+        <article class="kpi"><p>Listos</p><h2 id="kpi-listos">0</h2></article>
+      </div>
+    </header>
+
     <section class="panel">
-      <div class="header">
-        <div>
-          <h1>Panel de Cocina</h1>
-          <p class="subtitle">Kanban operativo: recibido, en preparacion y listo para salida.</p>
-        </div>
-        <span class="badge" id="totalBadge">0 pedidos</span>
+      <div class="head">
+        <h3>Flujo de pedidos</h3>
+        <button class="btn" id="btn-refresh" type="button">Actualizar</button>
       </div>
 
-      <div class="meta">
-        <span class="dot" aria-hidden="true"></span>
-        <span>Actualizacion automatica cada 15 segundos</span>
-        <span>|</span>
-        <span id="lastUpdate">Sin actualizar</span>
-      </div>
-
-      <div class="kanban-board" id="kanbanBoard">
-        <section class="kanban-col" data-drop-state="recibido">
-          <div class="kanban-head">
-            <h3 class="kanban-title">Recibido</h3>
-            <span class="kanban-count" id="count-recibido">0</span>
-          </div>
-          <div class="kanban-list" id="ordersRecibido"></div>
+      <div class="board" id="kanbanBoard">
+        <section class="col" data-drop-state="recibido">
+          <p class="col-title">Recibido <span id="count-recibido" class="chip blue">0</span></p>
+          <div id="orders-recibido" class="list"></div>
         </section>
 
-        <section class="kanban-col" data-drop-state="en_preparacion">
-          <div class="kanban-head">
-            <h3 class="kanban-title">En preparacion</h3>
-            <span class="kanban-count" id="count-prep">0</span>
-          </div>
-          <div class="kanban-list" id="ordersPrep"></div>
+        <section class="col" data-drop-state="en_preparacion">
+          <p class="col-title">En preparacion <span id="count-prep" class="chip amber">0</span></p>
+          <div id="orders-prep" class="list"></div>
         </section>
 
-        <section class="kanban-col" data-drop-state="listo">
-          <div class="kanban-head">
-            <h3 class="kanban-title">Listo</h3>
-            <span class="kanban-count" id="count-listo">0</span>
-          </div>
-          <div class="kanban-list" id="ordersListo"></div>
+        <section class="col" data-drop-state="listo">
+          <p class="col-title">Listo <span id="count-listo" class="chip green">0</span></p>
+          <div id="orders-listo" class="list"></div>
         </section>
       </div>
-      <p class="error" id="errorText"></p>
+
+      <div class="error" id="errorText"></div>
     </section>
 
     <aside class="panel">
-      <div class="header">
-        <div>
-          <h2>Organizacion por cercania</h2>
-          <p class="subtitle">Ordenado por codigo postal (CP)</p>
-        </div>
+      <div class="head">
+        <h3>Agrupado por CP</h3>
+        <span class="sub">Ayuda para salida de reparto</span>
       </div>
-      <div class="group-list" id="zoneContainer"></div>
+      <div id="zoneContainer" class="zones"></div>
     </aside>
-  </div>
+  </main>
 
   <script>
-    const API_QUEUE_URL = "/api/pedidos?estado=recibido,en_preparacion,listo";
-    const API_STATUS_BASE = "/api/pedidos";
-    const REFRESH_MS = 15000;
+    (function () {
+      const API_QUEUE_URL = "/api/pedidos?estado=recibido,en_preparacion,listo";
+      const API_STATUS_BASE = "/api/pedidos";
+      const REFRESH_MS = 15000;
 
-    const kanbanBoard = document.getElementById("kanbanBoard");
-    const ordersRecibido = document.getElementById("ordersRecibido");
-    const ordersPrep = document.getElementById("ordersPrep");
-    const ordersListo = document.getElementById("ordersListo");
-    const countRecibido = document.getElementById("count-recibido");
-    const countPrep = document.getElementById("count-prep");
-    const countListo = document.getElementById("count-listo");
-    const zoneContainer = document.getElementById("zoneContainer");
-    const totalBadge = document.getElementById("totalBadge");
-    const lastUpdate = document.getElementById("lastUpdate");
-    const errorText = document.getElementById("errorText");
+      const nodes = {
+        board: document.getElementById("kanbanBoard"),
+        recibido: document.getElementById("orders-recibido"),
+        prep: document.getElementById("orders-prep"),
+        listo: document.getElementById("orders-listo"),
+        cRec: document.getElementById("count-recibido"),
+        cPrep: document.getElementById("count-prep"),
+        cListo: document.getElementById("count-listo"),
+        kTotal: document.getElementById("kpi-total"),
+        kRec: document.getElementById("kpi-recibidos"),
+        kPrep: document.getElementById("kpi-prep"),
+        kListo: document.getElementById("kpi-listos"),
+        zone: document.getElementById("zoneContainer"),
+        last: document.getElementById("lastUpdate"),
+        err: document.getElementById("errorText"),
+        refresh: document.getElementById("btn-refresh")
+      };
 
-    let currentOrders = [];
-    let refreshTimer = null;
-    let isFetching = false;
+      let currentOrders = [];
+      let refreshTimer = null;
+      let isFetching = false;
 
-    function getField(obj, keys, fallback = "-") {
-      for (const key of keys) {
-        const value = obj?.[key];
-        if (value !== undefined && value !== null && value !== "") {
-          return value;
+      function esc(value) {
+        return String(value == null ? "" : value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function jsEsc(value) {
+        return String(value == null ? "" : value)
+          .replaceAll("\\", "\\\\")
+          .replaceAll("'", "\\'")
+          .replaceAll("\n", " ");
+      }
+
+      function showError(message) {
+        nodes.err.textContent = message;
+        nodes.err.classList.add("show");
+      }
+
+      function clearError() {
+        nodes.err.classList.remove("show");
+        nodes.err.textContent = "";
+      }
+
+      function getField(obj, keys, fallback = "-") {
+        for (const key of keys) {
+          const value = obj && obj[key];
+          if (value !== undefined && value !== null && value !== "") return value;
         }
+        return fallback;
       }
-      return fallback;
-    }
 
-    function asArray(value) {
-      if (Array.isArray(value)) {
-        return value;
+      function asArray(value) {
+        return Array.isArray(value) ? value : [];
       }
-      return [];
-    }
 
-    function formatTime(value) {
-      if (!value || value === "-") {
-        return "-";
+      function formatHour(value) {
+        const dt = new Date(value || "");
+        if (Number.isNaN(dt.getTime())) return "-";
+        return dt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
       }
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) {
-        return String(value);
-      }
-      return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
-    }
 
-    function formatState(state) {
-      if (state === "en_preparacion") {
-        return "En preparacion";
+      function minutesSince(value) {
+        const dt = new Date(value || "");
+        if (Number.isNaN(dt.getTime())) return null;
+        return Math.max(0, Math.floor((Date.now() - dt.getTime()) / 60000));
       }
-      if (state === "recibido") {
-        return "Recibido";
-      }
-      return String(state || "-");
-    }
 
-    function minutesSince(value) {
-      if (!value || value === "-") {
-        return null;
-      }
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) {
-        return null;
-      }
-      return Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
-    }
-
-    function getPriorityByMinutes(minutes) {
-      if (minutes === null) {
+      function priority(minutes) {
+        if (minutes == null) return "normal";
+        if (minutes >= 25) return "urgent";
+        if (minutes >= 15) return "warn";
         return "normal";
       }
-      if (minutes >= 25) {
-        return "urgent";
-      }
-      if (minutes >= 15) {
-        return "warn";
-      }
-      return "normal";
-    }
 
-    function normalizeOrder(raw) {
-      const id = getField(raw, ["id", "pedido_id", "numero", "numero_pedido"], "");
-      const number = getField(raw, ["numero_pedido", "numero", "folio", "id"], id || "-");
-      const customer = getField(raw, ["cliente_nombre", "nombre_cliente", "cliente", "nombre"], "Cliente sin nombre");
-      const state = getField(raw, ["estado"], "recibido");
-      const receivedAt = getField(raw, ["hora_recepcion", "recibido_en", "creado_en", "created_at", "fecha_hora"], "-");
-      const address = getField(raw, ["direccion_entrega", "direccion", "entrega_direccion"], "Direccion no disponible");
-      const postalCode = String(getField(raw, ["codigo_postal", "cp"], "00000"));
-      const items = asArray(getField(raw, ["productos", "items", "detalle"], []));
-      const totalQty = Number(getField(raw, ["cantidad_total", "total_cantidad"], NaN));
-
-      return {
-        id,
-        number,
-        customer,
-        state,
-        receivedAt,
-        address,
-        postalCode,
-        items,
-        totalQty: Number.isNaN(totalQty) ? sumItems(items) : totalQty
-      };
-    }
-
-    function sumItems(items) {
-      return items.reduce((acc, item) => acc + Number(getField(item, ["cantidad", "qty"], 0)), 0);
-    }
-
-    function renderProducts(items) {
-      if (!items.length) {
-        return "<li>Sin detalle de productos</li>";
+      function stateLabel(value) {
+        if (value === "en_preparacion") return "En preparacion";
+        if (value === "recibido") return "Recibido";
+        if (value === "listo") return "Listo";
+        return value || "-";
       }
 
-      return items.map((item) => {
-        const name = getField(item, ["producto", "nombre", "tipo", "sabor"], "Producto");
-        const qty = getField(item, ["cantidad", "qty"], "-");
-        return `<li>${name} x ${qty}</li>`;
-      }).join("");
-    }
-
-    function buildOrderCard(order) {
-      const stateClass = `state-${order.state}`;
-      const safeId = String(order.id || order.number);
-      const ageMins = minutesSince(order.receivedAt);
-      const priority = getPriorityByMinutes(ageMins);
-      const ageClass = priority === "normal" ? "" : priority;
-      const cardClass = priority === "normal" ? "" : priority;
-      const ageLabel = ageMins === null ? "Sin hora" : `${ageMins} min`;
-
-      const actions = [];
-      if (order.state === "recibido") {
-        actions.push(`<button class="btn btn-yellow" data-action="prep" data-id="${safeId}">En preparacion</button>`);
-      }
-      if (order.state === "recibido" || order.state === "en_preparacion") {
-        actions.push(`<button class="btn btn-green" data-action="ready" data-id="${safeId}">Listo para entregar</button>`);
-      }
-      actions.push(`<button class="btn btn-dark" data-action="print" data-id="${safeId}">Imprimir etiqueta QR</button>`);
-
-      return `
-        <article class="order-card ${cardClass}" draggable="true" data-draggable-id="${safeId}">
-          <div class="order-head">
-            <h3 class="order-title">Pedido #${order.number}</h3>
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-              <span class="age-pill ${ageClass}">${ageLabel}</span>
-              <span class="state-pill ${stateClass}">${formatState(order.state)}</span>
-            </div>
-          </div>
-
-          <div class="order-grid">
-            <p><span class="label">Cliente:</span>${order.customer}</p>
-            <p><span class="label">Hora recepcion:</span>${formatTime(order.receivedAt)}</p>
-            <p><span class="label">Cantidad total:</span>${order.totalQty}</p>
-            <p><span class="label">CP:</span>${order.postalCode}</p>
-          </div>
-
-          <p class="label">Productos:</p>
-          <ul class="products">${renderProducts(order.items)}</ul>
-
-          <div class="actions">
-            ${actions.join("")}
-          </div>
-        </article>
-      `;
-    }
-
-    function renderOrders(orders) {
-      const byPriorityAndTime = (a, b) => {
-        const pa = getPriorityByMinutes(minutesSince(a.receivedAt));
-        const pb = getPriorityByMinutes(minutesSince(b.receivedAt));
-        const weight = { urgent: 3, warn: 2, normal: 1 };
-        if (weight[pb] !== weight[pa]) {
-          return weight[pb] - weight[pa];
-        }
-        const ta = new Date(a.receivedAt).getTime() || 0;
-        const tb = new Date(b.receivedAt).getTime() || 0;
-        return ta - tb;
-      };
-
-      const recibidos = orders.filter((order) => order.state === "recibido").sort(byPriorityAndTime);
-      const prep = orders.filter((order) => order.state === "en_preparacion").sort(byPriorityAndTime);
-      const listos = orders.filter((order) => order.state === "listo").sort(byPriorityAndTime);
-
-      countRecibido.textContent = `${recibidos.length}`;
-      countPrep.textContent = `${prep.length}`;
-      countListo.textContent = `${listos.length}`;
-
-      ordersRecibido.innerHTML = recibidos.length
-        ? recibidos.map(buildOrderCard).join("")
-        : "<div class='empty'>No hay pedidos recibidos.</div>";
-
-      ordersPrep.innerHTML = prep.length
-        ? prep.map(buildOrderCard).join("")
-        : "<div class='empty'>No hay pedidos en preparacion.</div>";
-
-      ordersListo.innerHTML = listos.length
-        ? listos.map(buildOrderCard).join("")
-        : "<div class='empty'>No hay pedidos listos.</div>";
-
-      setUpDragAndDrop();
-    }
-
-    function setUpDragAndDrop() {
-      const draggableCards = document.querySelectorAll(".order-card[draggable='true']");
-      draggableCards.forEach((card) => {
-        card.addEventListener("dragstart", (event) => {
-          const id = card.getAttribute("data-draggable-id");
-          if (!id || !event.dataTransfer) {
-            return;
-          }
-          event.dataTransfer.setData("text/plain", id);
-          event.dataTransfer.effectAllowed = "move";
-        });
-      });
-
-      const columns = document.querySelectorAll(".kanban-col[data-drop-state]");
-      columns.forEach((col) => {
-        col.addEventListener("dragover", (event) => {
-          event.preventDefault();
-          col.classList.add("drag-over");
-          if (event.dataTransfer) {
-            event.dataTransfer.dropEffect = "move";
-          }
-        });
-
-        col.addEventListener("dragleave", () => {
-          col.classList.remove("drag-over");
-        });
-
-        col.addEventListener("drop", async (event) => {
-          event.preventDefault();
-          col.classList.remove("drag-over");
-
-          const targetState = col.getAttribute("data-drop-state");
-          const orderId = event.dataTransfer ? event.dataTransfer.getData("text/plain") : "";
-          if (!targetState || !orderId) {
-            return;
-          }
-
-          const order = getOrderById(orderId);
-          if (!order || order.state === targetState) {
-            return;
-          }
-
-          await updateOrderStatus(orderId, targetState);
-        });
-      });
-    }
-
-    function renderZones(orders) {
-      if (!orders.length) {
-        zoneContainer.innerHTML = "<div class='empty'>Sin pedidos para agrupar.</div>";
-        return;
+      function stateChip(state) {
+        if (state === "recibido") return "<span class='chip blue'>Recibido</span>";
+        if (state === "en_preparacion") return "<span class='chip amber'>En preparacion</span>";
+        if (state === "listo") return "<span class='chip green'>Listo</span>";
+        return "<span class='chip red'>" + esc(state) + "</span>";
       }
 
-      const sorted = [...orders].sort((a, b) => a.postalCode.localeCompare(b.postalCode));
-      const groups = new Map();
-
-      for (const order of sorted) {
-        const key = order.postalCode || "00000";
-        if (!groups.has(key)) {
-          groups.set(key, []);
-        }
-        groups.get(key).push(order);
+      function normalizeOrder(raw) {
+        const id = getField(raw, ["pedido_id", "id", "numero"], "");
+        const number = getField(raw, ["numero_pedido", "numero", "pedido_id", "id"], id || "-");
+        const customer = [raw && raw.nombre, raw && raw.apellidos].filter(Boolean).join(" ").trim() || getField(raw, ["cliente_nombre", "cliente"], "Cliente sin nombre");
+        const state = String(getField(raw, ["estado"], "recibido")).toLowerCase();
+        const receivedAt = getField(raw, ["creado_en", "recibido_en", "hora_recepcion"], "-");
+        const address = getField(raw, ["direccion_entrega", "direccion"], "Direccion no disponible");
+        const postalCode = String(getField(raw, ["codigo_postal", "cp"], "00000"));
+        const items = asArray(getField(raw, ["items", "productos", "detalle"], []));
+        const totalQty = Number(getField(raw, ["cantidad_total", "total_cantidad"], NaN));
+        return {
+          id,
+          number,
+          customer,
+          state,
+          receivedAt,
+          address,
+          postalCode,
+          items,
+          totalQty: Number.isNaN(totalQty) ? items.reduce((a, it) => a + Number(getField(it, ["cantidad"], 0)), 0) : totalQty
+        };
       }
 
-      const html = [];
-      for (const [cp, items] of groups.entries()) {
-        const lines = items.map((order) => {
-          return `<li>#${order.number} - ${order.customer} (${formatState(order.state)})</li>`;
+      function renderProducts(items) {
+        if (!items.length) return "<li>Sin detalle de productos</li>";
+        return items.map((it) => {
+          if (typeof it === "string") return "<li>" + esc(it) + "</li>";
+          const name = getField(it, ["producto", "nombre", "tipo"], "Producto");
+          const qty = getField(it, ["cantidad", "qty"], "-");
+          return "<li>" + esc(name) + " x " + esc(qty) + "</li>";
         }).join("");
-
-        html.push(`
-          <section class="zone-card">
-            <h3 class="zone-title">CP ${cp}</h3>
-            <ul class="zone-items">${lines}</ul>
-          </section>
-        `);
       }
 
-      zoneContainer.innerHTML = html.join("");
-    }
+      function buildCard(order) {
+        const mins = minutesSince(order.receivedAt);
+        const p = priority(mins);
+        const ageText = mins == null ? "Sin hora" : (mins + " min");
+        const actions = [];
+        if (order.state === "recibido") {
+          actions.push("<button class='btn' data-action='prep' data-id='" + esc(order.id) + "'>En preparacion</button>");
+        }
+        if (order.state === "recibido" || order.state === "en_preparacion") {
+          actions.push("<button class='btn primary' data-action='ready' data-id='" + esc(order.id) + "'>Listo para entregar</button>");
+        }
+        actions.push("<button class='btn' data-action='print' data-id='" + esc(order.id) + "'>Imprimir QR</button>");
 
-    function stampUpdateTime() {
-      const now = new Date();
-      lastUpdate.textContent = `Ultima actualizacion: ${now.toLocaleTimeString("es-MX")}`;
-    }
-
-    async function fetchOrders(force = false) {
-      if (isFetching && !force) {
-        return;
+        return (
+          "<article class='card " + p + "' draggable='true' data-draggable-id='" + esc(order.id) + "'>" +
+            "<div class='card-head'>" +
+              "<h4>Pedido #" + esc(order.number) + "</h4>" +
+              "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>" +
+                (p === "urgent" ? "<span class='chip red'>" + esc(ageText) + "</span>" : (p === "warn" ? "<span class='chip amber'>" + esc(ageText) + "</span>" : "<span class='chip blue'>" + esc(ageText) + "</span>")) +
+                stateChip(order.state) +
+              "</div>" +
+            "</div>" +
+            "<div class='meta'>" +
+              "<div><span>Cliente:</span> <strong>" + esc(order.customer) + "</strong></div>" +
+              "<div><span>Hora:</span> <strong>" + esc(formatHour(order.receivedAt)) + "</strong></div>" +
+              "<div><span>Cantidad:</span> <strong>" + esc(order.totalQty) + "</strong></div>" +
+              "<div><span>CP:</span> <strong>" + esc(order.postalCode) + "</strong></div>" +
+            "</div>" +
+            "<ul class='products'>" + renderProducts(order.items) + "</ul>" +
+            "<div class='actions'>" + actions.join("") + "</div>" +
+          "</article>"
+        );
       }
 
-      isFetching = true;
-      try {
-        const response = await fetch(API_QUEUE_URL, { headers: { "Accept": "application/json" } });
-        if (!response.ok) {
-          throw new Error(`Error ${response.status} al cargar pedidos`);
+      function renderOrders() {
+        const weight = { urgent: 3, warn: 2, normal: 1 };
+        const sorter = (a, b) => {
+          const pa = priority(minutesSince(a.receivedAt));
+          const pb = priority(minutesSince(b.receivedAt));
+          if (weight[pb] !== weight[pa]) return weight[pb] - weight[pa];
+          const ta = new Date(a.receivedAt).getTime() || 0;
+          const tb = new Date(b.receivedAt).getTime() || 0;
+          return ta - tb;
+        };
+
+        const rec = currentOrders.filter((o) => o.state === "recibido").sort(sorter);
+        const prep = currentOrders.filter((o) => o.state === "en_preparacion").sort(sorter);
+        const listo = currentOrders.filter((o) => o.state === "listo").sort(sorter);
+
+        nodes.cRec.textContent = String(rec.length);
+        nodes.cPrep.textContent = String(prep.length);
+        nodes.cListo.textContent = String(listo.length);
+
+        nodes.kTotal.textContent = String(currentOrders.length);
+        nodes.kRec.textContent = String(rec.length);
+        nodes.kPrep.textContent = String(prep.length);
+        nodes.kListo.textContent = String(listo.length);
+
+        nodes.recibido.innerHTML = rec.length ? rec.map(buildCard).join("") : "<div class='empty'>No hay pedidos recibidos.</div>";
+        nodes.prep.innerHTML = prep.length ? prep.map(buildCard).join("") : "<div class='empty'>No hay pedidos en preparacion.</div>";
+        nodes.listo.innerHTML = listo.length ? listo.map(buildCard).join("") : "<div class='empty'>No hay pedidos listos.</div>";
+
+        setDragAndDrop();
+      }
+
+      function renderZones() {
+        if (!currentOrders.length) {
+          nodes.zone.innerHTML = "<div class='empty'>Sin pedidos para agrupar.</div>";
+          return;
         }
 
-        const data = await response.json();
-        const rawOrders = Array.isArray(data) ? data : (data.pedidos || data.data || []);
-        currentOrders = rawOrders.map(normalizeOrder);
-
-        renderOrders(currentOrders);
-        renderZones(currentOrders);
-        totalBadge.textContent = `${currentOrders.length} pedido(s)`;
-        errorText.textContent = "";
-        stampUpdateTime();
-      } catch (error) {
-        errorText.textContent = `No se pudo actualizar la cola: ${error.message}`;
-      } finally {
-        isFetching = false;
-      }
-    }
-
-    function getOrderById(orderId) {
-      const target = String(orderId);
-      return currentOrders.find((o) => String(o.id) === target || String(o.number) === target);
-    }
-
-    async function updateOrderStatus(orderId, newState) {
-      try {
-        const response = await fetch(`${API_STATUS_BASE}/${orderId}/estado`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify({ estado: newState })
+        const map = new Map();
+        [...currentOrders].sort((a, b) => String(a.postalCode).localeCompare(String(b.postalCode))).forEach((order) => {
+          const key = order.postalCode || "00000";
+          if (!map.has(key)) map.set(key, []);
+          map.get(key).push(order);
         });
 
-        if (!response.ok) {
-          throw new Error(`Error ${response.status} al cambiar estado`);
+        const html = [];
+        for (const [cp, orders] of map.entries()) {
+          html.push(
+            "<section class='zone'>" +
+              "<h4>CP " + esc(cp) + "</h4>" +
+              "<ul>" +
+                orders.map((o) => "<li>#" + esc(o.number) + " - " + esc(o.customer) + " (" + esc(stateLabel(o.state)) + ")</li>").join("") +
+              "</ul>" +
+            "</section>"
+          );
+        }
+        nodes.zone.innerHTML = html.join("");
+      }
+
+      function setDragAndDrop() {
+        document.querySelectorAll(".card[draggable='true']").forEach((card) => {
+          card.addEventListener("dragstart", (event) => {
+            const id = card.getAttribute("data-draggable-id");
+            if (!id || !event.dataTransfer) return;
+            event.dataTransfer.setData("text/plain", id);
+            event.dataTransfer.effectAllowed = "move";
+          });
+        });
+
+        document.querySelectorAll(".col[data-drop-state]").forEach((col) => {
+          col.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            col.classList.add("drag-over");
+          });
+          col.addEventListener("dragleave", () => {
+            col.classList.remove("drag-over");
+          });
+          col.addEventListener("drop", async (event) => {
+            event.preventDefault();
+            col.classList.remove("drag-over");
+            const state = col.getAttribute("data-drop-state");
+            const id = event.dataTransfer ? event.dataTransfer.getData("text/plain") : "";
+            if (!state || !id) return;
+            const order = currentOrders.find((o) => String(o.id) === String(id));
+            if (!order || order.state === state) return;
+            await updateOrderStatus(id, state);
+          });
+        });
+      }
+
+      async function fetchOrders(force) {
+        if (isFetching && !force) return;
+        isFetching = true;
+        try {
+          const res = await fetch(API_QUEUE_URL, {
+            method: "GET",
+            credentials: "same-origin",
+            headers: { "Accept": "application/json" }
+          });
+
+          if (res.redirected && res.url) {
+            window.location.href = res.url;
+            return;
+          }
+
+          const ct = (res.headers.get("content-type") || "").toLowerCase();
+          if (!ct.includes("application/json")) {
+            if (ct.includes("text/html")) window.location.href = "/login";
+            throw new Error("Respuesta no valida");
+          }
+
+          const payload = await res.json().catch(() => ({}));
+          const raw = Array.isArray(payload)
+            ? payload
+            : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.pedidos) ? payload.pedidos : []));
+
+          currentOrders = raw.map(normalizeOrder);
+          renderOrders();
+          renderZones();
+          clearError();
+          nodes.last.textContent = "Ultima actualizacion: " + new Date().toLocaleTimeString("es-MX");
+        } catch (err) {
+          showError("No se pudo actualizar la cola: " + (err && err.message ? err.message : "error"));
+        } finally {
+          isFetching = false;
+        }
+      }
+
+      async function updateOrderStatus(orderId, newState) {
+        try {
+          const res = await fetch(API_STATUS_BASE + "/" + orderId + "/estado", {
+            method: "PATCH",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify({ estado: newState })
+          });
+
+          if (res.redirected && res.url) {
+            window.location.href = res.url;
+            return;
+          }
+          if (!res.ok) {
+            throw new Error("Error " + res.status + " al cambiar estado");
+          }
+          await fetchOrders(true);
+        } catch (err) {
+          showError("No se pudo actualizar el pedido #" + orderId + ": " + (err && err.message ? err.message : "error"));
+        }
+      }
+
+      function scheduleRefresh() {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(async () => {
+          if (!document.hidden) {
+            await fetchOrders(false);
+          }
+          scheduleRefresh();
+        }, REFRESH_MS);
+      }
+
+      function printOrderLabel(orderId) {
+        const order = currentOrders.find((o) => String(o.id) === String(orderId) || String(o.number) === String(orderId));
+        if (!order) {
+          showError("No se encontro el pedido #" + orderId + " para imprimir.");
+          return;
         }
 
-        await fetchOrders(true);
-      } catch (error) {
-        errorText.textContent = `No se pudo actualizar el pedido #${orderId}: ${error.message}`;
-      }
-    }
+        const payload = {
+          pedido: order.number,
+          cliente: order.customer,
+          cp: order.postalCode,
+          direccion: order.address,
+          estado: order.state
+        };
 
-    function scheduleRefresh() {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-      }
-
-      refreshTimer = setTimeout(async () => {
-        if (!document.hidden) {
-          await fetchOrders();
+        const w = window.open("", "_blank", "width=420,height=640");
+        if (!w) {
+          showError("El navegador bloqueo la ventana de impresion.");
+          return;
         }
-        scheduleRefresh();
-      }, REFRESH_MS);
-    }
 
-    function initPolling() {
-      fetchOrders(true).catch(() => {
+        w.document.write(
+          "<!doctype html><html lang='es'><head><meta charset='UTF-8'><title>Etiqueta Pedido #" + esc(order.number) + "</title>" +
+          "<script src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'><\/script>" +
+          "<style>body{font-family:system-ui,-apple-system,sans-serif;margin:16px;color:#111}.sheet{border:1px solid #333;border-radius:8px;padding:12px}h1{font-size:18px;margin-bottom:8px}p{font-size:14px;margin:6px 0}.address{font-weight:500;font-size:15px}#qr{margin-top:10px;width:180px;height:180px}</style>" +
+          "</head><body><div class='sheet'><h1>Que Chimba - Pedido #" + esc(order.number) + "</h1><p><strong>Cliente:</strong> " + esc(order.customer) + "</p><p><strong>Estado:</strong> " + esc(stateLabel(order.state)) + "</p><p class='address'><strong>Direccion:</strong> " + esc(order.address) + "</p><div id='qr'></div></div>" +
+          "<script>new QRCode(document.getElementById('qr'),{text:" + JSON.stringify(JSON.stringify(payload)) + ",width:180,height:180,correctLevel:QRCode.CorrectLevel.H});setTimeout(function(){window.print();},400);<\/script></body></html>"
+        );
+        w.document.close();
+      }
+
+      nodes.board.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const action = target.getAttribute("data-action");
+        const id = target.getAttribute("data-id");
+        if (!action || !id) return;
+        if (action === "prep") {
+          await updateOrderStatus(id, "en_preparacion");
+        } else if (action === "ready") {
+          await updateOrderStatus(id, "listo");
+        } else if (action === "print") {
+          printOrderLabel(id);
+        }
       });
+
+      nodes.refresh.addEventListener("click", () => {
+        fetchOrders(true);
+      });
+
+      fetchOrders(true).catch(() => {});
       scheduleRefresh();
 
       document.addEventListener("visibilitychange", () => {
         if (!document.hidden) {
-          fetchOrders(true).catch(() => {
-          });
+          fetchOrders(true).catch(() => {});
         }
       });
 
       window.addEventListener("beforeunload", () => {
-        if (refreshTimer) {
-          clearTimeout(refreshTimer);
-        }
+        if (refreshTimer) clearTimeout(refreshTimer);
       });
-    }
-
-    function printOrderLabel(orderId) {
-      const order = getOrderById(orderId);
-      if (!order) {
-        errorText.textContent = `No se encontro el pedido #${orderId} para imprimir.`;
-        return;
-      }
-
-      const payload = {
-        pedido: order.number,
-        cliente: order.customer,
-        cp: order.postalCode,
-        direccion: order.address,
-        estado: order.state
-      };
-
-      const printWindow = window.open("", "_blank", "width=420,height=640");
-      if (!printWindow) {
-        errorText.textContent = "El navegador bloqueo la ventana de impresion.";
-        return;
-      }
-
-      printWindow.document.write(`
-        <!doctype html>
-        <html lang="es">
-        <head>
-          <meta charset="UTF-8" />
-          <title>Etiqueta Pedido #${order.number}</title>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 16px;
-              color: #111;
-            }
-            .sheet {
-              border: 1px solid #333;
-              border-radius: 8px;
-              padding: 12px;
-            }
-            h1 {
-              font-size: 18px;
-              margin-bottom: 8px;
-            }
-            p {
-              font-size: 14px;
-              margin: 6px 0;
-            }
-            .address {
-              font-weight: 700;
-              font-size: 15px;
-            }
-            #qr {
-              margin-top: 10px;
-              width: 180px;
-              height: 180px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="sheet">
-            <h1>Que Chimba - Pedido #${order.number}</h1>
-            <p><strong>Cliente:</strong> ${order.customer}</p>
-            <p><strong>Estado:</strong> ${formatState(order.state)}</p>
-            <p class="address"><strong>Direccion:</strong> ${order.address}</p>
-            <div id="qr"></div>
-          </div>
-          <script>
-            new QRCode(document.getElementById('qr'), {
-              text: ${JSON.stringify(JSON.stringify(payload))},
-              width: 180,
-              height: 180,
-              correctLevel: QRCode.CorrectLevel.H
-            });
-            setTimeout(function () {
-              window.print();
-            }, 400);
-          <\/script>
-        </body>
-        </html>
-      `);
-
-      printWindow.document.close();
-    }
-
-    kanbanBoard.addEventListener("click", async (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) {
-        return;
-      }
-
-      const action = target.dataset.action;
-      const id = target.dataset.id;
-      if (!action || !id) {
-        return;
-      }
-
-      if (action === "prep") {
-        await updateOrderStatus(id, "en_preparacion");
-      } else if (action === "ready") {
-        await updateOrderStatus(id, "listo");
-      } else if (action === "print") {
-        printOrderLabel(id);
-      }
-    });
-
-    initPolling();
+    })();
   </script>
 </body>
 </html>

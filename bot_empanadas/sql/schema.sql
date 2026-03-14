@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS clientes (
     cliente_id  BIGSERIAL PRIMARY KEY,
     whatsapp_id VARCHAR(50) NOT NULL UNIQUE,
     nombre      VARCHAR(80) NOT NULL DEFAULT 'Cliente',
-    apellidos   VARCHAR(80) NOT NULL DEFAULT 'WhatsApp'
+    apellidos   VARCHAR(80) NOT NULL DEFAULT 'WhatsApp',
+    genero_trato VARCHAR(10) NOT NULL DEFAULT 'neutro'
 );
 
 -- Direcciones de entrega del cliente
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS direcciones_cliente (
     longitud       NUMERIC(11,7),
     alias          VARCHAR(80),
     direccion_texto TEXT NOT NULL DEFAULT '',
+    codigo_postal  VARCHAR(5),
     referencia     TEXT,
     principal      BOOLEAN NOT NULL DEFAULT FALSE,
     actualizado_en TIMESTAMP
@@ -148,6 +150,7 @@ CREATE TABLE IF NOT EXISTS usuarios_sistema (
     rol                VARCHAR(30) NOT NULL,
     nombre_mostrar     VARCHAR(120) NOT NULL,
     telefono           VARCHAR(30),
+    area_entrega       VARCHAR(80),
     activo             BOOLEAN NOT NULL DEFAULT TRUE,
     intentos_fallidos  SMALLINT NOT NULL DEFAULT 0,
     bloqueado_hasta    TIMESTAMP,
@@ -159,6 +162,9 @@ CREATE TABLE IF NOT EXISTS usuarios_sistema (
 );
 CREATE INDEX IF NOT EXISTS idx_usuarios_sistema_rol_activo
     ON usuarios_sistema (rol, activo);
+CREATE INDEX IF NOT EXISTS idx_usuarios_sistema_reparto_area
+    ON usuarios_sistema (rol, area_entrega)
+    WHERE activo = TRUE;
 
 -- Auditoria de seguridad (accesos y cambios administrativos)
 CREATE TABLE IF NOT EXISTS auditoria_seguridad (

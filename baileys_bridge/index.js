@@ -20,6 +20,8 @@ const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
 const PORT = Number(process.env.BAILEYS_BRIDGE_PORT || 3001);
 const FLASK_WEBHOOK_URL = (process.env.FLASK_BAILEYS_WEBHOOK_URL || "http://localhost:5000/webhook/baileys").trim();
+const FLASK_WEBHOOK_TOKEN = (process.env.BAILEYS_WEBHOOK_TOKEN || "").trim();
+const BRIDGE_API_TOKEN = (process.env.BAILEYS_BRIDGE_API_TOKEN || "").trim();
 const AUTH_DIR = path.resolve(__dirname, process.env.BAILEYS_AUTH_DIR || "auth");
 const MEDIA_DIR = path.resolve(__dirname, process.env.BAILEYS_MEDIA_DIR || "media_tmp");
 const PUBLIC_BASE_URL = (process.env.BAILEYS_PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
@@ -34,6 +36,17 @@ if (!fs.existsSync(MEDIA_DIR)) {
 const app = express();
 app.use(express.json({ limit: "5mb" }));
 app.use("/media", express.static(MEDIA_DIR, { maxAge: "1h" }));
+
+function requireBridgeToken(req, res, next) {
+  if (!BRIDGE_API_TOKEN) {
+    return next();
+  }
+  const incoming = String(req.headers["x-bridge-token"] || "").trim();
+  if (incoming !== BRIDGE_API_TOKEN) {
+    return res.status(401).json({ ok: false, error: "Token de bridge invalido" });
+  }
+  return next();
+}
 
 let sock = null;
 
@@ -195,9 +208,14 @@ async function processIncomingMessage(msg) {
 
   let flaskData = null;
   try {
+    const webhookHeaders = { "Content-Type": "application/json" };
+    if (FLASK_WEBHOOK_TOKEN) {
+      webhookHeaders["x-bridge-token"] = FLASK_WEBHOOK_TOKEN;
+    }
+
     const flaskResp = await axios.post(FLASK_WEBHOOK_URL, payload, {
       timeout: 45000,
-      headers: { "Content-Type": "application/json" },
+      headers: webhookHeaders,
     });
 
     flaskData = flaskResp?.data?.data || flaskResp?.data;
@@ -229,7 +247,7 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, connected, user: sock?.user || null });
 });
 
-app.post("/api/send-text", async (req, res) => {
+app.post("/api/send-text", requireBridgeToken, async (req, res) => {
   try {
     const to = req.body?.to;
     const text = req.body?.text;
@@ -244,7 +262,7 @@ app.post("/api/send-text", async (req, res) => {
   }
 });
 
-app.post("/api/send-audio", async (req, res) => {
+app.post("/api/send-audio", requireBridgeToken, async (req, res) => {
   try {
     const to = req.body?.to;
     const audioUrl = req.body?.audioUrl;

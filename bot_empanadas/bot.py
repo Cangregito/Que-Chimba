@@ -56,8 +56,14 @@ MODISMOS_SEGUROS = [
 	"Ay que chimba,",
 	"Listo parce,",
 	"Buena nota,",
-	"Dale que si mi rey/reina,",
+	"Dale que si,",
 ]
+
+TRATO_POR_GENERO = {
+	"mujer": "mi reina",
+	"hombre": "mi rey",
+	"neutro": "parce",
+}
 
 
 BOT_REPLY_MODE = (os.getenv("BOT_REPLY_MODE", "texto") or "texto").strip().lower()
@@ -114,6 +120,18 @@ def _obtener_sesion(whatsapp_id):
 
 def _obtener_o_crear_cliente(whatsapp_id):
 	result = db.obtener_o_crear_cliente(whatsapp_id)
+	if _es_error(result):
+		raise RuntimeError(result["error"])
+	return result
+
+
+def _actualizar_cliente_basico(cliente_id, nombre=None, apellidos=None, genero_trato=None):
+	result = db.actualizar_cliente_basico(
+		cliente_id=cliente_id,
+		nombre=nombre,
+		apellidos=apellidos,
+		genero_trato=genero_trato,
+	)
 	if _es_error(result):
 		raise RuntimeError(result["error"])
 	return result
@@ -212,14 +230,23 @@ def _voice_generar_audio(texto):
 	return None
 
 
-def _armar_respuesta(texto, opciones):
+def _modo_respuesta(datos_temp: Optional[Dict[str, Any]] = None) -> str:
+	datos = _as_dict(datos_temp)
+	modo_turno = _normalizar_texto(datos.get("modo_respuesta_turno") or "")
+	if modo_turno in {"audio", "texto"}:
+		return modo_turno
+	if BOT_REPLY_MODE == "audio":
+		return "audio"
+	return "texto"
+
+
+def _armar_respuesta(texto, opciones, datos_temp: Optional[Dict[str, Any]] = None):
 	prefijo = random.choice(MODISMOS_SEGUROS)
 	cuerpo = f"{prefijo} {texto}".strip()
 	if opciones:
 		cuerpo = f"{cuerpo}\n\nOpciones:\n{opciones}"
 
-	# En WhatsApp Sandbox el audio puede fallar por media URL; texto es mas estable.
-	if BOT_REPLY_MODE == "audio":
+	if _modo_respuesta(datos_temp) == "audio":
 		audio_filename = _voice_generar_audio(cuerpo)
 		if audio_filename:
 			return {
@@ -232,6 +259,269 @@ def _armar_respuesta(texto, opciones):
 		"tipo": "texto",
 		"contenido": cuerpo,
 	}
+
+
+def _detectar_genero_desde_texto(texto: str) -> Optional[str]:
+	t = _normalizar_texto(texto)
+	if not t:
+		return None
+
+	patrones_mujer = [
+		"soy mujer",
+		"soy una mujer",
+		"soy femenina",
+		"soy senora",
+		"soy chica",
+		"soy dama",
+		"trata me como mujer",
+	]
+	patrones_hombre = [
+		"soy hombre",
+		"soy un hombre",
+		"soy masculino",
+		"soy senor",
+		"soy chico",
+		"trata me como hombre",
+	]
+
+	if any(p in t for p in patrones_mujer):
+		return "mujer"
+	if any(p in t for p in patrones_hombre):
+		return "hombre"
+	return None
+
+
+def _aplicar_preferencia_trato(entrada: str, datos_temp: Dict[str, Any]) -> Dict[str, Any]:
+	datos = _as_dict(datos_temp)
+	genero_detectado = _detectar_genero_desde_texto(entrada)
+	if genero_detectado in {"mujer", "hombre", "neutro"}:
+		datos["genero_trato"] = genero_detectado
+	return datos
+
+
+def _extraer_codigo_postal(texto: str) -> Optional[str]:
+	t = texto or ""
+	match = re.search(r"\b(\d{5})\b", t)
+	if match:
+		return match.group(1)
+	return None
+
+
+def _nombre_cliente_es_valido(nombre: Optional[str]) -> bool:
+	t = (nombre or "").strip()
+	if not t:
+		return False
+	n = _normalizar_texto(t)
+	invalidos = {
+		"cliente",
+		"cliente whatsapp",
+		"whatsapp",
+		"sin nombre",
+	}
+	if n in invalidos:
+		return False
+	if len(n) < 2:
+		return False
+	return bool(re.search(r"[a-z]", n))
+
+
+def _extraer_nombre_cliente(texto: str) -> Optional[str]:
+	t = (texto or "").strip()
+	if not t:
+		return None
+
+	norm = _normalizar_texto(t)
+	patrones = [
+		r"(?:me llamo|soy|mi nombre es|nombre[:\s]+)\s+([a-zA-Z\s]{2,60})",
+	]
+	for patron in patrones:
+		match = re.search(patron, norm)
+		if match:
+			valor = match.group(1).strip()
+			if _nombre_cliente_es_valido(valor):
+				return " ".join(p.title() for p in valor.split())
+
+	# Si no hay frase guia, intentamos usar el texto completo como nombre.
+	if _nombre_cliente_es_valido(norm) and len(norm.split()) <= 5:
+		return " ".join(p.title() for p in norm.split())
+	return None
+
+
+def _persistir_datos_cliente(cliente: Dict[str, Any], datos_temp: Dict[str, Any]) -> None:
+	cliente_id = cliente.get("cliente_id")
+	if not cliente_id:
+		return
+	nombre = datos_temp.get("cliente_nombre")
+	apellidos = datos_temp.get("cliente_apellidos")
+	genero = datos_temp.get("genero_trato")
+	_actualizar_cliente_basico(cliente_id, nombre=nombre, apellidos=apellidos, genero_trato=genero)
+
+
+def _trato_cliente(datos_temp: Dict[str, Any]) -> str:
+	datos = _as_dict(datos_temp)
+	genero = _normalizar_texto(datos.get("genero_trato") or "")
+	if genero in {"mujer", "hombre"}:
+		return TRATO_POR_GENERO[genero]
+	return TRATO_POR_GENERO["neutro"]
+
+
+def _armar_respuesta_comercial(texto: str, opciones: Optional[str], datos_temp: Dict[str, Any]) -> Dict[str, Any]:
+	trato = _trato_cliente(datos_temp)
+	prefijo = random.choice(MODISMOS_SEGUROS)
+	texto_final = f"{trato}, {texto}" if trato else texto
+	cuerpo = f"{prefijo} {texto_final}".strip()
+	if opciones:
+		cuerpo = f"{cuerpo}\n\nOpciones:\n{opciones}"
+
+	if _modo_respuesta(datos_temp) == "audio":
+		audio_filename = _voice_generar_audio(cuerpo)
+		if audio_filename:
+			return {
+				"tipo": "audio",
+				"audio_filename": audio_filename,
+				"contenido": cuerpo,
+			}
+
+	return {
+		"tipo": "texto",
+		"contenido": cuerpo,
+	}
+
+
+def _detectar_intencion_comercial(texto: str) -> Optional[str]:
+	t = _normalizar_texto(texto)
+	if not t:
+		return None
+
+	es_pregunta = "?" in texto or any(
+		t.startswith(pref)
+		for pref in ["como", "cual", "que", "cuando", "donde", "cuanto", "precio", "horario"]
+	)
+
+	if any(k in t for k in ["precio", "cuanto", "costo", "vale"]):
+		return "precio"
+	if es_pregunta and any(k in t for k in ["horario", "abren", "cierran", "hora"]):
+		return "horario"
+	if es_pregunta and any(k in t for k in ["domicilio", "envio", "delivery", "zona"]):
+		return "entrega"
+	if es_pregunta and any(k in t for k in ["pago", "tarjeta", "mercadopago", "efectivo"]):
+		return "pago"
+	if es_pregunta and "factura" in t:
+		return "factura"
+	if es_pregunta and any(k in t for k in ["estado", "folio", "codigo"]):
+		return "estado"
+	if any(k in t for k in ["menu", "sabores", "que venden", "que hay"]):
+		return "menu"
+	return None
+
+
+def _respuesta_intencion_comercial(intencion: str, datos_temp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+	if intencion == "menu":
+		menu = _menu_texto(list(_obtener_catalogo_productos()))
+		return _armar_respuesta_comercial(menu, "Para ordenar escribe: individual", datos_temp)
+
+	if intencion == "precio":
+		cantidad = int(datos_temp.get("cantidad") or 1)
+		precio = _to_float(datos_temp.get("precio_unitario"), 0.0)
+		if precio > 0:
+			total = precio * max(cantidad, 1)
+			texto = f"te cotizo rapido: {cantidad} pieza(s) te quedan en ${total:.2f} MXN aprox."
+			opciones = "Si te late, confirma sabor y cantidad"
+		else:
+			texto = "te paso precios al momento con menu actualizado y te cotizo exacto en 1 paso."
+			opciones = "Escribe: menu"
+		return _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+	if intencion == "horario":
+		return _armar_respuesta_comercial(
+			"te atendemos por este canal y te confirmo horario exacto segun tu zona al cerrar el pedido.",
+			"Si quieres, arranco tu orden: individual",
+			datos_temp,
+		)
+
+	if intencion == "entrega":
+		return _armar_respuesta_comercial(
+			"hacemos domicilio y tambien recoger en tienda. En domicilio te pedimos GPS para evitar errores.",
+			"Responde: domicilio o recoger en tienda",
+			datos_temp,
+		)
+
+	if intencion == "pago":
+		return _armar_respuesta_comercial(
+			"aceptamos efectivo y tarjeta por MercadoPago. El pedido queda registrado al confirmar.",
+			"Responde: efectivo o tarjeta",
+			datos_temp,
+		)
+
+	if intencion == "factura":
+		return _armar_respuesta_comercial(
+			"si facturamos. Si la necesitas, te pido RFC y datos fiscales en formato guiado.",
+			"Responde: si factura o no factura",
+			datos_temp,
+		)
+
+	if intencion == "estado":
+		pedido_id = datos_temp.get("pedido_id")
+		if pedido_id:
+			texto = f"tu ultimo folio activo es #{pedido_id}. Si quieres, te ayudo a continuar el flujo sin perder datos."
+		else:
+			texto = "todavia no tengo un folio confirmado en esta sesion."
+		return _armar_respuesta_comercial(texto, "Para iniciar orden escribe: individual", datos_temp)
+
+	return None
+
+
+def _normalizar_slots_llm(raw_slots: Dict[str, Any]) -> Dict[str, Any]:
+	if not isinstance(raw_slots, dict):
+		return {}
+
+	slots: Dict[str, Any] = {}
+	tipo_servicio = _normalizar_texto(raw_slots.get("tipo_servicio") or "")
+	if tipo_servicio in {"individual", "evento"}:
+		slots["tipo_servicio"] = tipo_servicio
+
+	producto = raw_slots.get("producto")
+	if isinstance(producto, str) and producto.strip():
+		slots["producto"] = producto.strip()
+
+	try:
+		cantidad = raw_slots.get("cantidad")
+		if cantidad is not None:
+			cantidad_int = int(cantidad)
+			if 1 <= cantidad_int <= 300:
+				slots["cantidad"] = cantidad_int
+	except (TypeError, ValueError):
+		pass
+
+	metodo_entrega = _normalizar_texto(raw_slots.get("metodo_entrega") or "")
+	if metodo_entrega in {"domicilio", "recoger_tienda"}:
+		slots["metodo_entrega"] = metodo_entrega
+
+	metodo_pago = _normalizar_texto(raw_slots.get("metodo_pago") or "")
+	if metodo_pago in {"efectivo", "mercadopago"}:
+		slots["metodo_pago"] = metodo_pago
+
+	req_fact = _parsear_bool_flexible(raw_slots.get("requiere_factura"))
+	if req_fact is not None:
+		slots["requiere_factura"] = req_fact
+
+	confirmar = _parsear_bool_flexible(raw_slots.get("confirmar"))
+	if confirmar is not None:
+		slots["confirmar"] = confirmar
+
+	cancelar = _parsear_bool_flexible(raw_slots.get("cancelar"))
+	if cancelar is not None:
+		slots["cancelar"] = cancelar
+
+	notas = raw_slots.get("notas_evento")
+	if isinstance(notas, str) and notas.strip():
+		slots["notas_evento"] = notas.strip()[:240]
+
+	genero_trato = _normalizar_texto(raw_slots.get("genero_cliente") or "")
+	if genero_trato in {"mujer", "hombre"}:
+		slots["genero_trato"] = genero_trato
+
+	return slots
 
 
 def _extraer_cantidad(texto):
@@ -361,7 +651,8 @@ def _extraer_slots_llm(texto: str) -> Dict[str, Any]:
 
 	system_prompt = (
 		"Eres un extractor de entidades para pedidos por WhatsApp. "
-		"Devuelve SOLO JSON valido sin markdown."
+		"Devuelve SOLO JSON valido sin markdown. "
+		"Nunca inventes datos faltantes; usa null cuando no exista evidencia."
 	)
 	user_prompt = (
 		"Extrae campos de este mensaje de cliente para pedido de empanadas. "
@@ -369,7 +660,8 @@ def _extraer_slots_llm(texto: str) -> Dict[str, Any]:
 		"Campos esperados: tipo_servicio(individual|evento|null), producto(carne|pollo|null), "
 		"cantidad(numero|null), metodo_entrega(domicilio|recoger_tienda|null), "
 		"metodo_pago(efectivo|mercadopago|null), requiere_factura(boolean|null), "
-		"confirmar(boolean|null), cancelar(boolean|null), notas_evento(string|null).\n"
+		"confirmar(boolean|null), cancelar(boolean|null), notas_evento(string|null), "
+		"genero_cliente(mujer|hombre|null).\n"
 		f"Mensaje: {texto}"
 	)
 
@@ -394,9 +686,7 @@ def _extraer_slots_llm(texto: str) -> Dict[str, Any]:
 		body = resp.json()
 		content = (((body.get("choices") or [{}])[0].get("message") or {}).get("content") or "{}").strip()
 		data = json.loads(content)
-		if not isinstance(data, dict):
-			return {}
-		return data
+		return _normalizar_slots_llm(data)
 	except Exception as exc:
 		logger.warning("LLM fallback no disponible o fallo de parseo: %s", exc)
 		return {}
@@ -412,7 +702,9 @@ def _extraer_slots_llm_local(texto: str) -> Dict[str, Any]:
 		"Campos: tipo_servicio(individual|evento|null), producto(carne|pollo|null), "
 		"cantidad(numero|null), metodo_entrega(domicilio|recoger_tienda|null), "
 		"metodo_pago(efectivo|mercadopago|null), requiere_factura(boolean|null), "
-		"confirmar(boolean|null), cancelar(boolean|null), notas_evento(string|null). "
+		"confirmar(boolean|null), cancelar(boolean|null), notas_evento(string|null), "
+		"genero_cliente(mujer|hombre|null). "
+		"Si no hay evidencia directa usa null. "
 		f"Mensaje: {texto}"
 	)
 
@@ -430,9 +722,7 @@ def _extraer_slots_llm_local(texto: str) -> Dict[str, Any]:
 		body = resp.json()
 		content = (body.get("response") or "{}").strip()
 		data = json.loads(content)
-		if isinstance(data, dict):
-			return data
-		return {}
+		return _normalizar_slots_llm(data)
 	except Exception as exc:
 		logger.info("LLM local (Ollama) no disponible o sin parseo: %s", exc)
 		return {}
@@ -441,6 +731,7 @@ def _extraer_slots_llm_local(texto: str) -> Dict[str, Any]:
 def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], usar_llm: bool = False) -> Dict[str, Any]:
 	datos = _as_dict(datos_temp)
 	text = _normalizar_texto(entrada)
+	datos = _aplicar_preferencia_trato(text, datos)
 
 	if not text:
 		return datos
@@ -488,7 +779,7 @@ def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], us
 	logger.info("Slots locales tras enriquecimiento: %s", {k: v for k, v in datos.items() if k not in {"ultimo_audio_transcrito"}})
 
 	if usar_llm:
-		slots = _extraer_slots_llm(text)
+		slots = _normalizar_slots_llm(_extraer_slots_llm(text))
 		if slots:
 			logger.info("Slots LLM detectados: %s", slots)
 
@@ -527,6 +818,10 @@ def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], us
 			if isinstance(notas, str) and notas.strip() and not datos.get("notas_evento"):
 				datos["notas_evento"] = notas.strip()
 
+			genero_slot = _normalizar_texto(slots.get("genero_trato") or "")
+			if genero_slot in {"mujer", "hombre"}:
+				datos["genero_trato"] = genero_slot
+
 	return datos
 
 
@@ -563,14 +858,70 @@ def _debe_confirmar_rapido(texto: str) -> bool:
 	return any(k in t for k in ["confirm", "procede", "hazlo", "cerrar pedido", "finaliza", "finalizar", "dale"])
 
 
+def _deberia_usar_llm(estado: str, entrada: str, datos_temp: Dict[str, Any], audio_attempted: bool) -> bool:
+	# Para audio siempre intentamos IA si esta disponible.
+	if audio_attempted:
+		return _llm_local_disponible() or _llm_disponible()
+
+	if not (_llm_local_disponible() or _llm_disponible()):
+		return False
+
+	t = _normalizar_texto(entrada)
+	if len(t) < 2:
+		return False
+
+	estados_utiles = {
+		"inicio",
+		"bienvenida",
+		"tipo_servicio",
+		"seleccion_producto",
+		"datos_evento",
+		"cantidad",
+		"metodo_entrega",
+		"metodo_pago",
+		"preguntar_factura",
+		"confirmacion",
+	}
+	if estado not in estados_utiles:
+		return False
+
+	# Si ya tenemos casi todo para cierre, no gastamos llamada IA.
+	if _puede_cierre_rapido(datos_temp):
+		return False
+
+	return True
+
+
+def _faltan_slots_clave_por_estado(estado: str, datos_temp: Dict[str, Any]) -> bool:
+	if estado in {"inicio", "bienvenida", "tipo_servicio"}:
+		return not bool(datos_temp.get("tipo_servicio"))
+	if estado == "seleccion_producto":
+		return not bool(datos_temp.get("producto_id"))
+	if estado == "datos_evento":
+		return not bool(datos_temp.get("notas_evento") or datos_temp.get("cantidad"))
+	if estado == "cantidad":
+		return not bool(datos_temp.get("cantidad"))
+	if estado == "metodo_entrega":
+		return not bool(datos_temp.get("metodo_entrega"))
+	if estado == "metodo_pago":
+		return not bool(datos_temp.get("metodo_pago"))
+	if estado == "preguntar_factura":
+		return "requiere_factura" not in datos_temp
+	return False
+
+
 def _puede_cierre_rapido(datos_temp: Dict[str, Any]) -> bool:
 	if not datos_temp.get("tipo_servicio"):
+		return False
+	if not _nombre_cliente_es_valido(datos_temp.get("cliente_nombre")):
 		return False
 	if datos_temp.get("tipo_servicio") == "individual":
 		required = ["producto_id", "cantidad", "metodo_entrega", "metodo_pago"]
 		if any(not datos_temp.get(k) for k in required):
 			return False
 		if datos_temp.get("metodo_entrega") == "domicilio" and not datos_temp.get("direccion_id"):
+			return False
+		if datos_temp.get("metodo_entrega") == "domicilio" and not _extraer_codigo_postal(datos_temp.get("codigo_postal") or ""):
 			return False
 	if "requiere_factura" not in datos_temp:
 		return False
@@ -646,13 +997,18 @@ def _insert_dinamico(tabla, data):
 			conn.close()
 
 
-def _guardar_direccion_en_db(cliente_id, lat, lng):
+def _guardar_direccion_en_db(cliente_id, lat, lng, codigo_postal=None):
+	cp = _extraer_codigo_postal(codigo_postal or "")
+	direccion = f"GPS {lat},{lng}"
+	if cp:
+		direccion = f"{direccion} CP:{cp}"
 	data = {
 		"cliente_id": cliente_id,
 		"latitud": lat,
 		"longitud": lng,
 		"alias": "Ubicacion WhatsApp",
-		"direccion_texto": f"GPS {lat},{lng}",
+		"direccion_texto": direccion,
+		"codigo_postal": cp,
 		"referencia": "Compartida por cliente en WhatsApp",
 		"principal": True,
 		"actualizado_en": datetime.utcnow(),
@@ -734,12 +1090,12 @@ def _producto_desde_texto(texto, catalogo):
 	t = _normalizar_texto(texto)
 	if "carne" in t:
 		for p in catalogo:
-			blob = f"{p.get('nombre', '')} {p.get('variante', '')}".lower()
+			blob = _normalizar_texto(f"{p.get('nombre', '')} {p.get('variante', '')}")
 			if "carne" in blob:
 				return p
 	if "pollo" in t:
 		for p in catalogo:
-			blob = f"{p.get('nombre', '')} {p.get('variante', '')}".lower()
+			blob = _normalizar_texto(f"{p.get('nombre', '')} {p.get('variante', '')}")
 			if "pollo" in blob:
 				return p
 
@@ -750,21 +1106,76 @@ def _producto_desde_texto(texto, catalogo):
 			if p.get("producto_id") == qty:
 				return p
 
+	# Match directo por nombre/variante completo (o por fragmento relevante).
+	for p in catalogo:
+		blob = _normalizar_texto(f"{p.get('nombre', '')} {p.get('variante', '')}")
+		if blob and (t == blob or t in blob or blob in t):
+			return p
+
+	# Match difuso por nombre de producto para tolerar typos/ASR.
+	blobs = []
+	for p in catalogo:
+		blob = _normalizar_texto(f"{p.get('nombre', '')} {p.get('variante', '')}")
+		if blob:
+			blobs.append((blob, p))
+	if blobs:
+		candidatos = [b for b, _ in blobs]
+		for guess in difflib.get_close_matches(t, candidatos, n=1, cutoff=0.72):
+			for blob, p in blobs:
+				if blob == guess:
+					return p
+
 	# Correcciones comunes de transcripcion de voz.
 	tokens = re.findall(r"[a-z]+", t)
 	for token in tokens:
 		if difflib.get_close_matches(token, ["carne"], n=1, cutoff=0.72):
 			for p in catalogo:
-				blob = f"{p.get('nombre', '')} {p.get('variante', '')}".lower()
+				blob = _normalizar_texto(f"{p.get('nombre', '')} {p.get('variante', '')}")
 				if "carne" in _normalizar_texto(blob):
 					return p
 		if difflib.get_close_matches(token, ["pollo"], n=1, cutoff=0.72):
 			for p in catalogo:
-				blob = f"{p.get('nombre', '')} {p.get('variante', '')}".lower()
+				blob = _normalizar_texto(f"{p.get('nombre', '')} {p.get('variante', '')}")
 				if "pollo" in _normalizar_texto(blob):
 					return p
 
 	return None
+
+
+def _producto_por_id(catalogo, producto_id):
+	for p in catalogo:
+		if p.get("producto_id") == producto_id:
+			return p
+	return None
+
+
+def _guardar_alias_sabores(datos_temp, catalogo):
+	if not catalogo:
+		return
+
+	carne = None
+	pollo = None
+	for p in catalogo:
+		blob = _normalizar_texto(f"{p.get('nombre', '')} {p.get('variante', '')}")
+		if not carne and any(k in blob for k in ["carne", "res", "beef"]):
+			carne = p
+		if not pollo and any(k in blob for k in ["pollo", "chicken"]):
+			pollo = p
+
+	if not carne and catalogo:
+		carne = catalogo[0]
+	if not pollo:
+		for p in catalogo:
+			if not carne or p.get("producto_id") != carne.get("producto_id"):
+				pollo = p
+				break
+	if not pollo:
+		pollo = carne
+
+	if carne:
+		datos_temp["alias_carne_producto_id"] = carne.get("producto_id")
+	if pollo:
+		datos_temp["alias_pollo_producto_id"] = pollo.get("producto_id")
 
 
 def _aplicar_transiciones_programadas(estado, datos_temp):
@@ -864,52 +1275,69 @@ def _guardar_pedido_final(cliente, datos_temp):
 	return creado["pedido_id"], codigo
 
 
-def _manejar_inicio(_text, datos_temp):
-	texto = (
-		"bienvenido a Que Chimba Empanadas. Te tomo el pedido completo por aqui "
-		"y queda guardado en el sistema."
-	)
-	opciones = (
-		"individual\n"
-		"evento\n\n"
-		"Flujo rapido:\n"
-		"1) individual\n"
-		"2) carne o pollo\n"
-		"3) cantidad\n"
-		"4) domicilio o recoger en tienda\n"
-		"5) efectivo o tarjeta\n"
-		"6) si/no factura\n"
-		"7) confirmar"
-	)
-	return "tipo_servicio", datos_temp, _armar_respuesta(texto, opciones)
+def _manejar_inicio(_text, datos_temp, cliente):
+	datos = _as_dict(datos_temp)
+	nombre_actual = datos.get("cliente_nombre") or cliente.get("nombre")
+	if _nombre_cliente_es_valido(nombre_actual):
+		datos["cliente_nombre"] = str(nombre_actual).strip()
+		texto = "bienvenido a Que Chimba Empanadas. Te tomo el pedido completo por aqui y queda guardado en el sistema."
+		opciones = (
+			"individual\n"
+			"evento\n\n"
+			"Flujo rapido:\n"
+			"1) individual\n"
+			"2) carne o pollo\n"
+			"3) cantidad\n"
+			"4) domicilio o recoger en tienda\n"
+			"5) efectivo o tarjeta\n"
+			"6) si/no factura\n"
+			"7) confirmar"
+		)
+		return "tipo_servicio", datos, _armar_respuesta_comercial(texto, opciones, datos)
+
+	texto = "antes de arrancar, dime tu nombre porfa para registrar bien tu orden."
+	opciones = "Ejemplo: me llamo Ana Torres"
+	return "bienvenida", datos, _armar_respuesta_comercial(texto, opciones, datos)
 
 
-def _manejar_bienvenida(_text, datos_temp):
-	texto = "cuentame si hoy quieres orden individual o cotizacion para evento."
+def _manejar_bienvenida(text, datos_temp):
+	nombre = _extraer_nombre_cliente(text)
+	if not nombre:
+		texto = "necesito tu nombre para registrar el pedido sin errores."
+		opciones = "Escribe tu nombre completo. Ejemplo: Carlos Rivera"
+		return "bienvenida", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+	datos_temp["cliente_nombre"] = nombre
+	partes = nombre.split()
+	if len(partes) > 1:
+		datos_temp["cliente_apellidos"] = " ".join(partes[1:])
+
+	texto = "perfecto, ya te tengo registrado. Cuentame si hoy quieres orden individual o cotizacion para evento."
 	opciones = "1) individual\n2) evento"
-	return "tipo_servicio", datos_temp, _armar_respuesta(texto, opciones)
+	return "tipo_servicio", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_tipo_servicio(text, datos_temp):
 	t = _normalizar_texto(text)
 	if "1" in t or any(k in t for k in ["individual", "pedido", "normal", "personal", "quiero pedir"]):
 		datos_temp["tipo_servicio"] = "individual"
-		catalogo = _obtener_catalogo_productos()
+		catalogo = list(_obtener_catalogo_productos())
+		_guardar_alias_sabores(datos_temp, catalogo)
 		texto = "de una, elige sabor de empanada."
 		opciones = "carne\npollo\nmenu"
 		if catalogo:
 			opciones = f"carne\npollo\nmenu\n\n{_menu_texto(catalogo)}"
-		return "seleccion_producto", datos_temp, _armar_respuesta(texto, opciones)
+		return "seleccion_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	if "2" in t or any(k in t for k in ["evento", "cotizacion", "catering", "fiesta", "mayoreo"]):
 		datos_temp["tipo_servicio"] = "evento"
 		texto = "perfecto, pasame datos del evento: fecha, zona y cantidad estimada."
 		opciones = "Formato sugerido: fecha | zona | cantidad estimada"
-		return "datos_evento", datos_temp, _armar_respuesta(texto, opciones)
+		return "datos_evento", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	texto = "no te entendi bien en el tipo de servicio."
 	opciones = "Responde: individual o evento"
-	return "tipo_servicio", datos_temp, _armar_respuesta(texto, opciones)
+	return "tipo_servicio", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_datos_evento(text, datos_temp):
@@ -922,23 +1350,28 @@ def _manejar_datos_evento(text, datos_temp):
 
 	texto = "gracias, ya tengo tus datos para cotizar. Te pido metodo de pago preferido para dejar todo listo."
 	opciones = "efectivo\ntarjeta"
-	return "metodo_pago", datos_temp, _armar_respuesta(texto, opciones)
+	return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_seleccion_producto(text, datos_temp):
 	t = _normalizar_texto(text)
 	catalogo = list(_obtener_catalogo_productos())
+	_guardar_alias_sabores(datos_temp, catalogo)
 
 	if "menu" in t:
 		texto = _menu_texto(catalogo)
 		opciones = "Elige: carne o pollo"
-		return "seleccion_producto", datos_temp, _armar_respuesta(texto, opciones)
+		return "seleccion_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	producto = _producto_desde_texto(t, catalogo)
+	if not producto and "carne" in t:
+		producto = _producto_por_id(catalogo, datos_temp.get("alias_carne_producto_id"))
+	if not producto and "pollo" in t:
+		producto = _producto_por_id(catalogo, datos_temp.get("alias_pollo_producto_id"))
 	if not producto:
 		texto = "todavia no identifique el sabor."
 		opciones = "Responde: carne o pollo"
-		return "seleccion_producto", datos_temp, _armar_respuesta(texto, opciones)
+		return "seleccion_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	datos_temp["producto_id"] = producto.get("producto_id")
 	datos_temp["producto_nombre"] = f"{producto.get('nombre', '')} {producto.get('variante', '')}".strip()
@@ -946,7 +1379,7 @@ def _manejar_seleccion_producto(text, datos_temp):
 
 	texto = "cuantas empanadas quieres?"
 	opciones = "Escribe un numero. Ejemplo: 6"
-	return "cantidad", datos_temp, _armar_respuesta(texto, opciones)
+	return "cantidad", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_cantidad(text, datos_temp):
@@ -954,12 +1387,19 @@ def _manejar_cantidad(text, datos_temp):
 	if not qty or qty <= 0:
 		texto = "necesito una cantidad valida para seguir."
 		opciones = "Ejemplo: 4"
-		return "cantidad", datos_temp, _armar_respuesta(texto, opciones)
+		return "cantidad", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+	if qty > 300:
+		texto = "esa cantidad esta altisima para orden normal; te paso a cotizacion de evento para evitar errores."
+		opciones = "Comparte fecha | zona | cantidad estimada"
+		datos_temp["tipo_servicio"] = "evento"
+		datos_temp["cantidad"] = qty
+		return "datos_evento", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	datos_temp["cantidad"] = qty
 	texto = "super, como prefieres la entrega?"
 	opciones = "domicilio\nrecoger en tienda"
-	return "metodo_entrega", datos_temp, _armar_respuesta(texto, opciones)
+	return "metodo_entrega", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_metodo_entrega(text, datos_temp):
@@ -969,36 +1409,66 @@ def _manejar_metodo_entrega(text, datos_temp):
 		datos_temp["metodo_entrega"] = "domicilio"
 		texto = "comparteme tu ubicacion GPS para el envio."
 		opciones = "Manda ubicacion en WhatsApp o escribe: lat, lng"
-		return "solicitar_ubicacion", datos_temp, _armar_respuesta(texto, opciones)
+		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	if any(k in t for k in ["recoger", "tienda", "local", "llevar", "paso por", "voy por", "recojo"]):
 		datos_temp["metodo_entrega"] = "recoger_tienda"
 		texto = "listo, pasamos al pago."
 		opciones = "efectivo\ntarjeta"
-		return "metodo_pago", datos_temp, _armar_respuesta(texto, opciones)
+		return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	texto = "no logre identificar el metodo de entrega."
 	opciones = "Responde: domicilio o recoger en tienda"
-	return "metodo_entrega", datos_temp, _armar_respuesta(texto, opciones)
+	return "metodo_entrega", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_solicitar_ubicacion(text, datos_temp, cliente, latitude=None, longitude=None):
+	cp_texto = _extraer_codigo_postal(text)
+	if cp_texto:
+		datos_temp["codigo_postal"] = cp_texto
+
+	if datos_temp.get("esperando_codigo_postal") and datos_temp.get("latitud") is not None and datos_temp.get("longitud") is not None:
+		if not datos_temp.get("codigo_postal"):
+			texto = "me falta el codigo postal para cerrar envio a domicilio."
+			opciones = "Comparte CP de 5 digitos. Ejemplo: 32695"
+			return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+		direccion_id = _guardar_direccion_en_db(
+			cliente["cliente_id"],
+			datos_temp["latitud"],
+			datos_temp["longitud"],
+			codigo_postal=datos_temp.get("codigo_postal"),
+		)
+		if direccion_id:
+			datos_temp["direccion_id"] = direccion_id
+		datos_temp["esperando_codigo_postal"] = False
+		texto = "ubicacion y codigo postal recibidos, seguimos con metodo de pago."
+		opciones = "efectivo\ntarjeta"
+		return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
 	lat, lng = _extraer_lat_lng(text, latitude=latitude, longitude=longitude)
 	if lat is None or lng is None:
 		texto = "aun no veo coordenadas validas."
 		opciones = "Comparte ubicacion GPS o escribe: 31.690,-106.424"
-		return "solicitar_ubicacion", datos_temp, _armar_respuesta(texto, opciones)
+		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	datos_temp["latitud"] = lat
 	datos_temp["longitud"] = lng
+	datos_temp["esperando_codigo_postal"] = True
 
-	direccion_id = _guardar_direccion_en_db(cliente["cliente_id"], lat, lng)
+	if not datos_temp.get("codigo_postal"):
+		texto = "ya tengo tu ubicacion fija. Ahora comparteme tu codigo postal (5 digitos) para registrar el envio exacto."
+		opciones = "Ejemplo: 32695"
+		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+	direccion_id = _guardar_direccion_en_db(cliente["cliente_id"], lat, lng, codigo_postal=datos_temp.get("codigo_postal"))
 	if direccion_id:
 		datos_temp["direccion_id"] = direccion_id
+	datos_temp["esperando_codigo_postal"] = False
 
-	texto = "ubicacion recibida, seguimos con metodo de pago."
+	texto = "ubicacion y codigo postal recibidos, seguimos con metodo de pago."
 	opciones = "efectivo\ntarjeta"
-	return "metodo_pago", datos_temp, _armar_respuesta(texto, opciones)
+	return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_metodo_pago(text, datos_temp):
@@ -1010,11 +1480,11 @@ def _manejar_metodo_pago(text, datos_temp):
 	else:
 		texto = "no detecte metodo de pago valido."
 		opciones = "Responde: efectivo o tarjeta"
-		return "metodo_pago", datos_temp, _armar_respuesta(texto, opciones)
+		return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	texto = "quieres factura?"
 	opciones = "si\nno"
-	return "preguntar_factura", datos_temp, _armar_respuesta(texto, opciones)
+	return "preguntar_factura", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _resumen_pedido(datos_temp):
@@ -1031,6 +1501,11 @@ def _resumen_pedido(datos_temp):
 	if datos_temp.get("metodo_pago"):
 		piezas.append(f"Pago: {datos_temp['metodo_pago']}")
 
+	precio = _to_float(datos_temp.get("precio_unitario"), 0.0)
+	cantidad = int(datos_temp.get("cantidad") or 0)
+	if precio > 0 and cantidad > 0:
+		piezas.append(f"Total estimado: ${precio * cantidad:.2f} MXN")
+
 	return "\n".join(piezas)
 
 
@@ -1040,18 +1515,18 @@ def _manejar_preguntar_factura(text, datos_temp):
 		datos_temp["requiere_factura"] = True
 		texto = "dale, pasame datos fiscales en este formato:\nRFC|RAZON SOCIAL|REGIMEN|USO_CFDI|EMAIL(opcional)"
 		opciones = "Ejemplo: ABC123456T12|QUE CHIMBA SA DE CV|601|G03|correo@mail.com"
-		return "datos_fiscales", datos_temp, _armar_respuesta(texto, opciones)
+		return "datos_fiscales", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	if _es_negativo(t) or t in {"n", "0"}:
 		datos_temp["requiere_factura"] = False
 		resumen = _resumen_pedido(datos_temp)
 		texto = f"asi va tu pedido:\n{resumen}"
 		opciones = "confirmar\ncancelar"
-		return "confirmacion", datos_temp, _armar_respuesta(texto, opciones)
+		return "confirmacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	texto = "no te entendi en factura."
 	opciones = "Responde: si o no"
-	return "preguntar_factura", datos_temp, _armar_respuesta(texto, opciones)
+	return "preguntar_factura", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_datos_fiscales(text, datos_temp, cliente):
@@ -1059,7 +1534,7 @@ def _manejar_datos_fiscales(text, datos_temp, cliente):
 	if not parsed:
 		texto = "el formato no coincide."
 		opciones = "Usa: RFC|RAZON SOCIAL|REGIMEN|USO_CFDI|EMAIL(opcional)"
-		return "datos_fiscales", datos_temp, _armar_respuesta(texto, opciones)
+		return "datos_fiscales", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	datos_temp["datos_fiscales"] = parsed
 	_guardar_datos_fiscales_en_db(cliente["cliente_id"], parsed)
@@ -1067,19 +1542,37 @@ def _manejar_datos_fiscales(text, datos_temp, cliente):
 	resumen = _resumen_pedido(datos_temp)
 	texto = f"perfecto, tengo datos fiscales y este es tu resumen:\n{resumen}"
 	opciones = "confirmar\ncancelar"
-	return "confirmacion", datos_temp, _armar_respuesta(texto, opciones)
+	return "confirmacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_confirmacion(text, datos_temp, cliente):
 	t = _normalizar_texto(text)
 	if _es_negativo(t):
-		return "inicio", {}, _armar_respuesta("pedido cancelado. Cuando quieras arrancamos de nuevo.", "Escribe hola para iniciar")
+		return "inicio", {}, _armar_respuesta_comercial("pedido cancelado. Cuando quieras arrancamos de nuevo.", "Escribe hola para iniciar", datos_temp)
 
 	if "confirm" not in t and not _es_afirmativo(t):
 		resumen = _resumen_pedido(datos_temp)
 		texto = f"revisa tu pedido y confirmame:\n{resumen}"
 		opciones = "confirmar\ncancelar"
-		return "confirmacion", datos_temp, _armar_respuesta(texto, opciones)
+		return "confirmacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+	if not _nombre_cliente_es_valido(datos_temp.get("cliente_nombre") or cliente.get("nombre")):
+		texto = "antes de confirmar necesito tu nombre para registrar la venta correctamente."
+		opciones = "Escribe tu nombre completo. Ejemplo: Mariana Soto"
+		return "bienvenida", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+	if datos_temp.get("metodo_entrega") == "domicilio" and not _extraer_codigo_postal(datos_temp.get("codigo_postal") or ""):
+		texto = "para domicilio me falta tu codigo postal exacto."
+		opciones = "Comparte CP de 5 digitos. Ejemplo: 32695"
+		datos_temp["esperando_codigo_postal"] = True
+		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+	if datos_temp.get("metodo_pago") not in {"efectivo", "mercadopago"}:
+		texto = "me falta metodo de pago valido para cerrar el pedido."
+		opciones = "Responde: efectivo o tarjeta"
+		return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+
+	_persistir_datos_cliente(cliente, datos_temp)
 
 	pedido_id, codigo_entrega = _guardar_pedido_final(cliente, datos_temp)
 	datos_temp["pedido_id"] = pedido_id
@@ -1094,13 +1587,13 @@ def _manejar_confirmacion(text, datos_temp, cliente):
 		f"Tu codigo de entrega es: {codigo_entrega}"
 	)
 	opciones = "menu\nayuda"
-	return "completado", datos_temp, _armar_respuesta(texto, opciones)
+	return "completado", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_completado(_text, datos_temp):
 	texto = "tu pedido ya esta en proceso. En breve te pedire evaluar la entrega y luego el producto."
 	opciones = "menu\nayuda\ncancelar"
-	return "completado", datos_temp, _armar_respuesta(texto, opciones)
+	return "completado", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_evaluar_entrega(text, datos_temp):
@@ -1109,13 +1602,13 @@ def _manejar_evaluar_entrega(text, datos_temp):
 	if not cal or cal < 1 or cal > 5:
 		texto = "como calificas la entrega del 1 al 5?"
 		opciones = "1 muy mala\n5 excelente"
-		return "evaluar_entrega", datos_temp, _armar_respuesta(texto, opciones)
+		return "evaluar_entrega", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	pedido_id = datos_temp.get("pedido_id")
 	_guardar_evaluacion(pedido_id, "entrega", cal, t)
 	texto = "gracias por evaluar la entrega."
 	opciones = "Te escribo manana para evaluar producto."
-	return "evaluar_producto", datos_temp, _armar_respuesta(texto, opciones)
+	return "evaluar_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
 def _manejar_evaluar_producto(text, datos_temp):
@@ -1124,24 +1617,24 @@ def _manejar_evaluar_producto(text, datos_temp):
 	if not cal or cal < 1 or cal > 5:
 		texto = "ultima pregunta: como calificas el producto del 1 al 5?"
 		opciones = "1 muy malo\n5 brutal"
-		return "evaluar_producto", datos_temp, _armar_respuesta(texto, opciones)
+		return "evaluar_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	pedido_id = datos_temp.get("pedido_id")
 	_guardar_evaluacion(pedido_id, "producto", cal, t)
 	texto = "mil gracias por tu feedback, buena nota. Cuando quieras pedimos de nuevo."
 	opciones = "Escribe menu para ver sabores"
-	return "inicio", {}, _armar_respuesta(texto, opciones)
+	return "inicio", {}, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
-def _respuesta_ayuda():
+def _respuesta_ayuda(datos_temp):
 	texto = "te ayudo rapido: seguimos paso a paso para tomar pedido, pago y entrega."
 	opciones = "menu\ncancelar\ncontinuar"
-	return _armar_respuesta(texto, opciones)
+	return _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
-def _respuesta_menu():
+def _respuesta_menu(datos_temp):
 	menu = _menu_texto(list(_obtener_catalogo_productos()))
-	return _armar_respuesta(menu, "Para ordenar escribe: individual")
+	return _armar_respuesta_comercial(menu, "Para ordenar escribe: individual", datos_temp)
 
 
 def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=None, longitude=None):
@@ -1161,6 +1654,13 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 		else:
 			estado = sesion.get("estado", "inicio")
 			datos_temp = _as_dict(sesion.get("datos_temp"))
+
+		if _nombre_cliente_es_valido(cliente.get("nombre")) and not _nombre_cliente_es_valido(datos_temp.get("cliente_nombre")):
+			datos_temp["cliente_nombre"] = str(cliente.get("nombre", "")).strip()
+		if cliente.get("apellidos") and not datos_temp.get("cliente_apellidos"):
+			datos_temp["cliente_apellidos"] = str(cliente.get("apellidos", "")).strip()
+		if cliente.get("genero_trato") in {"mujer", "hombre", "neutro"} and not datos_temp.get("genero_trato"):
+			datos_temp["genero_trato"] = cliente.get("genero_trato")
 
 		if estado not in ESTADOS:
 			estado = "inicio"
@@ -1184,20 +1684,34 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 				datos_temp["ultimo_audio_transcrito"] = transcrito
 
 		if audio_attempted and not texto_entrada.strip():
+			datos_temp["modo_respuesta_turno"] = "audio"
 			_guardar_sesion(whatsapp_id, estado, datos_temp)
-			return _armar_respuesta(
+			return _armar_respuesta_comercial(
 				"no pude transcribir ese audio. Prueba con una nota de voz mas corta o escribeme el mensaje en texto.",
 				"Ejemplo: individual",
+				datos_temp,
 			)
 
-		entrada = _normalizar_texto(texto_entrada)
+		datos_temp["modo_respuesta_turno"] = "audio" if audio_attempted else "texto"
 
-		# Enriquecimiento de slots para voz natural. El LLM es opcional por env vars.
-		datos_temp = _enriquecer_datos_desde_entrada(
+		entrada = _normalizar_texto(texto_entrada)
+		datos_temp = _aplicar_preferencia_trato(entrada, datos_temp)
+
+		# Estrategia hibrida: primero reglas locales, luego IA solo si faltan slots clave.
+		datos_temp_local = _enriquecer_datos_desde_entrada(
 			entrada,
 			datos_temp,
-			usar_llm=audio_attempted,
+			usar_llm=False,
 		)
+		usar_llm = _deberia_usar_llm(estado, entrada, datos_temp_local, audio_attempted)
+		if usar_llm and _faltan_slots_clave_por_estado(estado, datos_temp_local):
+			datos_temp = _enriquecer_datos_desde_entrada(
+				entrada,
+				datos_temp_local,
+				usar_llm=True,
+			)
+		else:
+			datos_temp = datos_temp_local
 
 		# Auto-avanzar estado FSM cuando el audio ya lleno slots de etapas anteriores.
 		if audio_attempted:
@@ -1211,6 +1725,7 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 				estado = estado_inferido
 
 		if _debe_confirmar_rapido(entrada) and _puede_cierre_rapido(datos_temp):
+			_persistir_datos_cliente(cliente, datos_temp)
 			pedido_id, codigo_entrega = _guardar_pedido_final(cliente, datos_temp)
 			datos_temp["pedido_id"] = pedido_id
 			datos_temp["codigo_entrega"] = codigo_entrega
@@ -1219,9 +1734,10 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 			datos_temp["evaluar_entrega_enviada"] = False
 			datos_temp["evaluar_producto_enviada"] = False
 			_guardar_sesion(whatsapp_id, "completado", datos_temp)
-			return _armar_respuesta(
+			return _armar_respuesta_comercial(
 				f"pedido confirmado y guardado en DB con folio #{pedido_id}. Tu codigo de entrega es: {codigo_entrega}",
 				"menu\nayuda",
+				datos_temp,
 			)
 
 		# Palabras clave globales.
@@ -1229,26 +1745,34 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 			estado = "inicio"
 			datos_temp = {}
 			_guardar_sesion(whatsapp_id, estado, datos_temp)
-			return _armar_respuesta("pedido cancelado y sesion reiniciada.", "Escribe hola para empezar")
+			return _armar_respuesta_comercial("pedido cancelado y sesion reiniciada.", "Escribe hola para empezar", datos_temp)
 
 		if entrada in {"hola", "buenas", "buenos dias", "inicio", "empezar"}:
-			nuevo_estado, datos_temp, response = _manejar_inicio(entrada, {})
+			nuevo_estado, datos_temp, response = _manejar_inicio(entrada, {}, cliente)
 			_guardar_sesion(whatsapp_id, nuevo_estado, datos_temp)
 			return response
 
 		if "ayuda" in entrada:
 			_guardar_sesion(whatsapp_id, estado, datos_temp)
-			return _respuesta_ayuda()
+			return _respuesta_ayuda(datos_temp)
 
 		if "menu" in entrada:
 			_guardar_sesion(whatsapp_id, estado, datos_temp)
-			return _respuesta_menu()
+			return _respuesta_menu(datos_temp)
+
+		if estado in {"inicio", "bienvenida", "completado"}:
+			intencion = _detectar_intencion_comercial(texto_entrada)
+			if intencion:
+				respuesta_comercial = _respuesta_intencion_comercial(intencion, datos_temp)
+				if respuesta_comercial:
+					_guardar_sesion(whatsapp_id, estado, datos_temp)
+					return respuesta_comercial
 
 		# Transiciones temporizadas.
 		estado, datos_temp = _aplicar_transiciones_programadas(estado, datos_temp)
 
 		if estado == "inicio":
-			nuevo_estado, datos_temp, response = _manejar_inicio(entrada, datos_temp)
+			nuevo_estado, datos_temp, response = _manejar_inicio(entrada, datos_temp, cliente)
 
 		elif estado == "bienvenida":
 			nuevo_estado, datos_temp, response = _manejar_bienvenida(entrada, datos_temp)
@@ -1294,7 +1818,7 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 			if datos_temp.get("evaluar_entrega_en") and datetime.utcnow() >= datetime.fromisoformat(datos_temp["evaluar_entrega_en"]):
 				nuevo_estado = "evaluar_entrega"
 				texto = "ya te entregamos, como calificas la entrega del 1 al 5?"
-				response = _armar_respuesta(texto, "1 muy mala\n5 excelente")
+				response = _armar_respuesta(texto, "1 muy mala\n5 excelente", datos_temp)
 			else:
 				nuevo_estado, datos_temp, response = _manejar_completado(entrada, datos_temp)
 
@@ -1307,20 +1831,18 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 		else:
 			nuevo_estado = "inicio"
 			datos_temp = {}
-			response = _armar_respuesta("se reinicio tu flujo por seguridad.", "Escribe hola para continuar")
+			response = _armar_respuesta_comercial("se reinicio tu flujo por seguridad.", "Escribe hola para continuar", datos_temp)
 
 		_guardar_sesion(whatsapp_id, nuevo_estado, datos_temp)
 		return response
 
 	except Exception as exc:
 		# Nunca rompemos el webhook; regresamos mensaje amable y mantenemos reintento sencillo.
-		return {
-			"tipo": "texto",
-			"contenido": (
-				"Listo parce, tuve un enredo tecnico momentaneo. "
-				f"Intenta de nuevo en un momento. Detalle: {exc}"
-			),
-		}
+		return _armar_respuesta(
+			"tuve un enredo tecnico momentaneo. Intenta de nuevo en un momento.",
+			f"Detalle tecnico: {exc}",
+			datos_temp if 'datos_temp' in locals() else None,
+		)
 
 
 def procesar_mensaje_whatsapp(whatsapp_id, mensaje, media_url=None, media_type=None, latitude=None, longitude=None):

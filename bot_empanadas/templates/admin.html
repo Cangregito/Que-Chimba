@@ -3,318 +3,478 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Que Chimba - Admin Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Que Chimba | Panel Admin</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
     :root {
-      --brand-gold: #F5A623;
-      --brand-gold-soft: #FFD47A;
-      --ink: #1A1A1A;
-      --coffee: #2B1F17;
-      --paper: #F7F1E3;
-      --card: #FFFDF8;
-      --muted: #6C6257;
-      --danger: #C62828;
-      --ok: #1B8B3A;
-      --line: #E4DCCB;
-      --shadow: 0 10px 28px rgba(19, 13, 9, 0.12);
-      --radius: 14px;
+      --bg: #FFFFFF;
+      --surface: #F8F8F7;
+      --line: #E5E5E3;
+      --text: #1A1A1A;
+      --text-2: #6B6B6B;
+      --text-3: #9B9B9B;
+      --accent: #1F2328;
+      --blue-bg: #E6F1FB;
+      --blue-fg: #0C447C;
+      --green-bg: #EAF3DE;
+      --green-fg: #27500A;
+      --amber-bg: #FAEEDA;
+      --amber-fg: #633806;
+      --red-bg: #FCEBEB;
+      --red-fg: #791F1F;
+      --r-sm: 8px;
+      --r-lg: 12px;
+      --t: 120ms ease;
     }
 
     * {
       box-sizing: border-box;
+    }
+
+    html,
+    body {
       margin: 0;
       padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 400;
     }
 
-    body {
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      color: var(--ink);
-      background: radial-gradient(circle at 10% 5%, #FFE7AF 0%, #F7F1E3 38%, #F2E6CF 100%);
-      min-height: 100vh;
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+      color: inherit;
     }
 
-    .layout {
+    .app {
       display: grid;
-      grid-template-columns: 260px 1fr;
+      grid-template-columns: 200px 1fr;
       min-height: 100vh;
+      background: var(--bg);
     }
 
     .sidebar {
-      background: linear-gradient(190deg, #2B1F17 0%, #1A1A1A 90%);
-      color: #FFF7E8;
-      padding: 26px 18px;
       position: sticky;
       top: 0;
       height: 100vh;
-      border-right: 2px solid rgba(245, 166, 35, 0.26);
+      border-right: 0.5px solid var(--line);
+      background: var(--surface);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
     }
 
     .brand {
-      border: 1px solid rgba(245, 166, 35, 0.45);
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 26px;
-      background: rgba(245, 166, 35, 0.12);
+      padding: 8px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
     }
 
     .brand h1 {
-      font-size: 1.1rem;
-      margin-bottom: 4px;
-      color: var(--brand-gold-soft);
-      letter-spacing: 0.3px;
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
     }
 
     .brand p {
-      font-size: 0.84rem;
-      color: #EED6AA;
+      margin: 4px 0 0;
+      color: var(--text-2);
+      font-size: 12px;
     }
 
-    .nav a {
-      display: block;
-      text-decoration: none;
-      color: #FFF3D9;
-      margin: 8px 0;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid transparent;
-      transition: 0.2s ease;
-      font-size: 0.95rem;
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
-    .nav a:hover,
-    .nav a.active {
-      background: rgba(245, 166, 35, 0.14);
-      border-color: rgba(245, 166, 35, 0.45);
-      color: #FFFFFF;
+    .nav-item {
+      width: 100%;
+      border: 0.5px solid transparent;
+      background: transparent;
+      border-radius: var(--r-sm);
+      text-align: left;
+      padding: 10px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-2);
+      transition: background var(--t), opacity var(--t);
+      cursor: pointer;
     }
 
-    .sidebar-footer {
-      position: absolute;
-      left: 18px;
-      right: 18px;
-      bottom: 20px;
-      font-size: 0.84rem;
-      color: #DBC8A0;
+    .nav-item:hover {
+      background: var(--bg);
     }
 
-    main {
-      padding: 26px 28px 42px;
+    .nav-item.active {
+      background: var(--bg);
+      color: var(--text);
+      border-color: var(--line);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .dot.blue { background: #185FA5; }
+    .dot.green { background: #3F7A13; }
+    .dot.red { background: #B64A4A; }
+    .dot.amber { background: #9A6A22; }
+    .dot.darkgreen { background: #27500A; }
+
+    .session {
+      margin-top: auto;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      padding: 10px;
+      font-size: 12px;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+
+    .session strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .main {
+      overflow: auto;
+      background: var(--bg);
+    }
+
+    .main-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
     }
 
     .topbar {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      padding: 12px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      margin-bottom: 18px;
+      justify-content: space-between;
       gap: 12px;
       flex-wrap: wrap;
     }
 
     .topbar h2 {
-      font-size: 1.45rem;
+      margin: 0;
+      font-size: 16px;
+      font-weight: 500;
     }
 
-    .badge {
-      padding: 8px 12px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: #FFF8E8;
-      font-size: 0.86rem;
-      color: var(--coffee);
+    .subtle {
+      color: var(--text-2);
+      font-size: 13px;
     }
 
-    .badge-cost {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      border: 1px solid transparent;
-      white-space: nowrap;
-    }
-
-    .badge-cost.ok {
-      background: #EAF7EE;
-      color: #196B31;
-      border-color: #B9E0C4;
-    }
-
-    .badge-cost.warn {
-      background: #FFF4DE;
-      color: #8A5A00;
-      border-color: #F0D18C;
-    }
-
-    .badge-cost.danger {
-      background: #FCE8E8;
-      color: #A12A2A;
-      border-color: #E8B2B2;
-    }
-
-    .section-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 18px;
-      margin-top: 14px;
-    }
-
-    .section-title {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
+    .section {
+      display: none;
+      flex-direction: column;
       gap: 12px;
-      flex-wrap: wrap;
     }
 
-    .section-title h3 {
-      font-size: 1.1rem;
-      color: var(--coffee);
+    .section.active {
+      display: flex;
+    }
+
+    .row {
+      display: grid;
+      gap: 10px;
+    }
+
+    .row.kpi-4 {
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+    }
+
+    .row.kpi-3 {
+      grid-template-columns: repeat(3, minmax(160px, 1fr));
+    }
+
+    .row.grid-2 {
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+    }
+
+    .row.grid-3 {
+      grid-template-columns: repeat(3, minmax(260px, 1fr));
+    }
+
+    .card {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--bg);
+      padding: 12px;
+    }
+
+    .card.flat {
+      border: none;
+      background: var(--surface);
+      border-radius: var(--r-sm);
+      padding: 16px;
+    }
+
+    .kpi-label {
+      margin: 0;
+      color: var(--text-2);
+      font-size: 12px;
+    }
+
+    .kpi-number {
+      margin-top: 8px;
+      font-size: 24px;
+      line-height: 1.1;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .kpi-trend {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .card-head h3,
+    .card-head h4 {
+      margin: 0;
+      font-weight: 500;
+      font-size: 14px;
     }
 
     .btn {
-      border: 1px solid #B57A0B;
-      background: linear-gradient(180deg, #FFD47A 0%, #F5A623 100%);
-      color: #231A13;
-      font-weight: 700;
-      border-radius: 10px;
-      padding: 8px 14px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 12px;
+      min-height: 34px;
       cursor: pointer;
-      transition: transform 0.1s ease;
+      transition: background var(--t), opacity var(--t);
     }
 
     .btn:hover {
-      transform: translateY(-1px);
+      background: #EFEFEE;
     }
 
-    .btn-dark {
-      border: 1px solid #3D2B1E;
-      background: linear-gradient(180deg, #3A2A1F 0%, #221811 100%);
-      color: #FFE4AE;
+    .btn.primary {
+      background: var(--accent);
+      color: #FFFFFF;
+      border-color: var(--accent);
     }
 
-    .kpis {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(180px, 1fr));
-      gap: 12px;
-      margin-bottom: 12px;
+    .btn.primary:hover {
+      opacity: 0.92;
+      background: var(--accent);
     }
 
-    .kpi {
-      background: #FFF8EA;
-      border: 1px solid #EDD9AF;
-      border-left: 6px solid var(--brand-gold);
-      border-radius: 12px;
-      padding: 12px;
+    .btn:focus-visible,
+    .nav-item:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid rgba(12, 68, 124, 0.35);
+      outline-offset: 1px;
     }
 
-    .kpi h4 {
-      font-size: 0.86rem;
-      color: var(--muted);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
+    .btn.full {
+      width: 100%;
     }
 
-    .kpi .value {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--coffee);
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 0.5px solid transparent;
+      white-space: nowrap;
     }
 
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(240px, 1fr));
-      gap: 12px;
-      margin-top: 12px;
-    }
+    .badge.blue { background: var(--blue-bg); color: var(--blue-fg); }
+    .badge.green { background: var(--green-bg); color: var(--green-fg); }
+    .badge.amber { background: var(--amber-bg); color: var(--amber-fg); }
+    .badge.red { background: var(--red-bg); color: var(--red-fg); }
 
-    .chart-card {
-      background: #FFFCF4;
-      border: 1px solid #EEDFC0;
-      border-radius: 12px;
-      padding: 12px;
-      min-height: 300px;
-    }
-
-    .chart-box {
-      position: relative;
-      height: 240px;
-      margin-top: 8px;
+    .table-wrap {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      overflow: auto;
+      max-height: 360px;
+      background: var(--bg);
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 8px;
-      font-size: 0.93rem;
+      min-width: 780px;
     }
 
     th,
     td {
-      border-bottom: 1px solid #E9DFC8;
+      border-bottom: 0.5px solid var(--line);
       text-align: left;
-      padding: 10px 8px;
+      padding: 8px;
+      font-size: 13px;
       vertical-align: top;
     }
 
     th {
-      color: #4D3A2E;
-      background: #FFF7E3;
+      background: var(--surface);
+      color: var(--text-2);
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      z-index: 1;
     }
 
-    .text-right {
-      text-align: right;
-    }
-
-    .danger-row {
-      background: rgba(198, 40, 40, 0.1);
-    }
-
-    .danger-text {
-      color: var(--danger);
-      font-weight: 700;
+    tr:last-child td {
+      border-bottom: none;
     }
 
     .muted {
-      color: var(--muted);
-      font-size: 0.9rem;
+      color: var(--text-3);
+    }
+
+    .chart-box {
+      height: 250px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      padding: 8px;
+    }
+
+    .chart-box canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .grid-stock {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 10px;
+    }
+
+    .stock-card {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      padding: 10px;
+    }
+
+    .stock-name {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .stock-meta {
+      font-size: 12px;
+      color: var(--text-2);
+      margin-bottom: 8px;
+    }
+
+    .progress {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: #EFEFEE;
+      overflow: hidden;
+    }
+
+    .progress > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      transition: opacity var(--t), background var(--t);
+    }
+
+    .p-ok { background: #6F9D3B; }
+    .p-warn { background: #B27A29; }
+    .p-danger { background: #A84A4A; }
+
+    .pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      border: 0.5px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text-2);
+      padding: 7px 10px;
+      cursor: pointer;
+      transition: background var(--t), opacity var(--t);
+    }
+
+    .pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #FFFFFF;
     }
 
     .form-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
       gap: 10px;
-      margin-top: 8px;
+      grid-template-columns: repeat(2, minmax(200px, 1fr));
+    }
+
+    .form-grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
     }
 
     .field {
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 6px;
     }
 
     .field label {
-      font-size: 0.9rem;
-      color: #4F463F;
+      font-size: 12px;
+      color: var(--text-2);
     }
 
     .field input,
     .field select,
     .field textarea {
-      padding: 10px;
-      border: 1px solid #D6C9AE;
-      border-radius: 10px;
-      background: #FFFCF7;
-      font: inherit;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      padding: 8px;
+      outline: none;
     }
 
     .field textarea {
-      min-height: 96px;
+      min-height: 110px;
       resize: vertical;
     }
 
@@ -322,76 +482,123 @@
       grid-column: 1 / -1;
     }
 
-    .progress-wrap {
-      margin-top: 10px;
-      display: none;
-    }
-
-    .progress-track {
-      width: 100%;
-      background: #F4E7C9;
-      border-radius: 999px;
-      overflow: hidden;
-      height: 12px;
-      border: 1px solid #DFCBA0;
-    }
-
-    .progress-bar {
-      width: 0;
-      height: 100%;
-      background: linear-gradient(90deg, #D08A0D 0%, #F5A623 100%);
-      transition: width 0.2s ease;
-    }
-
-    .status {
-      margin-top: 6px;
-      font-size: 0.9rem;
-      color: #4F463F;
-    }
-
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(27, 20, 14, 0.65);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 20;
-      padding: 16px;
-    }
-
-    .modal.open {
-      display: flex;
-    }
-
-    .modal-card {
-      width: 100%;
-      max-width: 560px;
-      background: #FFFCF6;
-      border-radius: 14px;
-      border: 1px solid #E7D6B2;
-      box-shadow: var(--shadow);
-      padding: 16px;
-    }
-
-    .modal-head {
+    .error-card {
+      border: 0.5px solid #E3C3C3;
+      border-radius: var(--r-sm);
+      background: var(--red-bg);
+      color: var(--red-fg);
+      padding: 10px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
+    }
+
+    .skeleton {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .s-line {
+      height: 10px;
+      border-radius: 999px;
+      background: #ECECEB;
+      animation: pulse 1.2s ease infinite;
+    }
+
+    .s-line:nth-child(1) { width: 96%; }
+    .s-line:nth-child(2) { width: 78%; }
+    .s-line:nth-child(3) { width: 88%; }
+    .s-line:nth-child(4) { width: 65%; }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.55; }
+      100% { opacity: 1; }
+    }
+
+    .drawer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      transform: translateY(102%);
+      transition: transform var(--t), opacity var(--t);
+      opacity: 0;
+      background: var(--bg);
+      border-top: 0.5px solid var(--line);
+      padding: 12px 16px 16px;
+      z-index: 80;
+      max-height: 76vh;
+      overflow: auto;
+    }
+
+    .drawer.open {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .drawer-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 12px;
     }
 
-    .link-like {
-      border: none;
-      background: none;
-      color: #5F2F18;
-      text-decoration: underline;
-      cursor: pointer;
-      font: inherit;
+    .small {
+      font-size: 12px;
+      color: var(--text-2);
     }
 
-    @media (max-width: 1024px) {
-      .layout {
+    .toast {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      z-index: 90;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      padding: 10px 12px;
+      color: var(--text);
+      min-width: 260px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--t), background var(--t);
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    .toast.success {
+      background: var(--green-bg);
+      color: var(--green-fg);
+      border-color: #CDDDBA;
+    }
+
+    .toast.error {
+      background: var(--red-bg);
+      color: var(--red-fg);
+      border-color: #E3C3C3;
+    }
+
+    @media (max-width: 1150px) {
+      .row.kpi-4 {
+        grid-template-columns: repeat(2, minmax(160px, 1fr));
+      }
+
+      .row.grid-3 {
+        grid-template-columns: 1fr;
+      }
+
+      .form-grid.cols-3 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .app {
         grid-template-columns: 1fr;
       }
 
@@ -399,1852 +606,1777 @@
         position: static;
         height: auto;
         border-right: none;
-        border-bottom: 2px solid rgba(245, 166, 35, 0.26);
+        border-bottom: 0.5px solid var(--line);
       }
 
-      .sidebar-footer {
-        position: static;
-        margin-top: 14px;
+      .session {
+        margin-top: 0;
       }
 
-      .grid-3 {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 768px) {
-      main {
-        padding: 18px 14px 30px;
-      }
-
-      .kpis {
+      .row.kpi-4,
+      .row.kpi-3,
+      .row.grid-2 {
         grid-template-columns: 1fr;
       }
 
-      .form-grid {
+      .form-grid,
+      .form-grid.cols-3 {
         grid-template-columns: 1fr;
-      }
-
-      .chart-box {
-        height: 220px;
-      }
-    }
-    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
-
-    body {
-      font-family: "Space Grotesk", "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at 5% 0%, #ffe3ad 0%, transparent 38%),
-        radial-gradient(circle at 98% 20%, #ffeec9 0%, transparent 33%),
-        linear-gradient(180deg, #f8f3e8 0%, #f3ebda 100%);
-    }
-
-    .sidebar {
-      background: linear-gradient(190deg, #201711 0%, #16110d 100%);
-      border-right: 1px solid rgba(245, 166, 35, 0.35);
-    }
-
-    .section-card,
-    .chart-card,
-    .kpi,
-    .modal-card {
-      border-radius: 18px;
-      box-shadow: 0 14px 30px rgba(31, 22, 15, 0.12);
-    }
-
-    .section-card {
-      background: rgba(255, 252, 245, 0.92);
-      backdrop-filter: blur(4px);
-      border: 1px solid #eadcc0;
-      animation: rise 0.35s ease;
-    }
-
-    .btn {
-      border-radius: 12px;
-      letter-spacing: 0.2px;
-      box-shadow: 0 6px 14px rgba(181, 122, 11, 0.2);
-    }
-
-    table {
-      border-radius: 12px;
-      overflow: hidden;
-      background: #fffdf8;
-    }
-
-    th {
-      font-size: 0.82rem;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-    }
-
-    @keyframes rise {
-      from {
-        opacity: 0;
-        transform: translateY(6px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .topbar h2 {
-      font-size: clamp(1.3rem, 2.2vw, 1.75rem);
-      letter-spacing: -0.02em;
-    }
-
-    .section-title h3 {
-      font-size: 1.18rem;
-      letter-spacing: -0.01em;
-    }
-
-    .kpi {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .kpi::after {
-      content: "";
-      position: absolute;
-      right: -18px;
-      top: -18px;
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(245, 166, 35, 0.24) 0%, rgba(245, 166, 35, 0) 75%);
-    }
-
-    tbody tr:nth-child(odd) {
-      background: rgba(255, 252, 245, 0.9);
-    }
-
-    tbody tr:hover {
-      background: #fff5df;
-    }
-
-    .nav a {
-      font-weight: 600;
-      letter-spacing: 0.15px;
-    }
-
-    .badge {
-      box-shadow: 0 4px 12px rgba(130, 96, 41, 0.12);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation: none !important;
-        transition: none !important;
       }
     }
   </style>
 </head>
 <body>
-  <div class="layout">
+  <div class="app">
     <aside class="sidebar">
       <div class="brand">
         <h1>Que Chimba</h1>
-        <p>Panel de administracion</p>
+        <p>Panel administrativo</p>
       </div>
 
-      <nav class="nav">
-        <a href="#ventas" class="active">Ventas</a>
-        <a href="#operacion-db">Operacion DB</a>
-        <a href="#seguridad">Seguridad</a>
-        <a href="#campanas">Campanas</a>
-        <a href="#inventario">Inventario</a>
+      <nav class="nav" id="sidebar-nav">
+        <button class="nav-item active" data-section="ventas" type="button"><span class="dot blue"></span>Ventas</button>
+        <button class="nav-item" data-section="operacion" type="button"><span class="dot green"></span>Operacion DB</button>
+        <button class="nav-item" data-section="seguridad" type="button"><span class="dot red"></span>Seguridad</button>
+        <button class="nav-item" data-section="campanas" type="button"><span class="dot amber"></span>Campanas</button>
+        <button class="nav-item" data-section="inventario" type="button"><span class="dot darkgreen"></span>Inventario</button>
       </nav>
 
-      <div class="sidebar-footer">
-        Usuario: <strong>{{ user.username if user else 'admin' }}</strong>
+      <div class="session">
+        <div><strong>{{ (user.nombre_mostrar if user else 'Admin') or 'Admin' }}</strong></div>
+        <div>Rol: {{ (user.rol if user else 'admin') or 'admin' }}</div>
+        <div>IP: {{ request.remote_addr or 'N/D' }}</div>
       </div>
     </aside>
 
-    <main>
-      <div class="topbar">
-        <h2>Dashboard administrador</h2>
-        <span class="badge">Actualizado para demo local Flask + PostgreSQL</span>
-      </div>
+    <main class="main">
+      <div class="main-inner">
+        <header class="topbar">
+          <h2 id="page-title">Ventas</h2>
+          <div class="subtle" id="page-subtitle">Vista en tiempo real de ventas y clientes.</div>
+        </header>
 
-      <section id="ventas" class="section-card">
-        <div class="section-title">
-          <h3>Seccion ventas</h3>
-          <button id="btn-refrescar-ventas" class="btn" type="button">Refrescar</button>
-        </div>
-
-        <div class="kpis">
-          <article class="kpi">
-            <h4>Ventas hoy</h4>
-            <div class="value" id="kpi-hoy-ventas">0 pedidos</div>
-            <div class="muted" id="kpi-hoy-promedio">Promedio ticket: $0.00</div>
-          </article>
-          <article class="kpi">
-            <h4>Ventas mes</h4>
-            <div class="value" id="kpi-mes-ventas">0 pedidos</div>
-            <div class="muted" id="kpi-mes-promedio">Promedio ticket: $0.00</div>
-          </article>
-        </div>
-
-        <div class="grid-3">
-          <article class="chart-card">
-            <h4>Ventas del dia (por hora)</h4>
-            <div class="chart-box">
-              <canvas id="chart-dia"></canvas>
-            </div>
-          </article>
-          <article class="chart-card">
-            <h4>Ventas del mes (por dia)</h4>
-            <div class="chart-box">
-              <canvas id="chart-mes"></canvas>
-            </div>
-          </article>
-          <article class="chart-card">
-            <h4>Ventas del ano (por mes)</h4>
-            <div class="chart-box">
-              <canvas id="chart-ano"></canvas>
-            </div>
-          </article>
-        </div>
-
-        <div style="margin-top: 16px;">
-          <h4>Top 20 mejores clientes</h4>
-          <table>
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>WhatsApp</th>
-                <th class="text-right">Total gastado (MXN)</th>
-              </tr>
-            </thead>
-            <tbody id="top-clientes-body">
-              <tr><td colspan="3" class="muted">Cargando top clientes...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="operacion-db" class="section-card">
-        <div class="section-title">
-          <h3>Control operativo de base de datos</h3>
-          <button id="btn-refrescar-db" class="btn" type="button">Refrescar control DB</button>
-        </div>
-
-        <div class="kpis">
-          <article class="kpi">
-            <h4>Clientes registrados</h4>
-            <div class="value" id="db-clientes">0</div>
-            <div class="muted">Numero unico por WhatsApp</div>
-          </article>
-          <article class="kpi">
-            <h4>Pedidos activos</h4>
-            <div class="value" id="db-pedidos-activos">0</div>
-            <div class="muted">Recibido, preparacion, listo y en camino</div>
-          </article>
-          <article class="kpi">
-            <h4>Ventas hoy</h4>
-            <div class="value" id="db-ventas-hoy">$0.00</div>
-            <div class="muted">Total no cancelado</div>
-          </article>
-          <article class="kpi">
-            <h4>Ventas mes</h4>
-            <div class="value" id="db-ventas-mes">$0.00</div>
-            <div class="muted">Total no cancelado</div>
-          </article>
-          <article class="kpi">
-            <h4>Utilidad estimada hoy</h4>
-            <div class="value" id="db-utilidad-hoy">$0.00</div>
-            <div class="muted" id="db-margen-hoy">Margen estimado: 0%</div>
-          </article>
-        </div>
-
-        <div style="margin-top: 16px;">
-          <h4>Rentabilidad estimada por producto</h4>
-          <table>
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Calidad costo</th>
-                <th class="text-right">Precio venta</th>
-                <th class="text-right">Costo estimado</th>
-                <th class="text-right">Margen unitario</th>
-                <th class="text-right">Margen %</th>
-              </tr>
-            </thead>
-            <tbody id="rentabilidad-body">
-              <tr><td colspan="6" class="muted">Cargando rentabilidad...</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div style="margin-top: 16px;">
-          <h4>Pedidos recientes (gestion de estado)</h4>
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Cliente</th>
-                <th>WhatsApp</th>
-                <th class="text-right">Total</th>
-                <th>Estado actual</th>
-                <th>Nuevo estado</th>
-                <th>Accion</th>
-              </tr>
-            </thead>
-            <tbody id="pedidos-admin-body">
-              <tr><td colspan="7" class="muted">Cargando pedidos...</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div style="margin-top: 16px;">
-          <h4>Ultimas compras de inventario (auditoria)</h4>
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Insumo</th>
-                <th class="text-right">Cantidad</th>
-                <th class="text-right">Costo total</th>
-                <th>Proveedor</th>
-                <th>Capturado por</th>
-              </tr>
-            </thead>
-            <tbody id="compras-body">
-              <tr><td colspan="6" class="muted">Cargando historial de compras...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="seguridad" class="section-card">
-        <div class="section-title">
-          <h3>Seguridad y accesos</h3>
-          <button id="btn-refrescar-usuarios" class="btn" type="button">Refrescar usuarios</button>
-        </div>
-
-        <div class="form-grid" style="margin-bottom: 14px;">
-          <div class="field">
-            <label for="usuario-username">Usuario</label>
-            <input id="usuario-username" placeholder="nuevo_usuario" maxlength="80" required />
+        <section class="section active" id="section-ventas">
+          <div class="row kpi-4">
+            <article class="flat card">
+              <p class="kpi-label">Ventas hoy</p>
+              <div class="kpi-number" id="kpi-ventas-hoy">$0.00</div>
+              <div class="kpi-trend" id="kpi-ventas-hoy-trend">0.0% vs ayer</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Ventas mes</p>
+              <div class="kpi-number" id="kpi-ventas-mes">$0.00</div>
+              <div class="kpi-trend" id="kpi-ventas-mes-trend">0.0% vs mes anterior</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Ticket promedio</p>
+              <div class="kpi-number" id="kpi-ticket-promedio">$0.00</div>
+              <div class="kpi-trend">Promedio de pedidos de hoy</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Pedidos hoy</p>
+              <div class="kpi-number" id="kpi-pedidos-hoy">0</div>
+              <div class="kpi-trend">Pedidos no cancelados</div>
+            </article>
           </div>
 
-          <div class="field">
-            <label for="usuario-nombre">Nombre visible</label>
-            <input id="usuario-nombre" placeholder="Nombre del operador" maxlength="120" required />
-          </div>
-
-          <div class="field">
-            <label for="usuario-rol">Rol</label>
-            <select id="usuario-rol">
-              <option value="admin">admin</option>
-              <option value="cocina">cocina</option>
-              <option value="repartidor">repartidor</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="usuario-telefono">Telefono</label>
-            <input id="usuario-telefono" placeholder="6561234567" maxlength="30" />
-          </div>
-
-          <div class="field full">
-            <label for="usuario-password">Contrasena temporal (min 8)</label>
-            <input id="usuario-password" type="password" minlength="8" placeholder="Minimo 8 caracteres" required />
-          </div>
-
-          <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <button id="btn-crear-usuario" class="btn btn-dark" type="button">Crear usuario</button>
-            <span id="usuarios-status" class="muted"></span>
-          </div>
-        </div>
-
-        <div class="kpis" style="margin-bottom: 14px;">
-          <article class="kpi">
-            <h4>Eventos de seguridad hoy</h4>
-            <div class="value" id="seguridad-eventos-hoy">0</div>
-            <div class="muted">Logins, fallos y cambios de usuarios</div>
+          <article class="card">
+            <div class="card-head">
+              <h3>Ventas por hora (hoy)</h3>
+              <button class="btn" type="button" id="btn-refresh-ventas-dia">Refrescar</button>
+            </div>
+            <div id="ventas-dia-slot" class="chart-box"><canvas id="chart-ventas-dia"></canvas></div>
           </article>
 
-          <article class="kpi">
-            <h4>Eventos de negocio hoy</h4>
-            <div class="value" id="negocio-eventos-hoy">0</div>
-            <div class="muted">Pedidos, pagos e inventario auditados desde SQL</div>
+          <div class="row grid-2">
+            <article class="card">
+              <div class="card-head"><h3>Ventas por dia (mes actual)</h3></div>
+              <div id="ventas-mes-slot" class="chart-box"><canvas id="chart-ventas-mes"></canvas></div>
+            </article>
+            <article class="card">
+              <div class="card-head"><h3>Ventas por mes (ano actual)</h3></div>
+              <div id="ventas-ano-slot" class="chart-box"><canvas id="chart-ventas-ano"></canvas></div>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card-head"><h3>Top 20 clientes</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Nombre / WhatsApp</th>
+                    <th>Pedidos</th>
+                    <th>Total gastado</th>
+                    <th>Ultima compra</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-top-clientes"></tbody>
+              </table>
+            </div>
           </article>
-        </div>
+        </section>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Usuario</th>
-              <th>Rol</th>
-              <th>Nombre</th>
-              <th>Telefono</th>
-              <th>Ultimo login</th>
-              <th>Estatus</th>
-              <th>Accion</th>
-            </tr>
-          </thead>
-          <tbody id="usuarios-body">
-            <tr><td colspan="7" class="muted">Cargando usuarios del sistema...</td></tr>
-          </tbody>
-        </table>
-
-        <div style="margin-top: 16px;">
-          <h4>Bitacora reciente de seguridad</h4>
-          <div class="form-grid" style="margin-top: 8px; margin-bottom: 10px;">
-            <div class="field">
-              <label for="filtro-seguridad-evento">Evento</label>
-              <input id="filtro-seguridad-evento" placeholder="login_failed" maxlength="50" />
-            </div>
-            <div class="field">
-              <label for="filtro-seguridad-severidad">Severidad</label>
-              <select id="filtro-seguridad-severidad">
-                <option value="">Todas</option>
-                <option value="info">info</option>
-                <option value="warning">warning</option>
-                <option value="critical">critical</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="filtro-seguridad-actor">Actor</label>
-              <input id="filtro-seguridad-actor" placeholder="admin" maxlength="80" />
-            </div>
-            <div class="field">
-              <label for="filtro-seguridad-desde">Desde</label>
-              <input id="filtro-seguridad-desde" type="date" />
-            </div>
-            <div class="field">
-              <label for="filtro-seguridad-hasta">Hasta</label>
-              <input id="filtro-seguridad-hasta" type="date" />
-            </div>
-            <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-              <button id="btn-aplicar-filtro-seguridad" class="btn btn-dark" type="button">Aplicar filtros</button>
-              <button id="btn-limpiar-filtro-seguridad" class="btn" type="button">Limpiar</button>
-              <button id="btn-exportar-seguridad-csv" class="btn" type="button">Exportar CSV</button>
-            </div>
+        <section class="section" id="section-operacion">
+          <div class="row kpi-4">
+            <article class="flat card">
+              <p class="kpi-label">Clientes registrados</p>
+              <div class="kpi-number" id="kpi-clientes-total">0</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Pedidos activos</p>
+              <div class="kpi-number" id="kpi-pedidos-activos">0</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Utilidad estimada hoy</p>
+              <div class="kpi-number" id="kpi-utilidad-hoy">$0.00</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Margen estimado</p>
+              <div class="kpi-number" id="kpi-margen-hoy">0.00%</div>
+            </article>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Evento</th>
-                <th>Severidad</th>
-                <th>Actor</th>
-                <th>Objetivo</th>
-                <th>IP</th>
-                <th>Detalle</th>
-              </tr>
-            </thead>
-            <tbody id="auditoria-body">
-              <tr><td colspan="7" class="muted">Cargando auditoria de seguridad...</td></tr>
-            </tbody>
-          </table>
-        </div>
 
-        <div style="margin-top: 16px;">
-          <h4>Bitacora reciente de negocio</h4>
-          <div class="form-grid" style="margin-top: 8px; margin-bottom: 10px;">
-            <div class="field">
-              <label for="filtro-negocio-tabla">Tabla</label>
-              <select id="filtro-negocio-tabla">
-                <option value="">Todas</option>
-                <option value="pedidos">pedidos</option>
-                <option value="pagos">pagos</option>
-                <option value="insumos">insumos</option>
-                <option value="compras_insumos">compras_insumos</option>
-              </select>
+          <article class="card">
+            <div class="card-head"><h3>Rentabilidad por producto</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Variante</th>
+                    <th>Precio</th>
+                    <th>Costo</th>
+                    <th>Margen %</th>
+                    <th>Calidad receta</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-rentabilidad"></tbody>
+              </table>
             </div>
-            <div class="field">
-              <label for="filtro-negocio-actor">Actor</label>
-              <input id="filtro-negocio-actor" placeholder="admin" maxlength="80" />
-            </div>
-            <div class="field">
-              <label for="filtro-negocio-desde">Desde</label>
-              <input id="filtro-negocio-desde" type="date" />
-            </div>
-            <div class="field">
-              <label for="filtro-negocio-hasta">Hasta</label>
-              <input id="filtro-negocio-hasta" type="date" />
-            </div>
-            <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-              <button id="btn-aplicar-filtro-negocio" class="btn btn-dark" type="button">Aplicar filtros</button>
-              <button id="btn-limpiar-filtro-negocio" class="btn" type="button">Limpiar</button>
-              <button id="btn-exportar-negocio-csv" class="btn" type="button">Exportar CSV</button>
-            </div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Tabla</th>
-                <th>Operacion</th>
-                <th>Registro</th>
-                <th>Actor</th>
-                <th>Rol</th>
-                <th>Detalle</th>
-              </tr>
-            </thead>
-            <tbody id="auditoria-negocio-body">
-              <tr><td colspan="7" class="muted">Cargando auditoria de negocio...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+          </article>
 
-      <section id="campanas" class="section-card">
-        <div class="section-title">
-          <h3>Seccion campanas</h3>
-        </div>
-
-        <h4>Campanas enviadas</h4>
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Nombre</th>
-              <th class="text-right">Total enviados</th>
-            </tr>
-          </thead>
-          <tbody id="campanas-body">
-            <tr><td colspan="3" class="muted">Cargando campanas...</td></tr>
-          </tbody>
-        </table>
-
-        <div style="margin-top: 14px;">
-          <h4>Crear nueva campana</h4>
-          <form id="form-campana" class="form-grid">
-            <div class="field">
-              <label for="campana-nombre">Nombre campana</label>
-              <input id="campana-nombre" name="nombre" placeholder="Promo jueves empanadero" required />
+          <article class="card">
+            <div class="card-head"><h3>Pedidos recientes (activos)</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Productos</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th>Accion</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-pedidos-activos"></tbody>
+              </table>
             </div>
+          </article>
 
-            <div class="field">
-              <label for="campana-segmento">Filtro</label>
-              <select id="campana-segmento" name="segmento" required>
-                <option value="general">Todos</option>
-                <option value="solo_mujeres">Solo mujeres</option>
-                <option value="solo_hombres">Solo hombres</option>
-                <option value="top_compradores">Top compradores</option>
-                <option value="inactivos_30d">Clientes inactivos (30 dias)</option>
-              </select>
+          <article class="card">
+            <div class="card-head"><h3>Ultimas compras de inventario</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Insumo</th>
+                    <th>Cantidad</th>
+                    <th>Costo</th>
+                    <th>Registrado por</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-compras-recientes"></tbody>
+              </table>
             </div>
+          </article>
+        </section>
 
-            <div class="field full">
-              <label for="campana-mensaje">Mensaje</label>
-              <textarea id="campana-mensaje" name="mensaje" placeholder="Ay que chimba, hoy tenemos promo de empanadas..." required></textarea>
-            </div>
-
-            <div class="full" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-              <button class="btn" type="submit">Enviar campana por WhatsApp</button>
-              <span class="muted">Envio con progreso visual para la demo</span>
-            </div>
-
-            <div class="full progress-wrap" id="campana-progress-wrap">
-              <div class="progress-track">
-                <div class="progress-bar" id="campana-progress-bar"></div>
+        <section class="section" id="section-seguridad">
+          <article class="card">
+            <div class="card-head"><h3>Alta de usuario</h3></div>
+            <form id="form-alta-usuario" class="form-grid cols-3">
+              <div class="field">
+                <label for="usuario-nombre">Nombre</label>
+                <input id="usuario-nombre" name="nombre" required />
               </div>
-              <div class="status" id="campana-status">Iniciando...</div>
+              <div class="field">
+                <label for="usuario-rol">Rol</label>
+                <select id="usuario-rol" name="rol" required>
+                  <option value="admin">admin</option>
+                  <option value="cocina">cocina</option>
+                  <option value="repartidor">repartidor</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="usuario-whatsapp">WhatsApp</label>
+                <input id="usuario-whatsapp" name="whatsapp" placeholder="5216561234567" />
+              </div>
+              <div class="field">
+                <label for="usuario-email">Email</label>
+                <input id="usuario-email" name="email" placeholder="admin@quechimba.local" />
+              </div>
+              <div class="field">
+                <label for="usuario-password">Contrasena temporal</label>
+                <input id="usuario-password" name="password" type="password" minlength="8" required />
+              </div>
+              <div class="field" id="field-area-entrega" style="display:none;">
+                <label for="usuario-area-entrega">Area de entrega (repartidor)</label>
+                <input id="usuario-area-entrega" name="area_entrega" placeholder="ej. juarez-centro o 32600" />
+              </div>
+              <div class="field" style="align-self:end;">
+                <button class="btn primary full" type="submit">Guardar usuario</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><h3>Usuarios del sistema</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field">
+                <label for="f-usr-rol">Filtrar por rol</label>
+                <select id="f-usr-rol">
+                  <option value="">Todos</option>
+                  <option value="admin">admin</option>
+                  <option value="cocina">cocina</option>
+                  <option value="repartidor">repartidor</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-usr-area">Filtrar por area</label>
+                <input id="f-usr-area" placeholder="juarez-centro o 32600" />
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-usr-filtrar" type="button">Aplicar</button>
+                <button class="btn" id="btn-usr-limpiar" type="button">Limpiar</button>
+              </div>
             </div>
-          </form>
-        </div>
-      </section>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Rol</th>
+                    <th>Area</th>
+                    <th>Estado</th>
+                    <th>Ultima sesion</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-usuarios"></tbody>
+              </table>
+            </div>
+          </article>
 
-      <section id="inventario" class="section-card">
-        <div class="section-title">
-          <h3>Seccion inventario</h3>
-          <button id="btn-registrar-compra" type="button" class="btn btn-dark">Registrar compra</button>
-        </div>
+          <article class="card">
+            <div class="card-head"><h3>Bitacora de seguridad</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-seg-evento">Evento</label><input id="f-seg-evento" placeholder="login_failed" /></div>
+              <div class="field">
+                <label for="f-seg-sev">Severidad</label>
+                <select id="f-seg-sev">
+                  <option value="">Todas</option>
+                  <option value="critical">alta</option>
+                  <option value="warning">media</option>
+                  <option value="info">baja</option>
+                </select>
+              </div>
+              <div class="field"><label for="f-seg-actor">Actor</label><input id="f-seg-actor" placeholder="admin" /></div>
+              <div class="field"><label for="f-seg-desde">Desde</label><input id="f-seg-desde" type="date" /></div>
+              <div class="field"><label for="f-seg-hasta">Hasta</label><input id="f-seg-hasta" type="date" /></div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-seg-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-seg-export" type="button">Exportar CSV</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Actor</th>
+                    <th>Evento</th>
+                    <th>IP</th>
+                    <th>Fecha</th>
+                    <th>Severidad</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-bitacora-seguridad"></tbody>
+              </table>
+            </div>
+          </article>
 
-        <div class="form-grid" style="margin-bottom: 14px;">
-          <div class="field">
-            <label for="producto-manual-nombre">Producto (manual)</label>
-            <input id="producto-manual-nombre" placeholder="Empanada de Jamon" />
-          </div>
-          <div class="field">
-            <label for="producto-manual-variante">Variante</label>
-            <input id="producto-manual-variante" placeholder="Normal" />
-          </div>
-          <div class="field">
-            <label for="producto-manual-precio">Precio</label>
-            <input id="producto-manual-precio" type="number" min="0" step="0.01" />
-          </div>
-          <div class="field" style="justify-content:end;">
-            <label style="display:flex; gap:8px; align-items:center; margin-top: 24px;">
-              <input id="producto-manual-activo" type="checkbox" checked /> Activo
-            </label>
-          </div>
-          <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <button id="btn-guardar-producto-manual" class="btn" type="button">Guardar producto</button>
-            <span id="producto-manual-status" class="muted"></span>
-          </div>
-        </div>
+          <article class="card">
+            <div class="card-head"><h3>Bitacora de negocio</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field">
+                <label for="f-neg-tabla">Tabla</label>
+                <select id="f-neg-tabla">
+                  <option value="">Todas</option>
+                  <option value="pedidos">pedidos</option>
+                  <option value="pagos">pagos</option>
+                  <option value="insumos">insumos</option>
+                  <option value="compras_insumos">compras_insumos</option>
+                </select>
+              </div>
+              <div class="field"><label for="f-neg-actor">Actor</label><input id="f-neg-actor" placeholder="admin" /></div>
+              <div class="field"><label for="f-neg-desde">Desde</label><input id="f-neg-desde" type="date" /></div>
+              <div class="field"><label for="f-neg-hasta">Hasta</label><input id="f-neg-hasta" type="date" /></div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-neg-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-neg-export" type="button">Exportar CSV</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tabla</th>
+                    <th>Operacion</th>
+                    <th>Registro</th>
+                    <th>Actor</th>
+                    <th>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-bitacora-negocio"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
 
-        <div class="form-grid" style="margin-bottom: 14px;">
-          <div class="field">
-            <label for="insumo-manual-nombre">Insumo (manual)</label>
-            <input id="insumo-manual-nombre" placeholder="Salsa roja" />
-          </div>
-          <div class="field">
-            <label for="insumo-manual-unidad">Unidad</label>
-            <input id="insumo-manual-unidad" placeholder="kg / lt / pieza" />
-          </div>
-          <div class="field">
-            <label for="insumo-manual-stock-minimo">Stock minimo</label>
-            <input id="insumo-manual-stock-minimo" type="number" min="0" step="0.01" value="0" />
-          </div>
-          <div class="field">
-            <label for="insumo-manual-stock-inicial">Stock inicial</label>
-            <input id="insumo-manual-stock-inicial" type="number" min="0" step="0.01" value="0" />
-          </div>
-          <div class="field full">
-            <label for="insumo-manual-proveedor">Proveedor</label>
-            <input id="insumo-manual-proveedor" placeholder="Proveedor local" />
-          </div>
-          <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <button id="btn-guardar-insumo-manual" class="btn" type="button">Guardar insumo</button>
-            <span id="insumo-manual-status" class="muted"></span>
-          </div>
-        </div>
+        <section class="section" id="section-campanas">
+          <article class="card">
+            <div class="card-head"><h3>Nueva campana</h3></div>
+            <div class="field" style="margin-bottom:10px;">
+              <label>Segmento</label>
+              <div class="pill-group" id="campana-segmentos">
+                <button class="pill active" data-segment="todos" type="button">Todos</button>
+                <button class="pill" data-segment="top" type="button">Top compradores</button>
+                <button class="pill" data-segment="inactivos_30d" type="button">Inactivos 30d</button>
+                <button class="pill" data-segment="mujeres" type="button">Solo mujeres</button>
+                <button class="pill" data-segment="hombres" type="button">Solo hombres</button>
+              </div>
+              <div class="small" id="segmento-count">Calculando destinatarios...</div>
+            </div>
 
-        <div class="form-grid" style="margin-bottom: 14px;">
-          <div class="field">
-            <label for="receta-producto-id">Producto</label>
-            <select id="receta-producto-id"></select>
-          </div>
-          <div class="field">
-            <label for="receta-insumo-id">Insumo</label>
-            <select id="receta-insumo-id"></select>
-          </div>
-          <div class="field">
-            <label for="receta-cantidad">Cantidad por unidad vendida</label>
-            <input id="receta-cantidad" type="number" min="0" step="0.001" />
-          </div>
-          <div class="full" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <button id="btn-guardar-receta" class="btn btn-dark" type="button">Guardar componente de receta</button>
-            <span id="receta-status" class="muted"></span>
-          </div>
-        </div>
+            <form id="form-campana" class="form-grid">
+              <div class="field full">
+                <label for="campana-mensaje">Mensaje</label>
+                <textarea id="campana-mensaje" maxlength="1000" placeholder="Listo parce, hoy tenemos promo de empanadas..."></textarea>
+                <div class="small" id="campana-char-count">0/1000</div>
+              </div>
+              <div class="field full" style="display:flex; gap:8px; align-items:center;">
+                <button class="btn primary" type="submit">Enviar campana por WhatsApp</button>
+                <div class="small" id="campana-status">Listo para enviar.</div>
+              </div>
+            </form>
 
-        <div style="margin-bottom: 14px;">
-          <h4>Recetas configuradas</h4>
-          <table>
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Insumo</th>
-                <th class="text-right">Cantidad por unidad</th>
-                <th>Unidad</th>
-                <th>Estatus</th>
-                <th>Accion</th>
-              </tr>
-            </thead>
-            <tbody id="recetas-body">
-              <tr><td colspan="6" class="muted">Cargando recetas...</td></tr>
-            </tbody>
-          </table>
-        </div>
+            <div class="progress" style="margin-top:10px;"><span id="campana-progress"></span></div>
+          </article>
 
-        <div style="margin-bottom: 14px;">
-          <h4>Productos sin receta activa (bloqueados para venta)</h4>
-          <table>
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Variante</th>
-                <th class="text-right">Precio</th>
-              </tr>
-            </thead>
-            <tbody id="productos-sin-receta-body">
-              <tr><td colspan="3" class="muted">Cargando validacion de catalogo...</td></tr>
-            </tbody>
-          </table>
-        </div>
+          <article class="card">
+            <div class="card-head"><h3>Historial de campanas</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Segmento</th>
+                    <th>Mensajes enviados</th>
+                    <th>Fecha</th>
+                    <th>Creado por</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-campanas"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Insumo</th>
-              <th>Unidad</th>
-              <th class="text-right">Stock actual</th>
-              <th class="text-right">Stock minimo</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody id="inventario-body">
-            <tr><td colspan="5" class="muted">Cargando inventario...</td></tr>
-          </tbody>
-        </table>
+        <section class="section" id="section-inventario">
+          <div id="alerta-sin-receta"></div>
 
-        <div style="margin-top: 14px;">
-          <h4>Movimientos recientes de inventario</h4>
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Insumo</th>
-                <th>Tipo</th>
-                <th class="text-right">Movimiento</th>
-                <th class="text-right">Antes</th>
-                <th class="text-right">Despues</th>
-                <th>Referencia</th>
-              </tr>
-            </thead>
-            <tbody id="movimientos-inventario-body">
-              <tr><td colspan="7" class="muted">Cargando movimientos...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+          <div class="row grid-2">
+            <article class="card">
+              <div class="card-head"><h3>Alta de producto</h3></div>
+              <form id="form-producto" class="form-grid">
+                <div class="field"><label for="producto-nombre">Nombre</label><input id="producto-nombre" required /></div>
+                <div class="field"><label for="producto-variante">Variante</label>
+                  <select id="producto-variante">
+                    <option value="carne">carne</option>
+                    <option value="pollo">pollo</option>
+                  </select>
+                </div>
+                <div class="field"><label for="producto-precio">Precio</label><input id="producto-precio" type="number" min="0" step="0.01" required /></div>
+                <div class="field"><label for="producto-activo">Activo</label>
+                  <select id="producto-activo"><option value="1">si</option><option value="0">no</option></select>
+                </div>
+                <div class="field full"><button class="btn primary" type="submit">Guardar producto</button></div>
+              </form>
+            </article>
+
+            <article class="card">
+              <div class="card-head"><h3>Alta de insumo</h3></div>
+              <form id="form-insumo" class="form-grid">
+                <div class="field"><label for="insumo-nombre">Nombre</label><input id="insumo-nombre" required /></div>
+                <div class="field"><label for="insumo-unidad">Unidad de medida</label><input id="insumo-unidad" placeholder="pieza" required /></div>
+                <div class="field"><label for="insumo-minimo">Stock minimo</label><input id="insumo-minimo" type="number" min="0" step="0.001" required /></div>
+                <div class="field"><label for="insumo-inicial">Stock inicial</label><input id="insumo-inicial" type="number" min="0" step="0.001" required /></div>
+                <div class="field full"><label for="insumo-proveedor">Proveedor</label><input id="insumo-proveedor" /></div>
+                <div class="field full"><button class="btn primary" type="submit">Guardar insumo</button></div>
+              </form>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card-head"><h3>Gestion de recetas</h3></div>
+            <form id="form-receta" class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="receta-producto">Producto</label><select id="receta-producto" required></select></div>
+              <div class="field"><label for="receta-insumo">Insumo</label><select id="receta-insumo" required></select></div>
+              <div class="field"><label for="receta-cantidad">Cantidad por unidad</label><input id="receta-cantidad" type="number" min="0" step="0.001" required /></div>
+              <div class="field"><label for="receta-activo">Estado</label><select id="receta-activo"><option value="1">activo</option><option value="0">inactivo</option></select></div>
+              <div class="field" style="align-self:end;"><button class="btn primary full" type="submit">Guardar receta</button></div>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Insumo</th>
+                    <th>Cantidad</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-recetas"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <h3>Stock actual</h3>
+              <button id="btn-abrir-compra" class="btn" type="button">Registrar compra</button>
+            </div>
+            <div class="grid-stock" id="grid-stock"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><h3>Movimientos de inventario</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Insumo</th>
+                    <th>Tipo</th>
+                    <th>Cantidad antes</th>
+                    <th>Cantidad despues</th>
+                    <th>Referencia</th>
+                    <th>Registrado por</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-movimientos"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
     </main>
   </div>
 
-  <div class="modal" id="modal-compra" aria-hidden="true">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h4>Registrar compra de insumo</h4>
-        <button class="link-like" id="cerrar-modal" type="button">Cerrar</button>
-      </div>
-
-      <form id="form-compra" class="form-grid">
-        <div class="field">
-          <label for="compra-insumo">Insumo</label>
-          <input id="compra-insumo" required placeholder="Harina de maiz" />
-        </div>
-
-        <div class="field">
-          <label for="compra-cantidad">Cantidad comprada</label>
-          <input id="compra-cantidad" type="number" min="0" step="0.01" required />
-        </div>
-
-        <div class="field">
-          <label for="compra-proveedor">Proveedor</label>
-          <input id="compra-proveedor" placeholder="Proveedor local" />
-        </div>
-
-        <div class="field">
-          <label for="compra-costo">Costo total (MXN)</label>
-          <input id="compra-costo" type="number" min="0" step="0.01" />
-        </div>
-
-        <div class="full" style="display:flex; gap: 10px; align-items:center;">
-          <button class="btn" type="submit">Guardar compra</button>
-          <span id="compra-status" class="muted"></span>
-        </div>
-      </form>
+  <aside class="drawer" id="drawer-compra">
+    <div class="drawer-head">
+      <h3 style="margin:0; font-weight:500; font-size:14px;">Registrar compra de insumo</h3>
+      <button class="btn" id="btn-cerrar-compra" type="button">Cerrar</button>
     </div>
-  </div>
+    <form id="form-compra" class="form-grid cols-3">
+      <div class="field"><label for="compra-insumo">Insumo</label><select id="compra-insumo" required></select></div>
+      <div class="field"><label for="compra-cantidad">Cantidad</label><input id="compra-cantidad" type="number" min="0" step="0.001" required /></div>
+      <div class="field"><label for="compra-costo">Costo total</label><input id="compra-costo" type="number" min="0" step="0.01" /></div>
+      <div class="field"><label for="compra-proveedor">Proveedor</label><input id="compra-proveedor" /></div>
+      <div class="field full"><label for="compra-notas">Notas</label><textarea id="compra-notas" maxlength="400"></textarea></div>
+      <div class="field full"><button class="btn primary" type="submit">Guardar compra</button></div>
+    </form>
+  </aside>
+
+  <div class="toast" id="toast"></div>
 
   <script>
-    const state = {
-      charts: {
-        dia: null,
-        mes: null,
-        ano: null
-      },
-      ventasPollTimer: null,
-      ventasPollInFlight: false,
-      estadosPedido: ["recibido", "en_preparacion", "listo", "en_camino", "entregado", "cancelado"]
-    };
+    (function () {
+      const state = {
+        loaded: {
+          ventas: false,
+          operacion: false,
+          seguridad: false,
+          campanas: false,
+          inventario: false
+        },
+        current: "ventas",
+        timers: {
+          ventasDia: null,
+          pedidosActivos: null
+        },
+        charts: {
+          dia: null,
+          mes: null,
+          ano: null
+        },
+        campanaSegmento: "todos",
+        campanaProgressTimer: null,
+        inventoryCache: []
+      };
 
-    function escapeHtml(value) {
-      return String(value || "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-    }
+      const sectionMeta = {
+        ventas: {
+          title: "Ventas",
+          subtitle: "Vista en tiempo real de ventas y clientes."
+        },
+        operacion: {
+          title: "Operacion DB",
+          subtitle: "Rentabilidad, pedidos activos y auditoria operativa."
+        },
+        seguridad: {
+          title: "Seguridad",
+          subtitle: "Usuarios, accesos y bitacoras de auditoria."
+        },
+        campanas: {
+          title: "Campanas",
+          subtitle: "Segmentacion y envios por WhatsApp."
+        },
+        inventario: {
+          title: "Inventario",
+          subtitle: "Productos, insumos, recetas y compras."
+        }
+      };
 
-    function mxn(value) {
-      return Number(value || 0).toLocaleString("es-MX", {
-        style: "currency",
-        currency: "MXN",
-        minimumFractionDigits: 2
-      });
-    }
-
-    async function fetchApi(url, options) {
-      const res = await fetch(url, options);
-      const payload = await res.json().catch(() => ({}));
-
-      if (!res.ok || payload.ok === false) {
-        const message = payload.error || "Error en API";
-        throw new Error(message);
+      function qs(id) {
+        return document.getElementById(id);
       }
 
-      return payload.data || [];
-    }
+      function mxn(value) {
+        return Number(value || 0).toLocaleString("es-MX", {
+          style: "currency",
+          currency: "MXN",
+          minimumFractionDigits: 2
+        });
+      }
 
-    function buildBarChart(canvasId, label) {
-      return new Chart(document.getElementById(canvasId), {
-        type: "bar",
-        data: {
-          labels: [],
-          datasets: [{
-            label,
-            data: [],
-            backgroundColor: "rgba(245, 166, 35, 0.8)",
-            borderColor: "rgba(181, 122, 11, 1)",
-            borderWidth: 1,
-            borderRadius: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: {
-            duration: 180
+      function num(value) {
+        return Number(value || 0).toLocaleString("es-MX");
+      }
+
+      function pct(value) {
+        const n = Number(value || 0);
+        const sign = n > 0 ? "+" : "";
+        return sign + n.toFixed(1) + "%";
+      }
+
+      function dateTime(value) {
+        if (!value) return "-";
+        const dt = new Date(value);
+        if (Number.isNaN(dt.getTime())) return String(value);
+        return dt.toLocaleString("es-MX");
+      }
+
+      function dayOnly(value) {
+        if (!value) return "-";
+        const dt = new Date(value);
+        if (Number.isNaN(dt.getTime())) return String(value);
+        return dt.toLocaleDateString("es-MX");
+      }
+
+      function html(value) {
+        return String(value == null ? "" : value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      async function api(path, options) {
+        const cfg = Object.assign({ credentials: "same-origin" }, options || {});
+        if (cfg.body && typeof cfg.body !== "string") {
+          cfg.body = JSON.stringify(cfg.body);
+        }
+        cfg.headers = Object.assign({ "Content-Type": "application/json" }, cfg.headers || {});
+
+        const res = await fetch(path, cfg);
+        if (res.redirected && res.url) {
+          window.location.href = res.url;
+          throw new Error("Sesion requerida");
+        }
+
+        const contentType = (res.headers.get("content-type") || "").toLowerCase();
+        if (!contentType.includes("application/json")) {
+          if (contentType.includes("text/html")) {
+            window.location.href = "/login";
+          }
+          throw new Error("Respuesta no valida del servidor");
+        }
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || payload.ok === false) {
+          throw new Error(payload.error || "No se pudo completar la operacion.");
+        }
+        return Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;
+      }
+
+      function toast(message, kind) {
+        const el = qs("toast");
+        if (!el) return;
+        el.className = "toast";
+        if (kind) el.classList.add(kind);
+        el.textContent = message;
+        el.classList.add("show");
+        setTimeout(() => {
+          el.classList.remove("show");
+        }, 2400);
+      }
+
+      function skeleton(lines = 4) {
+        const div = document.createElement("div");
+        div.className = "skeleton";
+        for (let i = 0; i < lines; i += 1) {
+          const ln = document.createElement("div");
+          ln.className = "s-line";
+          div.appendChild(ln);
+        }
+        return div;
+      }
+
+      function showTableLoading(tbodyId, colspan) {
+        const tb = qs(tbodyId);
+        if (!tb) return;
+        tb.innerHTML = "";
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = colspan;
+        td.appendChild(skeleton(4));
+        tr.appendChild(td);
+        tb.appendChild(tr);
+      }
+
+      function showChartLoading(slotId) {
+        const slot = qs(slotId);
+        if (!slot) return;
+        slot.dataset.loading = "1";
+        slot.innerHTML = "";
+        slot.appendChild(skeleton(5));
+      }
+
+      function restoreChartCanvas(slotId, canvasId) {
+        const slot = qs(slotId);
+        if (!slot) return;
+        slot.innerHTML = "<canvas id='" + canvasId + "'></canvas>";
+      }
+
+      function showErrorCard(container, msg, retryHandler) {
+        const card = document.createElement("div");
+        card.className = "error-card";
+        const text = document.createElement("span");
+        text.textContent = msg || "No se pudo cargar esta seccion.";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn";
+        btn.textContent = "Reintentar";
+        btn.addEventListener("click", retryHandler);
+        card.appendChild(text);
+        card.appendChild(btn);
+        container.innerHTML = "";
+        container.appendChild(card);
+      }
+
+      function qualityBadge(value) {
+        if (value === "completo") return "<span class='badge green'>Completa</span>";
+        if (value === "incompleto") return "<span class='badge amber'>Incompleta</span>";
+        return "<span class='badge red'>Sin receta</span>";
+      }
+
+      function estadoBadge(estado) {
+        const v = String(estado || "").toLowerCase();
+        if (["entregado", "listo", "activo", "si"].includes(v)) return "green";
+        if (["en_preparacion", "en_camino", "warning"].includes(v)) return "amber";
+        if (["cancelado", "inactivo", "critical"].includes(v)) return "red";
+        return "blue";
+      }
+
+      function createChart(canvasId, label) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return null;
+        return new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: [],
+            datasets: [{
+              label,
+              data: [],
+              backgroundColor: "#185FA5",
+              borderRadius: 4,
+              borderSkipped: false
+            }]
           },
-          plugins: {
-            legend: { display: true }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: (value) => "$" + value
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => mxn(ctx.parsed.y)
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { color: "#6B6B6B", maxRotation: 0, autoSkip: true }
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: "rgba(26,26,26,0.08)" },
+                ticks: {
+                  color: "#6B6B6B",
+                  callback: (v) => "$" + Number(v).toLocaleString("es-MX")
+                }
               }
             }
           }
-        }
-      });
-    }
-
-    function updateChart(chart, rows) {
-      chart.data.labels = rows.map((row) => row.etiqueta || "N/A");
-      chart.data.datasets[0].data = rows.map((row) => Number(row.ventas || 0));
-      chart.update("none");
-    }
-
-    function calcTotals(rows) {
-      const pedidos = rows.reduce((acc, row) => acc + Number(row.pedidos || 0), 0);
-      const ventas = rows.reduce((acc, row) => acc + Number(row.ventas || 0), 0);
-      const promedio = pedidos > 0 ? ventas / pedidos : 0;
-      return { pedidos, promedio };
-    }
-
-    async function loadVentasDia() {
-      const rows = await fetchApi("/api/ventas/diarias");
-      updateChart(state.charts.dia, rows);
-      const totals = calcTotals(rows);
-      document.getElementById("kpi-hoy-ventas").textContent = `${totals.pedidos} pedidos`;
-      document.getElementById("kpi-hoy-promedio").textContent = `Promedio ticket: ${mxn(totals.promedio)}`;
-    }
-
-    async function loadVentasMes() {
-      const rows = await fetchApi("/api/ventas/mensuales");
-      updateChart(state.charts.mes, rows);
-      const totals = calcTotals(rows);
-      document.getElementById("kpi-mes-ventas").textContent = `${totals.pedidos} pedidos`;
-      document.getElementById("kpi-mes-promedio").textContent = `Promedio ticket: ${mxn(totals.promedio)}`;
-    }
-
-    async function loadVentasAno() {
-      const rows = await fetchApi("/api/ventas/anuales");
-      updateChart(state.charts.ano, rows);
-    }
-
-    async function loadAllVentas() {
-      await Promise.allSettled([
-        loadVentasDia(),
-        loadVentasMes(),
-        loadVentasAno()
-      ]);
-    }
-
-    async function refreshVentasSafely() {
-      if (state.ventasPollInFlight) {
-        return;
-      }
-
-      state.ventasPollInFlight = true;
-      try {
-        await loadAllVentas();
-      } finally {
-        state.ventasPollInFlight = false;
-      }
-    }
-
-    function scheduleVentasRefresh() {
-      if (state.ventasPollTimer) {
-        clearTimeout(state.ventasPollTimer);
-      }
-
-      state.ventasPollTimer = setTimeout(async () => {
-        if (!document.hidden) {
-          await refreshVentasSafely();
-        }
-        scheduleVentasRefresh();
-      }, 5 * 60 * 1000);
-    }
-
-    async function loadTopClientes() {
-      const tbody = document.getElementById("top-clientes-body");
-      try {
-        const rows = await fetchApi("/api/clientes/top20");
-        if (!rows.length) {
-          tbody.innerHTML = '<tr><td colspan="3" class="muted">No hay clientes todavia.</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = rows.map((row) => {
-          const nombre = [row.nombre, row.apellidos].filter(Boolean).join(" ") || "Sin nombre";
-          return `
-            <tr>
-              <td>${nombre}</td>
-              <td>${row.whatsapp_id || "-"}</td>
-              <td class="text-right">${mxn(row.monto_total_comprado)}</td>
-            </tr>
-          `;
-        }).join("");
-      } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="3" class="danger-text">${error.message}</td></tr>`;
-      }
-    }
-
-    function renderResumenDb(summary) {
-      document.getElementById("db-clientes").textContent = Number(summary.clientes || 0).toLocaleString("es-MX");
-      document.getElementById("db-pedidos-activos").textContent = Number(summary.pedidos_activos || 0).toLocaleString("es-MX");
-      document.getElementById("db-ventas-hoy").textContent = mxn(summary.ventas_hoy || 0);
-      document.getElementById("db-ventas-mes").textContent = mxn(summary.ventas_mes || 0);
-      document.getElementById("db-utilidad-hoy").textContent = mxn(summary.utilidad_estimada_hoy || 0);
-      document.getElementById("db-margen-hoy").textContent = `Margen estimado: ${Number(summary.margen_estimado_pct_hoy || 0).toLocaleString("es-MX")} %`;
-      document.getElementById("seguridad-eventos-hoy").textContent = Number(summary.eventos_seguridad_hoy || 0).toLocaleString("es-MX");
-      document.getElementById("negocio-eventos-hoy").textContent = Number(summary.eventos_negocio_hoy || 0).toLocaleString("es-MX");
-    }
-
-    async function loadResumenDb() {
-      const summary = await fetchApi("/api/admin/resumen-db");
-      renderResumenDb(summary || {});
-    }
-
-    function renderRentabilidadProductos(rows) {
-      const tbody = document.getElementById("rentabilidad-body");
-      if (!rows || !rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin datos de rentabilidad.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = rows.map((row) => {
-        const margen = Number(row.margen_unitario || 0);
-        const margenClass = margen < 0 ? "danger-text" : "";
-        const nombre = (row.nombre || "Producto") + (row.variante ? ` - ${row.variante}` : "");
-        const componentesActivos = Number(row.componentes_activos || 0);
-        const componentesSinCosto = Number(row.componentes_sin_costo || 0);
-        let calidadClass = "ok";
-        let calidadLabel = "Costo completo";
-
-        if (row.calidad_costo === "sin_receta") {
-          calidadClass = "danger";
-          calidadLabel = "Sin receta";
-        } else if (row.calidad_costo === "incompleto") {
-          calidadClass = "warn";
-          calidadLabel = `Costo incompleto (${componentesSinCosto}/${componentesActivos})`;
-        }
-
-        return `
-          <tr>
-            <td>${escapeHtml(nombre)}</td>
-            <td><span class="badge-cost ${calidadClass}">${escapeHtml(calidadLabel)}</span></td>
-            <td class="text-right">${mxn(row.precio_venta || 0)}</td>
-            <td class="text-right">${mxn(row.costo_estimado_unitario || 0)}</td>
-            <td class="text-right ${margenClass}">${mxn(row.margen_unitario || 0)}</td>
-            <td class="text-right ${margenClass}">${Number(row.margen_pct || 0).toLocaleString("es-MX")} %</td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    async function loadRentabilidadProductos() {
-      const rows = await fetchApi("/api/admin/rentabilidad-productos?limit=20");
-      renderRentabilidadProductos(rows || []);
-    }
-
-    function renderUsuariosSistema(rows) {
-      const tbody = document.getElementById("usuarios-body");
-      if (!rows || !rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="muted">No hay usuarios registrados.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = rows.map((row) => {
-        const activo = Boolean(row.activo);
-        const ultimoLogin = row.ultimo_login ? new Date(row.ultimo_login).toLocaleString("es-MX") : "Nunca";
-        return `
-          <tr>
-            <td>${escapeHtml(row.username || "-")}</td>
-            <td>${escapeHtml(row.rol || "-")}</td>
-            <td>${escapeHtml(row.nombre_mostrar || "-")}</td>
-            <td>${escapeHtml(row.telefono || "-")}</td>
-            <td>${escapeHtml(ultimoLogin)}</td>
-            <td class="${activo ? "" : "danger-text"}">${activo ? "Activo" : "Inactivo"}</td>
-            <td style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn btn-dark" data-action="toggle-usuario" data-usuario-id="${row.usuario_id}" data-next-activo="${activo ? "0" : "1"}" type="button">
-                ${activo ? "Desactivar" : "Activar"}
-              </button>
-              <button class="btn" data-action="reset-password" data-usuario-id="${row.usuario_id}" type="button">Reset pass</button>
-            </td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    async function loadUsuariosSistema() {
-      const rows = await fetchApi("/api/admin/usuarios");
-      renderUsuariosSistema(rows || []);
-    }
-
-    function renderAuditoriaSeguridad(rows) {
-      const tbody = document.getElementById("auditoria-body");
-      if (!rows || !rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin eventos recientes.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = rows.map((row) => {
-        const fecha = row.creado_en ? new Date(row.creado_en).toLocaleString("es-MX") : "-";
-        const detalle = row.detalle && typeof row.detalle === "object"
-          ? Object.entries(row.detalle).map(([key, value]) => `${key}: ${value}`).join(" | ")
-          : "-";
-        const actor = row.actor_username || row.actor_rol || "sistema";
-        const objetivo = row.objetivo_username || "-";
-        const severityClass = row.severidad === "warning" || row.severidad === "critical" ? "danger-text" : "";
-
-        return `
-          <tr>
-            <td>${escapeHtml(fecha)}</td>
-            <td>${escapeHtml(row.tipo_evento || "-")}</td>
-            <td class="${severityClass}">${escapeHtml(row.severidad || "info")}</td>
-            <td>${escapeHtml(actor)}</td>
-            <td>${escapeHtml(objetivo)}</td>
-            <td>${escapeHtml(row.direccion_ip || "-")}</td>
-            <td>${escapeHtml(detalle || "-")}</td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    async function loadAuditoriaSeguridad() {
-      const tipoEvento = (document.getElementById("filtro-seguridad-evento")?.value || "").trim();
-      const severidad = document.getElementById("filtro-seguridad-severidad")?.value || "";
-      const actor = (document.getElementById("filtro-seguridad-actor")?.value || "").trim();
-      const fechaDesde = document.getElementById("filtro-seguridad-desde")?.value || "";
-      const fechaHasta = document.getElementById("filtro-seguridad-hasta")?.value || "";
-
-      const params = new URLSearchParams({ limit: "25" });
-      if (tipoEvento) {
-        params.set("tipo_evento", tipoEvento);
-      }
-      if (severidad) {
-        params.set("severidad", severidad);
-      }
-      if (actor) {
-        params.set("actor", actor);
-      }
-      if (fechaDesde) {
-        params.set("fecha_desde", fechaDesde);
-      }
-      if (fechaHasta) {
-        params.set("fecha_hasta", fechaHasta);
-      }
-
-      const rows = await fetchApi(`/api/admin/auditoria-seguridad?${params.toString()}`);
-      renderAuditoriaSeguridad(rows || []);
-    }
-
-    function exportarAuditoriaSeguridadCsv() {
-      const tipoEvento = (document.getElementById("filtro-seguridad-evento")?.value || "").trim();
-      const severidad = document.getElementById("filtro-seguridad-severidad")?.value || "";
-      const actor = (document.getElementById("filtro-seguridad-actor")?.value || "").trim();
-      const fechaDesde = document.getElementById("filtro-seguridad-desde")?.value || "";
-      const fechaHasta = document.getElementById("filtro-seguridad-hasta")?.value || "";
-
-      const params = new URLSearchParams({ limit: "5000" });
-      if (tipoEvento) {
-        params.set("tipo_evento", tipoEvento);
-      }
-      if (severidad) {
-        params.set("severidad", severidad);
-      }
-      if (actor) {
-        params.set("actor", actor);
-      }
-      if (fechaDesde) {
-        params.set("fecha_desde", fechaDesde);
-      }
-      if (fechaHasta) {
-        params.set("fecha_hasta", fechaHasta);
-      }
-
-      window.location.href = `/api/admin/auditoria-seguridad.csv?${params.toString()}`;
-    }
-
-    function renderAuditoriaNegocio(rows) {
-      const tbody = document.getElementById("auditoria-negocio-body");
-      if (!rows || !rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin eventos recientes.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = rows.map((row) => {
-        const fecha = row.creado_en ? new Date(row.creado_en).toLocaleString("es-MX") : "-";
-        const detalle = row.detalle && typeof row.detalle === "object"
-          ? JSON.stringify(row.detalle)
-          : "-";
-        const opClass = row.operacion === "DELETE" ? "danger-text" : "";
-
-        return `
-          <tr>
-            <td>${escapeHtml(fecha)}</td>
-            <td>${escapeHtml(row.tabla_objetivo || "-")}</td>
-            <td class="${opClass}">${escapeHtml(row.operacion || "-")}</td>
-            <td>${escapeHtml(row.registro_id || "-")}</td>
-            <td>${escapeHtml(row.actor_username || "sistema")}</td>
-            <td>${escapeHtml(row.actor_rol || "-")}</td>
-            <td>${escapeHtml(detalle)}</td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    async function loadAuditoriaNegocio() {
-      const tabla = document.getElementById("filtro-negocio-tabla")?.value || "";
-      const actor = (document.getElementById("filtro-negocio-actor")?.value || "").trim();
-      const fechaDesde = document.getElementById("filtro-negocio-desde")?.value || "";
-      const fechaHasta = document.getElementById("filtro-negocio-hasta")?.value || "";
-
-      const params = new URLSearchParams({ limit: "25" });
-      if (tabla) {
-        params.set("tabla", tabla);
-      }
-      if (actor) {
-        params.set("actor", actor);
-      }
-      if (fechaDesde) {
-        params.set("fecha_desde", fechaDesde);
-      }
-      if (fechaHasta) {
-        params.set("fecha_hasta", fechaHasta);
-      }
-
-      const rows = await fetchApi(`/api/admin/auditoria-negocio?${params.toString()}`);
-      renderAuditoriaNegocio(rows || []);
-    }
-
-    function exportarAuditoriaNegocioCsv() {
-      const tabla = document.getElementById("filtro-negocio-tabla")?.value || "";
-      const actor = (document.getElementById("filtro-negocio-actor")?.value || "").trim();
-      const fechaDesde = document.getElementById("filtro-negocio-desde")?.value || "";
-      const fechaHasta = document.getElementById("filtro-negocio-hasta")?.value || "";
-
-      const params = new URLSearchParams({ limit: "5000" });
-      if (tabla) {
-        params.set("tabla", tabla);
-      }
-      if (actor) {
-        params.set("actor", actor);
-      }
-      if (fechaDesde) {
-        params.set("fecha_desde", fechaDesde);
-      }
-      if (fechaHasta) {
-        params.set("fecha_hasta", fechaHasta);
-      }
-
-      window.location.href = `/api/admin/auditoria-negocio.csv?${params.toString()}`;
-    }
-
-    async function crearUsuarioSistema() {
-      const status = document.getElementById("usuarios-status");
-      const payload = {
-        username: document.getElementById("usuario-username").value.trim(),
-        nombre_mostrar: document.getElementById("usuario-nombre").value.trim(),
-        rol: document.getElementById("usuario-rol").value,
-        telefono: document.getElementById("usuario-telefono").value.trim(),
-        password: document.getElementById("usuario-password").value
-      };
-
-      if (!payload.username || !payload.nombre_mostrar || !payload.password) {
-        status.textContent = "Usuario, nombre y contrasena son obligatorios.";
-        return;
-      }
-
-      status.textContent = "Creando usuario...";
-      try {
-        await fetchApi("/api/admin/usuarios", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
         });
-        status.textContent = "Usuario creado correctamente.";
-        document.getElementById("usuario-password").value = "";
-        await Promise.allSettled([loadUsuariosSistema(), loadAuditoriaSeguridad(), loadAuditoriaNegocio(), loadResumenDb()]);
-      } catch (error) {
-        status.textContent = `Error al crear usuario: ${error.message}`;
-      }
-    }
-
-    async function actualizarUsuarioSistema(usuarioId, payload, feedbackText) {
-      const status = document.getElementById("usuarios-status");
-      status.textContent = "Guardando cambios de usuario...";
-      try {
-        await fetchApi(`/api/admin/usuarios/${usuarioId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        });
-        status.textContent = feedbackText;
-        await Promise.allSettled([loadUsuariosSistema(), loadAuditoriaSeguridad(), loadAuditoriaNegocio(), loadResumenDb()]);
-      } catch (error) {
-        status.textContent = `Error en usuario: ${error.message}`;
-      }
-    }
-
-    function renderPedidosAdmin(rows) {
-      const tbody = document.getElementById("pedidos-admin-body");
-      if (!rows || !rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="muted">No hay pedidos registrados.</td></tr>';
-        return;
       }
 
-      tbody.innerHTML = rows.map((row) => {
-        const nombre = [row.nombre, row.apellidos].filter(Boolean).join(" ") || "Sin nombre";
-        const selectOptions = state.estadosPedido.map((estado) => {
-          const selected = estado === row.estado ? "selected" : "";
-          return `<option value="${estado}" ${selected}>${estado}</option>`;
-        }).join("");
-
-        return `
-          <tr>
-            <td>#${row.pedido_id}</td>
-            <td>${escapeHtml(nombre)}</td>
-            <td>${escapeHtml(row.whatsapp_id || "-")}</td>
-            <td class="text-right">${mxn(row.total || 0)}</td>
-            <td>${escapeHtml(row.estado || "-")}</td>
-            <td>
-              <select id="estado-pedido-${row.pedido_id}" data-pedido-id="${row.pedido_id}">
-                ${selectOptions}
-              </select>
-            </td>
-            <td>
-              <button class="btn btn-dark" data-action="guardar-estado" data-pedido-id="${row.pedido_id}" type="button">Guardar</button>
-            </td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    async function loadPedidosAdmin() {
-      const rows = await fetchApi("/api/pedidos");
-      renderPedidosAdmin(rows || []);
-    }
-
-    async function actualizarEstadoPedido(pedidoId, nuevoEstado, buttonEl) {
-      buttonEl.disabled = true;
-      const originalText = buttonEl.textContent;
-      buttonEl.textContent = "Guardando...";
-
-      try {
-        await fetchApi(`/api/pedidos/${pedidoId}/estado`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ estado: nuevoEstado })
-        });
-
-        buttonEl.textContent = "Listo";
-        await Promise.allSettled([loadPedidosAdmin(), loadResumenDb(), loadAuditoriaNegocio(), refreshVentasSafely()]);
-      } catch (error) {
-        buttonEl.textContent = "Error";
-        alert(`No se pudo actualizar estado: ${error.message}`);
-      } finally {
-        setTimeout(() => {
-          buttonEl.disabled = false;
-          buttonEl.textContent = originalText;
-        }, 900);
+      function hydrateChart(chart, rows) {
+        if (!chart) return;
+        chart.data.labels = rows.map((r) => r.etiqueta || "-");
+        chart.data.datasets[0].data = rows.map((r) => Number(r.ventas || 0));
+        chart.update();
       }
-    }
 
-    async function loadComprasInventario() {
-      const tbody = document.getElementById("compras-body");
-
-      try {
-        const rows = await fetchApi("/api/inventario/compras?limit=20");
-        if (!rows || !rows.length) {
-          tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin compras registradas aun.</td></tr>';
-          return;
+      async function loadVentasKpisAndCharts(forceDailyOnly = false) {
+        if (!forceDailyOnly) {
+          showChartLoading("ventas-mes-slot");
+          showChartLoading("ventas-ano-slot");
         }
+        showChartLoading("ventas-dia-slot");
 
-        tbody.innerHTML = rows.map((row) => {
-          const fecha = row.creado_en ? new Date(row.creado_en).toLocaleString("es-MX") : "-";
-          return `
-            <tr>
-              <td>${fecha}</td>
-              <td>${escapeHtml(row.insumo || "-")}</td>
-              <td class="text-right">${Number(row.cantidad || 0).toLocaleString("es-MX")}</td>
-              <td class="text-right">${mxn(row.costo_total || 0)}</td>
-              <td>${escapeHtml(row.proveedor || "-")}</td>
-              <td>${escapeHtml(row.creado_por || "-")}</td>
-            </tr>
-          `;
-        }).join("");
-      } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="6" class="danger-text">${escapeHtml(error.message)}</td></tr>`;
-      }
-    }
-
-    async function loadCampanas() {
-      const tbody = document.getElementById("campanas-body");
-      const candidateEndpoints = ["/api/campanias/historial", "/api/campanias"];
-
-      for (const endpoint of candidateEndpoints) {
+        let diaria = [];
+        let mensual = [];
+        let anual = [];
         try {
-          const rows = await fetchApi(endpoint);
-          renderCampanas(rows);
-          return;
-        } catch (_error) {
+          diaria = await api("/api/ventas/diarias");
+          restoreChartCanvas("ventas-dia-slot", "chart-ventas-dia");
+          state.charts.dia = createChart("chart-ventas-dia", "Ventas por hora");
+          hydrateChart(state.charts.dia, Array.isArray(diaria) ? diaria : []);
+
+          if (!forceDailyOnly) {
+            [mensual, anual] = await Promise.all([
+              api("/api/ventas/mensuales"),
+              api("/api/ventas/anuales")
+            ]);
+
+            restoreChartCanvas("ventas-mes-slot", "chart-ventas-mes");
+            restoreChartCanvas("ventas-ano-slot", "chart-ventas-ano");
+            state.charts.mes = createChart("chart-ventas-mes", "Ventas por dia");
+            state.charts.ano = createChart("chart-ventas-ano", "Ventas por mes");
+            hydrateChart(state.charts.mes, Array.isArray(mensual) ? mensual : []);
+            hydrateChart(state.charts.ano, Array.isArray(anual) ? anual : []);
+          }
+
+          const ventasHoy = (diaria || []).reduce((a, r) => a + Number(r.ventas || 0), 0);
+          const pedidosHoy = (diaria || []).reduce((a, r) => a + Number(r.pedidos || 0), 0);
+          const ticket = pedidosHoy > 0 ? ventasHoy / pedidosHoy : 0;
+
+          const hoyDate = new Date();
+          const ymd = (d) => d.toISOString().slice(0, 10);
+          const yesterday = new Date(hoyDate.getTime() - 24 * 60 * 60 * 1000);
+          const yesterdayRow = (mensual || []).find((r) => String(r.etiqueta || "") === ymd(yesterday));
+          const ventasAyer = Number((yesterdayRow && yesterdayRow.ventas) || 0);
+
+          const now = new Date();
+          const thisMonth = now.toISOString().slice(0, 7);
+          const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const prevMonth = prev.toISOString().slice(0, 7);
+          const monthRows = Array.isArray(anual) ? anual : [];
+          const thisMonthVentas = Number((monthRows.find((r) => String(r.etiqueta || "") === thisMonth) || {}).ventas || 0);
+          const prevMonthVentas = Number((monthRows.find((r) => String(r.etiqueta || "") === prevMonth) || {}).ventas || 0);
+
+          const trendHoy = ventasAyer > 0 ? ((ventasHoy - ventasAyer) / ventasAyer) * 100 : 0;
+          const trendMes = prevMonthVentas > 0 ? ((thisMonthVentas - prevMonthVentas) / prevMonthVentas) * 100 : 0;
+
+          qs("kpi-ventas-hoy").textContent = mxn(ventasHoy);
+          qs("kpi-pedidos-hoy").textContent = num(pedidosHoy);
+          qs("kpi-ticket-promedio").textContent = mxn(ticket);
+          qs("kpi-ventas-mes").textContent = mxn(thisMonthVentas);
+          qs("kpi-ventas-hoy-trend").textContent = pct(trendHoy) + " vs ayer";
+          qs("kpi-ventas-mes-trend").textContent = pct(trendMes) + " vs mes anterior";
+        } catch (err) {
+          const daySlot = qs("ventas-dia-slot");
+          if (daySlot) {
+            showErrorCard(daySlot, "No se pudieron cargar las ventas diarias.", () => {
+              loadVentasKpisAndCharts(true);
+            });
+          }
+          if (!forceDailyOnly) {
+            const monthSlot = qs("ventas-mes-slot");
+            const yearSlot = qs("ventas-ano-slot");
+            if (monthSlot) {
+              showErrorCard(monthSlot, "No se pudieron cargar las ventas mensuales.", () => {
+                loadVentasKpisAndCharts(false);
+              });
+            }
+            if (yearSlot) {
+              showErrorCard(yearSlot, "No se pudieron cargar las ventas anuales.", () => {
+                loadVentasKpisAndCharts(false);
+              });
+            }
+          }
         }
       }
 
-      tbody.innerHTML = '<tr><td colspan="3" class="muted">No hay endpoint GET de campanas aun. Se mostraran campanas nuevas al enviar.</td></tr>';
-    }
-
-    function renderCampanas(rows) {
-      const tbody = document.getElementById("campanas-body");
-      if (!rows || !rows.length) {
-        tbody.innerHTML = '<tr><td colspan="3" class="muted">Sin campanas enviadas.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = rows.map((row) => {
-        const fechaRaw = row.fecha || row.creado_en || row.enviado_en || "";
-        const fecha = fechaRaw ? new Date(fechaRaw).toLocaleString("es-MX") : "-";
-        return `
-          <tr>
-            <td>${fecha}</td>
-            <td>${row.nombre || "Campana"}</td>
-            <td class="text-right">${row.total_enviados || row.total || row.enviados || 0}</td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    function appendCampanaRow(nombre) {
-      const tbody = document.getElementById("campanas-body");
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${new Date().toLocaleString("es-MX")}</td>
-        <td>${nombre}</td>
-        <td class="text-right">En proceso</td>
-      `;
-
-      if (tbody.textContent.includes("Sin campanas") || tbody.textContent.includes("No hay endpoint")) {
-        tbody.innerHTML = "";
-      }
-
-      tbody.prepend(row);
-    }
-
-    function simulateProgressTick(current) {
-      const increment = Math.floor(Math.random() * 12) + 6;
-      return Math.min(current + increment, 92);
-    }
-
-    async function submitCampana(event) {
-      event.preventDefault();
-
-      const nombre = document.getElementById("campana-nombre").value.trim();
-      const segmento = document.getElementById("campana-segmento").value;
-      const mensaje = document.getElementById("campana-mensaje").value.trim();
-      const wrap = document.getElementById("campana-progress-wrap");
-      const bar = document.getElementById("campana-progress-bar");
-      const status = document.getElementById("campana-status");
-
-      if (!nombre || !mensaje) {
-        status.textContent = "Nombre y mensaje son obligatorios.";
-        wrap.style.display = "block";
-        return;
-      }
-
-      wrap.style.display = "block";
-      bar.style.width = "8%";
-      status.textContent = "Enviando campana...";
-
-      let progress = 8;
-      const timer = setInterval(() => {
-        progress = simulateProgressTick(progress);
-        bar.style.width = progress + "%";
-      }, 250);
-
-      try {
-        await fetchApi("/api/campanias", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            nombre,
-            segmento,
-            mensaje
-          })
-        });
-
-        clearInterval(timer);
-        bar.style.width = "100%";
-        status.textContent = "Campana enviada por WhatsApp correctamente.";
-        appendCampanaRow(nombre);
-        event.target.reset();
-      } catch (error) {
-        clearInterval(timer);
-        bar.style.width = "100%";
-        status.textContent = `Error al enviar: ${error.message}`;
-      }
-    }
-
-    async function loadInventario() {
-      const tbody = document.getElementById("inventario-body");
-      const endpoints = ["/api/inventario", "/api/inventario/alertas"];
-
-      for (const endpoint of endpoints) {
+      async function loadTopClientes() {
+        showTableLoading("tbody-top-clientes", 5);
         try {
-          const rows = await fetchApi(endpoint);
-          renderInventario(rows, endpoint === "/api/inventario/alertas");
-          return;
-        } catch (_error) {
-        }
-      }
-
-      tbody.innerHTML = '<tr><td colspan="5" class="danger-text">No se pudo cargar inventario.</td></tr>';
-    }
-
-    function renderInventario(rows, fromAlertsOnly) {
-      const tbody = document.getElementById("inventario-body");
-      if (!rows || !rows.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="muted">Sin datos de inventario.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = rows.map((row) => {
-        const actual = Number(row.stock_actual || 0);
-        const minimo = Number(row.stock_minimo || 0);
-        const low = actual < minimo;
-        const estado = low ? "Debajo del minimo" : "OK";
-
-        return `
-          <tr class="${low ? "danger-row" : ""}">
-            <td>${row.nombre || "-"}</td>
-            <td>${row.unidad_medida || "-"}</td>
-            <td class="text-right ${low ? "danger-text" : ""}">${actual}</td>
-            <td class="text-right">${minimo}</td>
-            <td class="${low ? "danger-text" : ""}">${estado}</td>
-          </tr>
-        `;
-      }).join("");
-
-      if (fromAlertsOnly) {
-        tbody.innerHTML += '<tr><td colspan="5" class="muted">Mostrando alertas por debajo del minimo (endpoint disponible).</td></tr>';
-      }
-    }
-
-    async function loadCatalogOptionsInventario() {
-      const [productos, insumos] = await Promise.all([
-        fetchApi("/api/productos?solo_pedibles=0"),
-        fetchApi("/api/inventario")
-      ]);
-
-      const productoSelect = document.getElementById("receta-producto-id");
-      const insumoSelect = document.getElementById("receta-insumo-id");
-
-      productoSelect.innerHTML = (productos || []).map((p) => {
-        const label = `${p.nombre || "Producto"}${p.variante ? " - " + p.variante : ""}`;
-        return `<option value="${p.producto_id}">${escapeHtml(label)}</option>`;
-      }).join("");
-
-      insumoSelect.innerHTML = (insumos || []).map((i) => {
-        return `<option value="${i.insumo_id}">${escapeHtml(i.nombre || "Insumo")}</option>`;
-      }).join("");
-    }
-
-    async function loadProductosSinReceta() {
-      const tbody = document.getElementById("productos-sin-receta-body");
-      try {
-        const rows = await fetchApi("/api/admin/productos-sin-receta");
-        if (!rows || !rows.length) {
-          tbody.innerHTML = '<tr><td colspan="3" class="muted">Perfecto: todos los productos activos tienen receta.</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = rows.map((row) => `
-          <tr class="danger-row">
-            <td>${escapeHtml(row.nombre || "-")}</td>
-            <td>${escapeHtml(row.variante || "-")}</td>
-            <td class="text-right danger-text">${mxn(row.precio || 0)}</td>
-          </tr>
-        `).join("");
-      } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="3" class="danger-text">${escapeHtml(error.message)}</td></tr>`;
-      }
-    }
-
-    async function loadRecetasInventario() {
-      const tbody = document.getElementById("recetas-body");
-      try {
-        const rows = await fetchApi("/api/admin/recetas-producto");
-        if (!rows || !rows.length) {
-          tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin recetas configuradas.</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = rows.map((row) => `
-          <tr>
-            <td>${escapeHtml((row.producto || "-") + (row.variante ? " - " + row.variante : ""))}</td>
-            <td>${escapeHtml(row.insumo || "-")}</td>
-            <td class="text-right">${Number(row.cantidad_por_unidad || 0).toLocaleString("es-MX")}</td>
-            <td>${escapeHtml(row.unidad_medida || "-")}</td>
-            <td class="${row.activo ? "" : "danger-text"}">${row.activo ? "Activa" : "Inactiva"}</td>
-            <td style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn btn-dark" data-action="toggle-receta" data-receta-id="${row.receta_id}" data-next-activo="${row.activo ? "0" : "1"}" type="button">
-                ${row.activo ? "Desactivar" : "Activar"}
-              </button>
-              <button class="btn" data-action="edit-qty-receta" data-receta-id="${row.receta_id}" data-current-qty="${Number(row.cantidad_por_unidad || 0)}" type="button">Editar cantidad</button>
-            </td>
-          </tr>
-        `).join("");
-      } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="6" class="danger-text">${escapeHtml(error.message)}</td></tr>`;
-      }
-    }
-
-    async function actualizarComponenteReceta(recetaId, payload, okMessage) {
-      const status = document.getElementById("receta-status");
-      status.textContent = "Actualizando receta...";
-      try {
-        await fetchApi(`/api/admin/recetas-producto/${recetaId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        status.textContent = okMessage;
-        await Promise.allSettled([loadRecetasInventario(), loadProductosSinReceta(), loadAuditoriaNegocio()]);
-      } catch (error) {
-        status.textContent = `Error al actualizar receta: ${error.message}`;
-      }
-    }
-
-    async function loadMovimientosInventario() {
-      const tbody = document.getElementById("movimientos-inventario-body");
-      try {
-        const rows = await fetchApi("/api/admin/inventario/movimientos?limit=20");
-        if (!rows || !rows.length) {
-          tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin movimientos registrados.</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = rows.map((row) => {
-          const fecha = row.creado_en ? new Date(row.creado_en).toLocaleString("es-MX") : "-";
-          const mov = Number(row.cantidad_movimiento || 0);
-          const isSalida = mov < 0;
-          const referencia = row.referencia_tipo
-            ? `${row.referencia_tipo}#${row.referencia_id || "-"}`
-            : "-";
-          return `
-            <tr>
-              <td>${escapeHtml(fecha)}</td>
-              <td>${escapeHtml(row.insumo || "-")}</td>
-              <td>${escapeHtml(row.tipo || "-")}</td>
-              <td class="text-right ${isSalida ? "danger-text" : ""}">${mov.toLocaleString("es-MX")}</td>
-              <td class="text-right">${Number(row.stock_antes || 0).toLocaleString("es-MX")}</td>
-              <td class="text-right">${Number(row.stock_despues || 0).toLocaleString("es-MX")}</td>
-              <td>${escapeHtml(referencia)}</td>
-            </tr>
-          `;
-        }).join("");
-      } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="7" class="danger-text">${escapeHtml(error.message)}</td></tr>`;
-      }
-    }
-
-    async function guardarProductoManual() {
-      const status = document.getElementById("producto-manual-status");
-      const payload = {
-        nombre: document.getElementById("producto-manual-nombre").value.trim(),
-        variante: document.getElementById("producto-manual-variante").value.trim(),
-        precio: Number(document.getElementById("producto-manual-precio").value || 0),
-        activo: document.getElementById("producto-manual-activo").checked
-      };
-
-      status.textContent = "Guardando producto...";
-      try {
-        await fetchApi("/api/admin/productos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        status.textContent = "Producto guardado.";
-        await Promise.allSettled([loadCatalogOptionsInventario(), loadRecetasInventario(), loadProductosSinReceta(), loadAuditoriaNegocio()]);
-      } catch (error) {
-        status.textContent = `Error en producto: ${error.message}`;
-      }
-    }
-
-    async function guardarInsumoManual() {
-      const status = document.getElementById("insumo-manual-status");
-      const payload = {
-        nombre: document.getElementById("insumo-manual-nombre").value.trim(),
-        unidad_medida: document.getElementById("insumo-manual-unidad").value.trim(),
-        stock_minimo: Number(document.getElementById("insumo-manual-stock-minimo").value || 0),
-        stock_inicial: Number(document.getElementById("insumo-manual-stock-inicial").value || 0),
-        proveedor: document.getElementById("insumo-manual-proveedor").value.trim()
-      };
-
-      status.textContent = "Guardando insumo...";
-      try {
-        await fetchApi("/api/admin/insumos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        status.textContent = "Insumo guardado.";
-        await Promise.allSettled([
-          loadInventario(),
-          loadCatalogOptionsInventario(),
-          loadMovimientosInventario(),
-          loadResumenDb(),
-          loadAuditoriaNegocio()
-        ]);
-      } catch (error) {
-        status.textContent = `Error en insumo: ${error.message}`;
-      }
-    }
-
-    async function guardarComponenteReceta() {
-      const status = document.getElementById("receta-status");
-      const payload = {
-        producto_id: Number(document.getElementById("receta-producto-id").value || 0),
-        insumo_id: Number(document.getElementById("receta-insumo-id").value || 0),
-        cantidad_por_unidad: Number(document.getElementById("receta-cantidad").value || 0),
-        activo: true
-      };
-
-      status.textContent = "Guardando receta...";
-      try {
-        await fetchApi("/api/admin/recetas-producto", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        status.textContent = "Receta guardada.";
-        await Promise.allSettled([loadRecetasInventario(), loadProductosSinReceta(), loadAuditoriaNegocio()]);
-      } catch (error) {
-        status.textContent = `Error en receta: ${error.message}`;
-      }
-    }
-
-    async function submitCompra(event) {
-      event.preventDefault();
-      const status = document.getElementById("compra-status");
-      const payload = {
-        insumo: document.getElementById("compra-insumo").value.trim(),
-        cantidad: Number(document.getElementById("compra-cantidad").value || 0),
-        proveedor: document.getElementById("compra-proveedor").value.trim(),
-        costo_total: Number(document.getElementById("compra-costo").value || 0)
-      };
-
-      status.textContent = "Guardando compra...";
-
-      try {
-        await fetchApi("/api/inventario/compras", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        });
-        status.textContent = "Compra registrada.";
-        await Promise.allSettled([loadInventario(), loadComprasInventario(), loadResumenDb(), loadAuditoriaNegocio()]);
-      } catch (error) {
-        status.textContent = `Error al guardar compra: ${error.message}`;
-      }
-    }
-
-    function setUpModal() {
-      const modal = document.getElementById("modal-compra");
-      document.getElementById("btn-registrar-compra").addEventListener("click", () => {
-        modal.classList.add("open");
-        modal.setAttribute("aria-hidden", "false");
-      });
-
-      document.getElementById("cerrar-modal").addEventListener("click", () => {
-        modal.classList.remove("open");
-        modal.setAttribute("aria-hidden", "true");
-      });
-
-      modal.addEventListener("click", (event) => {
-        if (event.target === modal) {
-          modal.classList.remove("open");
-          modal.setAttribute("aria-hidden", "true");
-        }
-      });
-    }
-
-    async function initialLoad() {
-      state.charts.dia = buildBarChart("chart-dia", "Ventas del dia");
-      state.charts.mes = buildBarChart("chart-mes", "Ventas del mes");
-      state.charts.ano = buildBarChart("chart-ano", "Ventas del ano");
-
-      document.getElementById("btn-refrescar-ventas").addEventListener("click", refreshVentasSafely);
-      document.getElementById("btn-refrescar-db").addEventListener("click", async () => {
-        await Promise.allSettled([loadResumenDb(), loadRentabilidadProductos(), loadPedidosAdmin(), loadComprasInventario(), loadUsuariosSistema(), loadAuditoriaSeguridad(), loadAuditoriaNegocio()]);
-      });
-      document.getElementById("btn-refrescar-usuarios").addEventListener("click", async () => {
-        await Promise.allSettled([loadUsuariosSistema(), loadAuditoriaSeguridad(), loadAuditoriaNegocio(), loadResumenDb()]);
-      });
-      document.getElementById("btn-aplicar-filtro-seguridad").addEventListener("click", async () => {
-        await loadAuditoriaSeguridad();
-      });
-      document.getElementById("btn-limpiar-filtro-seguridad").addEventListener("click", async () => {
-        document.getElementById("filtro-seguridad-evento").value = "";
-        document.getElementById("filtro-seguridad-severidad").value = "";
-        document.getElementById("filtro-seguridad-actor").value = "";
-        document.getElementById("filtro-seguridad-desde").value = "";
-        document.getElementById("filtro-seguridad-hasta").value = "";
-        await loadAuditoriaSeguridad();
-      });
-      document.getElementById("btn-exportar-seguridad-csv").addEventListener("click", exportarAuditoriaSeguridadCsv);
-      document.getElementById("btn-aplicar-filtro-negocio").addEventListener("click", async () => {
-        await loadAuditoriaNegocio();
-      });
-      document.getElementById("btn-limpiar-filtro-negocio").addEventListener("click", async () => {
-        document.getElementById("filtro-negocio-tabla").value = "";
-        document.getElementById("filtro-negocio-actor").value = "";
-        document.getElementById("filtro-negocio-desde").value = "";
-        document.getElementById("filtro-negocio-hasta").value = "";
-        await loadAuditoriaNegocio();
-      });
-      document.getElementById("btn-exportar-negocio-csv").addEventListener("click", exportarAuditoriaNegocioCsv);
-      document.getElementById("btn-crear-usuario").addEventListener("click", crearUsuarioSistema);
-      document.getElementById("btn-guardar-producto-manual").addEventListener("click", guardarProductoManual);
-      document.getElementById("btn-guardar-insumo-manual").addEventListener("click", guardarInsumoManual);
-      document.getElementById("btn-guardar-receta").addEventListener("click", guardarComponenteReceta);
-      document.getElementById("form-campana").addEventListener("submit", submitCampana);
-      document.getElementById("form-compra").addEventListener("submit", submitCompra);
-
-      document.getElementById("pedidos-admin-body").addEventListener("click", async (event) => {
-        const button = event.target.closest("button[data-action='guardar-estado']");
-        if (!button) {
-          return;
-        }
-
-        const pedidoId = Number(button.getAttribute("data-pedido-id"));
-        const selector = document.getElementById(`estado-pedido-${pedidoId}`);
-        const nuevoEstado = selector ? selector.value : null;
-        if (!pedidoId || !nuevoEstado) {
-          return;
-        }
-
-        await actualizarEstadoPedido(pedidoId, nuevoEstado, button);
-      });
-
-      document.getElementById("recetas-body").addEventListener("click", async (event) => {
-        const button = event.target.closest("button[data-action]");
-        if (!button) {
-          return;
-        }
-
-        const action = button.getAttribute("data-action");
-        const recetaId = Number(button.getAttribute("data-receta-id"));
-        if (!recetaId) {
-          return;
-        }
-
-        if (action === "toggle-receta") {
-          const nextActivo = button.getAttribute("data-next-activo") === "1";
-          await actualizarComponenteReceta(recetaId, { activo: nextActivo }, nextActivo ? "Componente activado." : "Componente desactivado.");
-          return;
-        }
-
-        if (action === "edit-qty-receta") {
-          const currentQty = Number(button.getAttribute("data-current-qty") || 0);
-          const nextQtyStr = window.prompt("Nueva cantidad por unidad:", String(currentQty));
-          if (!nextQtyStr) {
+          const rows = await api("/api/clientes/top20");
+          const tb = qs("tbody-top-clientes");
+          const list = Array.isArray(rows) ? rows : [];
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin registros.</td></tr>";
             return;
           }
-          const nextQty = Number(nextQtyStr);
-          if (!Number.isFinite(nextQty) || nextQty <= 0) {
-            alert("Cantidad invalida. Debe ser mayor a 0.");
+          tb.innerHTML = list.map((row, i) => {
+            const name = [row.nombre, row.apellidos].filter(Boolean).join(" ").trim() || "Sin nombre";
+            const wa = row.whatsapp_id || "Sin whatsapp";
+            return (
+              "<tr>" +
+                "<td>" + (i + 1) + "</td>" +
+                "<td><strong>" + html(name) + "</strong><br><span class='muted'>" + html(wa) + "</span></td>" +
+                "<td>" + num(row.total_pedidos) + "</td>" +
+                "<td>" + mxn(row.monto_total_comprado) + "</td>" +
+                "<td>" + html(dateTime(row.ultima_compra)) + "</td>" +
+              "</tr>"
+            );
+          }).join("");
+        } catch (_e) {
+          const tb = qs("tbody-top-clientes");
+          tb.innerHTML = "<tr><td colspan='5' class='muted'>No se pudieron cargar clientes. Reintenta.</td></tr>";
+        }
+      }
+
+      async function loadOperacionKpis() {
+        try {
+          const summary = await api("/api/admin/resumen-db");
+          qs("kpi-clientes-total").textContent = num(summary.clientes || 0);
+          qs("kpi-pedidos-activos").textContent = num(summary.pedidos_activos || 0);
+          qs("kpi-utilidad-hoy").textContent = mxn(summary.utilidad_estimada_hoy || 0);
+          qs("kpi-margen-hoy").textContent = Number(summary.margen_estimado_pct_hoy || 0).toFixed(2) + "%";
+        } catch (_e) {
+          toast("No se pudieron cargar KPIs operativos.", "error");
+        }
+      }
+
+      async function loadRentabilidad() {
+        showTableLoading("tbody-rentabilidad", 6);
+        try {
+          const rows = await api("/api/admin/rentabilidad-productos?limit=50");
+          const tb = qs("tbody-rentabilidad");
+          const list = Array.isArray(rows) ? rows : [];
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin datos.</td></tr>";
             return;
           }
-          await actualizarComponenteReceta(recetaId, { cantidad_por_unidad: nextQty }, "Cantidad de receta actualizada.");
+          tb.innerHTML = list.map((r) => {
+            return (
+              "<tr>" +
+                "<td>" + html(r.nombre || "-") + "</td>" +
+                "<td>" + html(r.variante || "-") + "</td>" +
+                "<td>" + mxn(r.precio_venta) + "</td>" +
+                "<td>" + mxn(r.costo_estimado_unitario) + "</td>" +
+                "<td>" + Number(r.margen_pct || 0).toFixed(2) + "%</td>" +
+                "<td>" + qualityBadge(r.calidad_costo) + "</td>" +
+              "</tr>"
+            );
+          }).join("");
+        } catch (_e) {
+          const tb = qs("tbody-rentabilidad");
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>No se pudo cargar rentabilidad.</td></tr>";
         }
-      });
+      }
 
-      document.getElementById("usuarios-body").addEventListener("click", async (event) => {
-        const button = event.target.closest("button[data-action]");
-        if (!button) {
-          return;
-        }
+      function productosLabel(items) {
+        if (!Array.isArray(items) || !items.length) return "-";
+        return items.map((it) => {
+          const nombre = it.producto || "Producto";
+          const v = it.variante ? " (" + it.variante + ")" : "";
+          return num(it.cantidad || 0) + "x " + nombre + v;
+        }).join(", ");
+      }
 
-        const action = button.getAttribute("data-action");
-        const usuarioId = Number(button.getAttribute("data-usuario-id"));
-        if (!usuarioId) {
-          return;
-        }
-
-        if (action === "toggle-usuario") {
-          const nextActivo = button.getAttribute("data-next-activo") === "1";
-          await actualizarUsuarioSistema(
-            usuarioId,
-            { activo: nextActivo },
-            nextActivo ? "Usuario activado." : "Usuario desactivado."
-          );
-          return;
-        }
-
-        if (action === "reset-password") {
-          const nuevaPassword = window.prompt("Nueva contrasena temporal (minimo 8 caracteres):", "");
-          if (!nuevaPassword) {
+      async function loadPedidosActivos() {
+        showTableLoading("tbody-pedidos-activos", 6);
+        try {
+          const rows = await api("/api/pedidos?estado=en_preparacion,listo");
+          const list = Array.isArray(rows) ? rows : [];
+          const tb = qs("tbody-pedidos-activos");
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin pedidos activos.</td></tr>";
             return;
           }
-          await actualizarUsuarioSistema(usuarioId, { nueva_password: nuevaPassword }, "Contrasena actualizada.");
-        }
-      });
+          tb.innerHTML = list.map((r) => {
+            const cliente = [r.nombre, r.apellidos].filter(Boolean).join(" ").trim() || (r.whatsapp_id || "Cliente");
+            const badge = "<span class='badge " + estadoBadge(r.estado) + "'>" + html(r.estado || "-") + "</span>";
+            return (
+              "<tr data-pedido-id='" + Number(r.pedido_id) + "'>" +
+                "<td>#" + Number(r.pedido_id) + "</td>" +
+                "<td>" + html(cliente) + "</td>" +
+                "<td>" + html(productosLabel(r.items)) + "</td>" +
+                "<td>" + mxn(r.total) + "</td>" +
+                "<td class='cell-estado'>" + badge + "</td>" +
+                "<td>" +
+                  "<select class='pedido-estado-select' data-id='" + Number(r.pedido_id) + "'>" +
+                    "<option value='en_preparacion'" + (String(r.estado) === "en_preparacion" ? " selected" : "") + ">en_preparacion</option>" +
+                    "<option value='listo'" + (String(r.estado) === "listo" ? " selected" : "") + ">listo</option>" +
+                    "<option value='en_camino'" + (String(r.estado) === "en_camino" ? " selected" : "") + ">en_camino</option>" +
+                    "<option value='entregado'" + (String(r.estado) === "entregado" ? " selected" : "") + ">entregado</option>" +
+                    "<option value='cancelado'" + (String(r.estado) === "cancelado" ? " selected" : "") + ">cancelado</option>" +
+                  "</select>" +
+                "</td>" +
+              "</tr>"
+            );
+          }).join("");
 
-      document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) {
-          refreshVentasSafely().catch(() => {
+          tb.querySelectorAll(".pedido-estado-select").forEach((sel) => {
+            sel.addEventListener("change", async (event) => {
+              const pedidoId = Number(event.target.getAttribute("data-id"));
+              const estado = event.target.value;
+              try {
+                await api("/api/pedidos/" + pedidoId + "/estado", {
+                  method: "PATCH",
+                  body: { estado }
+                });
+                const tr = event.target.closest("tr");
+                const cell = tr && tr.querySelector(".cell-estado");
+                if (cell) {
+                  cell.innerHTML = "<span class='badge " + estadoBadge(estado) + "'>" + html(estado) + "</span>";
+                }
+                toast("Estado actualizado.", "success");
+              } catch (_e) {
+                toast("No se pudo actualizar el estado.", "error");
+              }
+            });
           });
+        } catch (_e) {
+          const tb = qs("tbody-pedidos-activos");
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>Error al cargar pedidos activos.</td></tr>";
         }
-      });
+      }
 
-      setUpModal();
+      async function loadComprasRecientes() {
+        showTableLoading("tbody-compras-recientes", 5);
+        try {
+          const rows = await api("/api/inventario/compras?limit=20");
+          const list = Array.isArray(rows) ? rows : [];
+          const tb = qs("tbody-compras-recientes");
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin compras registradas.</td></tr>";
+            return;
+          }
+          tb.innerHTML = list.map((r) => (
+            "<tr>" +
+              "<td>" + html(dateTime(r.creado_en)) + "</td>" +
+              "<td>" + html(r.insumo || "-") + "</td>" +
+              "<td>" + num(r.cantidad) + "</td>" +
+              "<td>" + mxn(r.costo_total) + "</td>" +
+              "<td>" + html(r.creado_por || "-") + "</td>" +
+            "</tr>"
+          )).join("");
+        } catch (_e) {
+          const tb = qs("tbody-compras-recientes");
+          tb.innerHTML = "<tr><td colspan='5' class='muted'>Error al cargar compras.</td></tr>";
+        }
+      }
 
-      await Promise.allSettled([
-        refreshVentasSafely(),
-        loadResumenDb(),
-        loadRentabilidadProductos(),
-        loadPedidosAdmin(),
-        loadComprasInventario(),
-        loadCatalogOptionsInventario(),
-        loadUsuariosSistema(),
-        loadAuditoriaSeguridad(),
-        loadAuditoriaNegocio(),
-        loadTopClientes(),
-        loadCampanas(),
-        loadInventario(),
-        loadRecetasInventario(),
-        loadProductosSinReceta(),
-        loadMovimientosInventario()
-      ]);
+      async function loadUsuarios() {
+        showTableLoading("tbody-usuarios", 6);
+        try {
+          const params = new URLSearchParams();
+          const rolFiltro = qs("f-usr-rol") ? qs("f-usr-rol").value : "";
+          const areaFiltro = qs("f-usr-area") ? qs("f-usr-area").value.trim() : "";
+          if (rolFiltro) params.set("rol", rolFiltro);
+          if (areaFiltro) params.set("area_entrega", areaFiltro);
 
-      scheduleVentasRefresh();
-    }
+          const rows = await api("/api/admin/usuarios" + (params.toString() ? "?" + params.toString() : ""));
+          const list = Array.isArray(rows) ? rows : [];
+          const tb = qs("tbody-usuarios");
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='6' class='muted'>No hay usuarios.</td></tr>";
+            return;
+          }
+          tb.innerHTML = list.map((u) => {
+            const rolClass = u.rol === "admin" ? "blue" : (u.rol === "cocina" ? "amber" : "green");
+            const stateClass = u.activo ? "green" : "red";
+            const area = u.rol === "repartidor" ? (u.area_entrega || "Sin area") : "N/A";
+            return (
+              "<tr>" +
+                "<td><strong>" + html(u.nombre_mostrar || u.username || "-") + "</strong><br><span class='muted'>" + html(u.username || "-") + "</span></td>" +
+                "<td><span class='badge " + rolClass + "'>" + html(u.rol || "-") + "</span></td>" +
+                "<td>" + html(area) + "</td>" +
+                "<td><span class='badge " + stateClass + "'>" + (u.activo ? "activo" : "inactivo") + "</span></td>" +
+                "<td>" + html(dateTime(u.ultimo_login)) + "</td>" +
+                "<td>" +
+                  "<button class='btn btn-toggle-user' data-id='" + Number(u.usuario_id) + "' data-active='" + (u.activo ? "1" : "0") + "' type='button'>" + (u.activo ? "Desactivar" : "Activar") + "</button> " +
+                  "<button class='btn btn-reset-pass' data-id='" + Number(u.usuario_id) + "' type='button'>Reset pass</button>" +
+                "</td>" +
+              "</tr>"
+            );
+          }).join("");
 
-    initialLoad();
+          tb.querySelectorAll(".btn-toggle-user").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = Number(btn.getAttribute("data-id"));
+              const isActive = btn.getAttribute("data-active") === "1";
+              try {
+                await api("/api/admin/usuarios/" + id, {
+                  method: "PATCH",
+                  body: { activo: !isActive }
+                });
+                await loadUsuarios();
+                await loadBitacoraSeguridad();
+                toast("Usuario actualizado.", "success");
+              } catch (_e) {
+                toast("No se pudo actualizar usuario.", "error");
+              }
+            });
+          });
+
+          tb.querySelectorAll(".btn-reset-pass").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = Number(btn.getAttribute("data-id"));
+              const nueva = window.prompt("Nueva contrasena temporal (min 8):", "");
+              if (!nueva) return;
+              if (nueva.length < 8) {
+                toast("La contrasena debe tener al menos 8 caracteres.", "error");
+                return;
+              }
+              try {
+                await api("/api/admin/usuarios/" + id, {
+                  method: "PATCH",
+                  body: { nueva_password: nueva }
+                });
+                await loadBitacoraSeguridad();
+                toast("Contrasena reiniciada.", "success");
+              } catch (_e) {
+                toast("No se pudo reiniciar contrasena.", "error");
+              }
+            });
+          });
+        } catch (_e) {
+          const tb = qs("tbody-usuarios");
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>Error al cargar usuarios.</td></tr>";
+        }
+      }
+
+      function severityBadge(v) {
+        const s = String(v || "").toLowerCase();
+        if (s === "critical") return "red";
+        if (s === "warning") return "amber";
+        return "blue";
+      }
+
+      function initials(value) {
+        const text = String(value || "").trim();
+        if (!text) return "NA";
+        return text.split(/\s+/).slice(0, 2).map((x) => x[0]?.toUpperCase() || "").join("");
+      }
+
+      async function loadBitacoraSeguridad() {
+        showTableLoading("tbody-bitacora-seguridad", 5);
+        const params = new URLSearchParams();
+        const evento = qs("f-seg-evento").value.trim();
+        const sev = qs("f-seg-sev").value;
+        const actor = qs("f-seg-actor").value.trim();
+        const desde = qs("f-seg-desde").value;
+        const hasta = qs("f-seg-hasta").value;
+        if (evento) params.set("tipo_evento", evento);
+        if (sev) params.set("severidad", sev);
+        if (actor) params.set("actor", actor);
+        if (desde) params.set("fecha_desde", desde);
+        if (hasta) params.set("fecha_hasta", hasta);
+        params.set("limit", "80");
+
+        try {
+          const rows = await api("/api/admin/auditoria-seguridad?" + params.toString());
+          const tb = qs("tbody-bitacora-seguridad");
+          const list = Array.isArray(rows) ? rows : [];
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin registros.</td></tr>";
+            return;
+          }
+          tb.innerHTML = list.map((r) => {
+            const actorDisplay = r.actor_username || "sistema";
+            return (
+              "<tr>" +
+                "<td><span class='badge blue'>" + html(initials(actorDisplay)) + "</span> " + html(actorDisplay) + "</td>" +
+                "<td>" + html(r.tipo_evento || "-") + "</td>" +
+                "<td>" + html(r.direccion_ip || "-") + "</td>" +
+                "<td>" + html(dateTime(r.creado_en)) + "</td>" +
+                "<td><span class='badge " + severityBadge(r.severidad) + "'>" + html(r.severidad || "info") + "</span></td>" +
+              "</tr>"
+            );
+          }).join("");
+        } catch (_e) {
+          const tb = qs("tbody-bitacora-seguridad");
+          tb.innerHTML = "<tr><td colspan='5' class='muted'>No se pudo cargar bitacora de seguridad.</td></tr>";
+        }
+      }
+
+      async function loadBitacoraNegocio() {
+        showTableLoading("tbody-bitacora-negocio", 5);
+        const params = new URLSearchParams();
+        const tabla = qs("f-neg-tabla").value;
+        const actor = qs("f-neg-actor").value.trim();
+        const desde = qs("f-neg-desde").value;
+        const hasta = qs("f-neg-hasta").value;
+        if (tabla) params.set("tabla", tabla);
+        if (actor) params.set("actor", actor);
+        if (desde) params.set("fecha_desde", desde);
+        if (hasta) params.set("fecha_hasta", hasta);
+        params.set("limit", "80");
+
+        try {
+          const rows = await api("/api/admin/auditoria-negocio?" + params.toString());
+          const tb = qs("tbody-bitacora-negocio");
+          const list = Array.isArray(rows) ? rows : [];
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin registros.</td></tr>";
+            return;
+          }
+          tb.innerHTML = list.map((r) => (
+            "<tr>" +
+              "<td>" + html(r.tabla_objetivo || "-") + "</td>" +
+              "<td>" + html(r.operacion || "-") + "</td>" +
+              "<td>" + html(r.registro_id || "-") + "</td>" +
+              "<td>" + html(r.actor_username || "-") + "</td>" +
+              "<td>" + html(dateTime(r.creado_en)) + "</td>" +
+            "</tr>"
+          )).join("");
+        } catch (_e) {
+          const tb = qs("tbody-bitacora-negocio");
+          tb.innerHTML = "<tr><td colspan='5' class='muted'>No se pudo cargar bitacora de negocio.</td></tr>";
+        }
+      }
+
+      async function loadCampanas() {
+        showTableLoading("tbody-campanas", 5);
+        const tb = qs("tbody-campanas");
+        const endpoints = ["/api/campanias", "/api/campanias/historial"];
+        for (const endpoint of endpoints) {
+          try {
+            const rows = await api(endpoint);
+            const list = Array.isArray(rows) ? rows : [];
+            if (!list.length) {
+              tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin campanas registradas.</td></tr>";
+              return;
+            }
+            tb.innerHTML = list.map((r) => (
+              "<tr>" +
+                "<td>" + html(r.nombre || "Campana") + "</td>" +
+                "<td>" + html(r.segmento || "-") + "</td>" +
+                "<td>" + num(r.mensajes_enviados || r.total_enviados || 0) + "</td>" +
+                "<td>" + html(dateTime(r.creado_en || r.fecha)) + "</td>" +
+                "<td>" + html(r.creado_por || "-") + "</td>" +
+              "</tr>"
+            )).join("");
+            return;
+          } catch (_e) {
+          }
+        }
+        tb.innerHTML = "<tr><td colspan='5' class='muted'>El historial no esta disponible por ahora. Las nuevas campanas si se guardan y se envian.</td></tr>";
+      }
+
+      async function updateSegmentCount() {
+        const out = qs("segmento-count");
+        out.textContent = "Calculando destinatarios...";
+        try {
+          const countData = await api("/api/clientes/count?filtro=" + encodeURIComponent(state.campanaSegmento));
+          const n = Number(countData.count || countData.total || 0);
+          out.textContent = num(n) + " destinatarios";
+        } catch (_e) {
+          out.textContent = "Destinatarios disponibles al momento de enviar.";
+        }
+      }
+
+      function renderProductosSinReceta(items) {
+        const box = qs("alerta-sin-receta");
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+          box.innerHTML = "";
+          return;
+        }
+        box.innerHTML = (
+          "<article class='card' style='background:#FAEEDA;'>" +
+            "<div class='card-head'><h3>Alerta: productos sin receta activa</h3></div>" +
+            "<div class='small' style='color:#633806;'>" +
+              list.map((r) => html((r.nombre || "Producto") + (r.variante ? " (" + r.variante + ")" : ""))).join(", ") +
+            "</div>" +
+          "</article>"
+        );
+      }
+
+      async function loadProductosSinReceta() {
+        try {
+          const rows = await api("/api/admin/productos-sin-receta");
+          renderProductosSinReceta(rows);
+        } catch (_e) {
+          renderProductosSinReceta([]);
+        }
+      }
+
+      function ratioStock(actual, minimo) {
+        const a = Number(actual || 0);
+        const m = Number(minimo || 0);
+        if (m <= 0) return { pct: 100, cls: "p-ok" };
+        const ratio = (a / m) * 100;
+        if (a <= m) return { pct: Math.max(2, Math.min(100, ratio)), cls: "p-danger" };
+        if (a <= m * 1.5) return { pct: Math.max(2, Math.min(100, ratio)), cls: "p-warn" };
+        return { pct: Math.max(2, Math.min(100, ratio)), cls: "p-ok" };
+      }
+
+      function fillInsumoSelects(items) {
+        const insumos = Array.isArray(items) ? items : [];
+        const options = insumos.map((r) => (
+          "<option value='" + Number(r.insumo_id) + "'>" + html(r.nombre) + "</option>"
+        )).join("");
+        ["receta-insumo", "compra-insumo"].forEach((id) => {
+          const sel = qs(id);
+          if (sel) sel.innerHTML = options;
+        });
+      }
+
+      async function loadInventarioStock() {
+        const grid = qs("grid-stock");
+        grid.innerHTML = "";
+        grid.appendChild(skeleton(6));
+        try {
+          const rows = await api("/api/inventario");
+          const list = Array.isArray(rows) ? rows : [];
+          state.inventoryCache = list;
+          fillInsumoSelects(list);
+          if (!list.length) {
+            grid.innerHTML = "<div class='muted'>Sin insumos.</div>";
+            return;
+          }
+          grid.innerHTML = list.map((r) => {
+            const ratio = ratioStock(r.stock_actual, r.stock_minimo);
+            return (
+              "<article class='stock-card'>" +
+                "<p class='stock-name'>" + html(r.nombre || "-") + "</p>" +
+                "<div class='stock-meta'>Actual: " + num(r.stock_actual) + " | Minimo: " + num(r.stock_minimo) + "</div>" +
+                "<div class='progress'><span class='" + ratio.cls + "' style='width:" + ratio.pct + "%'></span></div>" +
+              "</article>"
+            );
+          }).join("");
+        } catch (_e) {
+          grid.innerHTML = "<div class='muted'>No se pudo cargar stock.</div>";
+        }
+      }
+
+      async function loadCatalogosInventario() {
+        try {
+          const [productos] = await Promise.all([
+            api("/api/productos?solo_pedibles=0")
+          ]);
+          const pList = Array.isArray(productos) ? productos : [];
+          qs("receta-producto").innerHTML = pList.map((p) => (
+            "<option value='" + Number(p.producto_id) + "'>" + html(p.nombre + (p.variante ? " (" + p.variante + ")" : "")) + "</option>"
+          )).join("");
+        } catch (_e) {
+          qs("receta-producto").innerHTML = "";
+        }
+      }
+
+      async function loadRecetas() {
+        showTableLoading("tbody-recetas", 5);
+        try {
+          const rows = await api("/api/admin/recetas-producto");
+          const list = Array.isArray(rows) ? rows : [];
+          const tb = qs("tbody-recetas");
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin recetas registradas.</td></tr>";
+            return;
+          }
+          tb.innerHTML = list.map((r) => {
+            const cls = r.activo ? "green" : "red";
+            return (
+              "<tr>" +
+                "<td>" + html((r.producto || "-") + (r.variante ? " (" + r.variante + ")" : "")) + "</td>" +
+                "<td>" + html(r.insumo || "-") + "</td>" +
+                "<td><input class='receta-cantidad' data-id='" + Number(r.receta_id) + "' type='number' min='0' step='0.001' value='" + Number(r.cantidad_por_unidad || 0) + "' /></td>" +
+                "<td><span class='badge " + cls + "'>" + (r.activo ? "activo" : "inactivo") + "</span></td>" +
+                "<td>" +
+                  "<button class='btn btn-receta-save' data-id='" + Number(r.receta_id) + "' type='button'>Guardar cantidad</button> " +
+                  "<button class='btn btn-receta-toggle' data-id='" + Number(r.receta_id) + "' data-active='" + (r.activo ? "1" : "0") + "' type='button'>" + (r.activo ? "Desactivar" : "Activar") + "</button>" +
+                "</td>" +
+              "</tr>"
+            );
+          }).join("");
+
+          tb.querySelectorAll(".btn-receta-save").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = Number(btn.getAttribute("data-id"));
+              const input = tb.querySelector(".receta-cantidad[data-id='" + id + "']");
+              const cantidad = Number(input && input.value);
+              if (!(cantidad > 0)) {
+                toast("Cantidad invalida.", "error");
+                return;
+              }
+              try {
+                await api("/api/admin/recetas-producto/" + id, {
+                  method: "PATCH",
+                  body: { cantidad_por_unidad: cantidad }
+                });
+                await loadRecetas();
+                await loadMovimientos();
+                await loadProductosSinReceta();
+                toast("Receta actualizada.", "success");
+              } catch (_e) {
+                toast("No se pudo actualizar receta.", "error");
+              }
+            });
+          });
+
+          tb.querySelectorAll(".btn-receta-toggle").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = Number(btn.getAttribute("data-id"));
+              const active = btn.getAttribute("data-active") === "1";
+              try {
+                await api("/api/admin/recetas-producto/" + id, {
+                  method: "PATCH",
+                  body: { activo: !active }
+                });
+                await loadRecetas();
+                await loadMovimientos();
+                await loadProductosSinReceta();
+                toast("Estado de receta actualizado.", "success");
+              } catch (_e) {
+                toast("No se pudo actualizar estado receta.", "error");
+              }
+            });
+          });
+        } catch (_e) {
+          qs("tbody-recetas").innerHTML = "<tr><td colspan='5' class='muted'>Error al cargar recetas.</td></tr>";
+        }
+      }
+
+      async function loadMovimientos() {
+        showTableLoading("tbody-movimientos", 7);
+        try {
+          const rows = await api("/api/admin/inventario/movimientos?limit=60");
+          const list = Array.isArray(rows) ? rows : [];
+          const tb = qs("tbody-movimientos");
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='7' class='muted'>Sin movimientos.</td></tr>";
+            return;
+          }
+          tb.innerHTML = list.map((m) => (
+            "<tr>" +
+              "<td>" + html(dateTime(m.creado_en)) + "</td>" +
+              "<td>" + html(m.insumo || "-") + "</td>" +
+              "<td>" + html(m.tipo || "-") + "</td>" +
+              "<td>" + num(m.stock_antes) + "</td>" +
+              "<td>" + num(m.stock_despues) + "</td>" +
+              "<td>" + html((m.referencia_tipo || "-") + (m.referencia_id ? " #" + m.referencia_id : "")) + "</td>" +
+              "<td>" + html(m.actor_username || "-") + "</td>" +
+            "</tr>"
+          )).join("");
+        } catch (_e) {
+          qs("tbody-movimientos").innerHTML = "<tr><td colspan='7' class='muted'>Error al cargar movimientos.</td></tr>";
+        }
+      }
+
+      function wireNav() {
+        const nav = qs("sidebar-nav");
+        nav.addEventListener("click", async (event) => {
+          const btn = event.target.closest(".nav-item");
+          if (!btn) return;
+          const target = btn.getAttribute("data-section");
+          await activateSection(target);
+        });
+      }
+
+      async function activateSection(sectionName) {
+        if (!sectionMeta[sectionName]) return;
+        state.current = sectionName;
+
+        document.querySelectorAll(".nav-item").forEach((el) => {
+          el.classList.toggle("active", el.getAttribute("data-section") === sectionName);
+        });
+        document.querySelectorAll(".section").forEach((el) => {
+          el.classList.toggle("active", el.id === "section-" + sectionName);
+        });
+
+        qs("page-title").textContent = sectionMeta[sectionName].title;
+        qs("page-subtitle").textContent = sectionMeta[sectionName].subtitle;
+
+        await loadSection(sectionName);
+        applySmartTimers();
+      }
+
+      async function loadSection(sectionName) {
+        if (state.loaded[sectionName]) return;
+        state.loaded[sectionName] = true;
+
+        if (sectionName === "ventas") {
+          await Promise.allSettled([
+            loadVentasKpisAndCharts(false),
+            loadTopClientes()
+          ]);
+          return;
+        }
+
+        if (sectionName === "operacion") {
+          await Promise.allSettled([
+            loadOperacionKpis(),
+            loadRentabilidad(),
+            loadPedidosActivos(),
+            loadComprasRecientes()
+          ]);
+          return;
+        }
+
+        if (sectionName === "seguridad") {
+          await Promise.allSettled([
+            loadUsuarios(),
+            loadBitacoraSeguridad(),
+            loadBitacoraNegocio()
+          ]);
+          return;
+        }
+
+        if (sectionName === "campanas") {
+          await Promise.allSettled([
+            updateSegmentCount(),
+            loadCampanas()
+          ]);
+          return;
+        }
+
+        if (sectionName === "inventario") {
+          await Promise.allSettled([
+            loadInventarioStock(),
+            loadCatalogosInventario(),
+            loadRecetas(),
+            loadMovimientos(),
+            loadProductosSinReceta()
+          ]);
+        }
+      }
+
+      function clearTimer(name) {
+        if (state.timers[name]) {
+          clearInterval(state.timers[name]);
+          state.timers[name] = null;
+        }
+      }
+
+      function applySmartTimers() {
+        clearTimer("ventasDia");
+        clearTimer("pedidosActivos");
+
+        if (state.current === "ventas") {
+          state.timers.ventasDia = setInterval(() => {
+            if (document.visibilityState === "visible") {
+              loadVentasKpisAndCharts(true);
+            }
+          }, 300000);
+        }
+
+        if (state.current === "operacion") {
+          state.timers.pedidosActivos = setInterval(() => {
+            if (document.visibilityState === "visible") {
+              loadPedidosActivos();
+            }
+          }, 30000);
+        }
+      }
+
+      function wireCommonEvents() {
+        qs("btn-refresh-ventas-dia").addEventListener("click", () => {
+          loadVentasKpisAndCharts(true);
+        });
+
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState !== "visible") return;
+          if (state.current === "ventas") {
+            loadVentasKpisAndCharts(true);
+          }
+          if (state.current === "operacion") {
+            loadPedidosActivos();
+          }
+        });
+
+        qs("form-alta-usuario").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const nombre = qs("usuario-nombre").value.trim();
+          const rol = qs("usuario-rol").value;
+          const whatsapp = qs("usuario-whatsapp").value.trim();
+          const email = qs("usuario-email").value.trim();
+          const password = qs("usuario-password").value;
+          const areaEntrega = qs("usuario-area-entrega") ? qs("usuario-area-entrega").value.trim() : "";
+
+          const username = (email || whatsapp || "").trim();
+          if (!username || !nombre || !password) {
+            toast("Completa nombre, usuario (email o whatsapp) y contrasena.", "error");
+            return;
+          }
+          if (rol === "repartidor" && !areaEntrega) {
+            toast("Para repartidor debes capturar area de entrega.", "error");
+            return;
+          }
+
+          try {
+            await api("/api/admin/usuarios", {
+              method: "POST",
+              body: {
+                username,
+                password,
+                rol,
+                nombre_mostrar: nombre,
+                telefono: whatsapp || null,
+                area_entrega: rol === "repartidor" ? areaEntrega : null
+              }
+            });
+            event.target.reset();
+            if (qs("field-area-entrega")) {
+              qs("field-area-entrega").style.display = "none";
+            }
+            await loadUsuarios();
+            toast("Usuario creado.", "success");
+          } catch (_e) {
+            toast("No se pudo crear usuario.", "error");
+          }
+        });
+
+        qs("usuario-rol").addEventListener("change", (event) => {
+          const isRepartidor = event.target.value === "repartidor";
+          if (qs("field-area-entrega")) {
+            qs("field-area-entrega").style.display = isRepartidor ? "flex" : "none";
+          }
+          if (qs("usuario-area-entrega") && !isRepartidor) {
+            qs("usuario-area-entrega").value = "";
+          }
+        });
+
+        qs("btn-usr-filtrar").addEventListener("click", loadUsuarios);
+        qs("btn-usr-limpiar").addEventListener("click", async () => {
+          if (qs("f-usr-rol")) qs("f-usr-rol").value = "";
+          if (qs("f-usr-area")) qs("f-usr-area").value = "";
+          await loadUsuarios();
+        });
+
+        qs("btn-seg-filtrar").addEventListener("click", loadBitacoraSeguridad);
+        qs("btn-neg-filtrar").addEventListener("click", loadBitacoraNegocio);
+
+        qs("btn-seg-export").addEventListener("click", () => {
+          const p = new URLSearchParams();
+          const evento = qs("f-seg-evento").value.trim();
+          const sev = qs("f-seg-sev").value;
+          const actor = qs("f-seg-actor").value.trim();
+          const desde = qs("f-seg-desde").value;
+          const hasta = qs("f-seg-hasta").value;
+          if (evento) p.set("tipo_evento", evento);
+          if (sev) p.set("severidad", sev);
+          if (actor) p.set("actor", actor);
+          if (desde) p.set("fecha_desde", desde);
+          if (hasta) p.set("fecha_hasta", hasta);
+          window.location.href = "/api/admin/auditoria-seguridad.csv?" + p.toString();
+        });
+
+        qs("btn-neg-export").addEventListener("click", () => {
+          const p = new URLSearchParams();
+          const tabla = qs("f-neg-tabla").value;
+          const actor = qs("f-neg-actor").value.trim();
+          const desde = qs("f-neg-desde").value;
+          const hasta = qs("f-neg-hasta").value;
+          if (tabla) p.set("tabla", tabla);
+          if (actor) p.set("actor", actor);
+          if (desde) p.set("fecha_desde", desde);
+          if (hasta) p.set("fecha_hasta", hasta);
+          window.location.href = "/api/admin/auditoria-negocio.csv?" + p.toString();
+        });
+
+        qs("campana-mensaje").addEventListener("input", (e) => {
+          const val = e.target.value || "";
+          qs("campana-char-count").textContent = val.length + "/1000";
+        });
+
+        qs("campana-segmentos").addEventListener("click", (event) => {
+          const pill = event.target.closest(".pill");
+          if (!pill) return;
+          state.campanaSegmento = pill.getAttribute("data-segment");
+          qs("campana-segmentos").querySelectorAll(".pill").forEach((p) => {
+            p.classList.toggle("active", p === pill);
+          });
+          updateSegmentCount();
+        });
+
+        qs("form-campana").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const mensaje = qs("campana-mensaje").value.trim();
+          if (!mensaje) {
+            toast("Escribe un mensaje para la campana.", "error");
+            return;
+          }
+
+          const progress = qs("campana-progress");
+          const status = qs("campana-status");
+          progress.style.width = "0%";
+          status.textContent = "Enviando campana...";
+          let current = 0;
+          clearInterval(state.campanaProgressTimer);
+          state.campanaProgressTimer = setInterval(() => {
+            current = Math.min(92, current + 6);
+            progress.style.width = current + "%";
+          }, 120);
+
+          try {
+            await api("/api/campanias", {
+              method: "POST",
+              body: {
+                nombre: "Campana " + new Date().toLocaleString("es-MX"),
+                segmento: state.campanaSegmento,
+                mensaje
+              }
+            });
+            clearInterval(state.campanaProgressTimer);
+            progress.style.width = "100%";
+            status.textContent = "Campana enviada correctamente.";
+            toast("Campana enviada.", "success");
+            event.target.reset();
+            qs("campana-char-count").textContent = "0/1000";
+            await loadCampanas();
+          } catch (_e) {
+            clearInterval(state.campanaProgressTimer);
+            progress.style.width = "0%";
+            status.textContent = "No se pudo enviar la campana. Intenta de nuevo.";
+            toast("No se pudo enviar campana.", "error");
+          }
+        });
+
+        qs("form-producto").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          try {
+            await api("/api/admin/productos", {
+              method: "POST",
+              body: {
+                nombre: qs("producto-nombre").value.trim(),
+                variante: qs("producto-variante").value,
+                precio: Number(qs("producto-precio").value || 0),
+                activo: qs("producto-activo").value === "1"
+              }
+            });
+            event.target.reset();
+            await loadCatalogosInventario();
+            toast("Producto guardado.", "success");
+          } catch (_e) {
+            toast("No se pudo guardar producto.", "error");
+          }
+        });
+
+        qs("form-insumo").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          try {
+            await api("/api/admin/insumos", {
+              method: "POST",
+              body: {
+                nombre: qs("insumo-nombre").value.trim(),
+                unidad_medida: qs("insumo-unidad").value.trim(),
+                stock_minimo: Number(qs("insumo-minimo").value || 0),
+                stock_inicial: Number(qs("insumo-inicial").value || 0),
+                proveedor: qs("insumo-proveedor").value.trim() || null
+              }
+            });
+            event.target.reset();
+            await Promise.allSettled([
+              loadInventarioStock(),
+              loadCatalogosInventario(),
+              loadMovimientos()
+            ]);
+            toast("Insumo guardado.", "success");
+          } catch (_e) {
+            toast("No se pudo guardar insumo.", "error");
+          }
+        });
+
+        qs("form-receta").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          try {
+            await api("/api/admin/recetas-producto", {
+              method: "POST",
+              body: {
+                producto_id: Number(qs("receta-producto").value),
+                insumo_id: Number(qs("receta-insumo").value),
+                cantidad_por_unidad: Number(qs("receta-cantidad").value || 0),
+                activo: qs("receta-activo").value === "1"
+              }
+            });
+            await Promise.allSettled([
+              loadRecetas(),
+              loadMovimientos(),
+              loadProductosSinReceta()
+            ]);
+            toast("Receta guardada.", "success");
+          } catch (_e) {
+            toast("No se pudo guardar receta.", "error");
+          }
+        });
+
+        qs("btn-abrir-compra").addEventListener("click", () => {
+          qs("drawer-compra").classList.add("open");
+        });
+        qs("btn-cerrar-compra").addEventListener("click", () => {
+          qs("drawer-compra").classList.remove("open");
+        });
+
+        qs("form-compra").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const insumoId = Number(qs("compra-insumo").value);
+          const selected = state.inventoryCache.find((i) => Number(i.insumo_id) === insumoId);
+          const insumoNombre = selected ? selected.nombre : "";
+          try {
+            await api("/api/inventario/compras", {
+              method: "POST",
+              body: {
+                insumo: insumoNombre,
+                cantidad: Number(qs("compra-cantidad").value || 0),
+                costo_total: Number(qs("compra-costo").value || 0) || null,
+                proveedor: qs("compra-proveedor").value.trim() || null
+              }
+            });
+            qs("drawer-compra").classList.remove("open");
+            event.target.reset();
+            await Promise.allSettled([
+              loadInventarioStock(),
+              loadMovimientos(),
+              loadComprasRecientes()
+            ]);
+            toast("Compra registrada.", "success");
+          } catch (_e) {
+            toast("No se pudo registrar la compra.", "error");
+          }
+        });
+      }
+
+      function boot() {
+        wireNav();
+        wireCommonEvents();
+        activateSection("ventas");
+      }
+
+      boot();
+    })();
   </script>
 </body>
 </html>

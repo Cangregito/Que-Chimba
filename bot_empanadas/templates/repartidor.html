@@ -3,919 +3,728 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Que Chimba - Panel Repartidor</title>
+  <title>Que Chimba | Repartidor</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --bg-soft: #171e25;
-      --card: #202a34;
-      --line: #34424f;
-      --text: #f1f5f8;
-      --muted: #b6c2cc;
-      --accent: #ffad32;
-      --accent-soft: #ffd37c;
-      --ok: #36b87b;
-      --ok-ink: #052516;
-      --danger: #f05f6f;
-      --danger-ink: #2a060b;
-      --chip: #2a3642;
-      --radius: 14px;
-      --shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+      --bg: #FFFFFF;
+      --surface: #F8F8F7;
+      --line: #E5E5E3;
+      --text: #1A1A1A;
+      --text-2: #6B6B6B;
+      --text-3: #9B9B9B;
+      --accent: #1F2328;
+      --blue-bg: #E6F1FB;
+      --blue-fg: #0C447C;
+      --green-bg: #EAF3DE;
+      --green-fg: #27500A;
+      --amber-bg: #FAEEDA;
+      --amber-fg: #633806;
+      --red-bg: #FCEBEB;
+      --red-fg: #791F1F;
+      --r-sm: 8px;
+      --r-lg: 12px;
+      --t: 120ms ease;
     }
 
-    * {
-      box-sizing: border-box;
+    * { box-sizing: border-box; }
+
+    html,
+    body {
       margin: 0;
       padding: 0;
-    }
-
-    body {
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100%;
+      background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at 8% 5%, #2a3139 0%, transparent 34%),
-        radial-gradient(circle at 88% 15%, #1c252e 0%, transparent 30%),
-        linear-gradient(180deg, #0d1217 0%, #121920 100%);
-      padding: 22px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 400;
     }
 
-    .layout {
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    .main {
       max-width: 1360px;
       margin: 0 auto;
+      padding: 16px;
       display: grid;
-      gap: 16px;
       grid-template-columns: 1.75fr 1fr;
-    }
-
-    .panel {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%), var(--bg-soft);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 18px;
-    }
-
-    .header {
-      grid-column: 1 / -1;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
-      margin-bottom: 2px;
-    }
-
-    .title h1 {
-      font-size: 2rem;
-      margin-bottom: 4px;
-      letter-spacing: 0.2px;
-    }
-
-    .title p {
-      color: var(--muted);
-      font-size: 1rem;
-    }
-
-    .repartidor-chip {
-      border: 1px solid rgba(255, 173, 50, 0.35);
-      background: rgba(255, 173, 50, 0.14);
-      border-radius: 999px;
-      padding: 10px 14px;
-      color: #ffdca8;
-      font-weight: 700;
-      font-size: 0.96rem;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(120px, 1fr));
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .stat {
-      border: 1px solid var(--line);
-      border-left: 6px solid var(--accent);
-      background: #18212a;
-      border-radius: 11px;
-      padding: 10px 12px;
-    }
-
-    .stat .label {
-      color: var(--muted);
-      font-size: 0.84rem;
-      margin-bottom: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-
-    .stat .value {
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: #fce7be;
-    }
-
-    .section-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 14px;
-    }
-
-    .section-head h2 {
-      font-size: 1.22rem;
-      color: #ffe3b0;
-    }
-
-    .subtle {
-      color: var(--muted);
-      font-size: 0.92rem;
-    }
-
-    .alert {
-      display: none;
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 12px;
-      border: 1px solid transparent;
-      font-weight: 700;
-      line-height: 1.35;
-    }
-
-    .alert.show {
-      display: block;
-    }
-
-    .alert-success {
-      background: rgba(54, 184, 123, 0.14);
-      border-color: rgba(54, 184, 123, 0.34);
-      color: #bbf4d7;
-    }
-
-    .alert-error {
-      background: rgba(240, 95, 111, 0.14);
-      border-color: rgba(240, 95, 111, 0.34);
-      color: #ffc6ce;
-    }
-
-    .orders {
-      display: grid;
       gap: 12px;
     }
 
-    .order-card {
-      border: 1px solid var(--line);
-      border-left: 7px solid var(--accent);
-      border-radius: 12px;
-      background: rgba(14, 20, 26, 0.54);
-      padding: 14px;
+    .top {
+      grid-column: 1 / -1;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--surface);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .top h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .sub {
+      color: var(--text-2);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 0.5px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+    .chip.blue { background: var(--blue-bg); color: var(--blue-fg); }
+    .chip.green { background: var(--green-bg); color: var(--green-fg); }
+    .chip.amber { background: var(--amber-bg); color: var(--amber-fg); }
+    .chip.red { background: var(--red-bg); color: var(--red-fg); }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
+    .kpi {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      padding: 10px;
+    }
+
+    .kpi p {
+      margin: 0;
+      color: var(--text-2);
+      font-size: 12px;
+    }
+
+    .kpi h2 {
+      margin: 6px 0 0;
+      font-size: 22px;
+      font-weight: 500;
+    }
+
+    .panel {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--bg);
+      padding: 12px;
+    }
+
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .head h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .btn {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 12px;
+      min-height: 34px;
+      cursor: pointer;
+      transition: background var(--t), opacity var(--t);
+    }
+
+    .btn:hover { background: #EFEFEE; }
+
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #FFFFFF;
+    }
+
+    .btn:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid rgba(12, 68, 124, 0.35);
+      outline-offset: 1px;
+    }
+
+    .orders,
+    .route {
+      display: grid;
+      gap: 8px;
+    }
+
+    .order-card,
+    .route-card {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      padding: 10px;
     }
 
     .order-head {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
+      justify-content: space-between;
       gap: 8px;
-      margin-bottom: 9px;
-    }
-
-    .order-id {
-      font-size: 1.2rem;
-      font-weight: 900;
-      color: #ffdf9f;
-    }
-
-    .status {
-      border-radius: 999px;
-      border: 1px solid rgba(255, 173, 50, 0.35);
-      color: #ffe3b3;
-      background: rgba(255, 173, 50, 0.13);
-      padding: 4px 10px;
-      font-size: 0.84rem;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
-    .order-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px 14px;
+      flex-wrap: wrap;
       margin-bottom: 8px;
     }
 
-    .order-item .k {
-      color: var(--muted);
-      font-size: 0.86rem;
-      margin-bottom: 2px;
+    .order-id {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 500;
     }
 
-    .order-item .v {
-      font-size: 1rem;
-      font-weight: 600;
-      line-height: 1.35;
-      word-break: break-word;
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+      font-size: 12px;
+      color: var(--text-2);
+      margin-bottom: 8px;
+    }
+
+    .grid strong {
+      color: var(--text);
+      font-weight: 500;
     }
 
     .products {
-      margin-top: 8px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: #18222c;
-      padding: 10px;
-    }
-
-    .products .k {
-      color: var(--muted);
-      font-size: 0.84rem;
-      margin-bottom: 4px;
-    }
-
-    .products .v {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      padding: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--text-2);
       white-space: pre-wrap;
       line-height: 1.45;
-      font-size: 0.95rem;
     }
 
     .actions {
       display: grid;
-      grid-template-columns: repeat(3, minmax(140px, 1fr));
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .btn {
-      border: 1px solid transparent;
-      border-radius: 10px;
-      padding: 10px 12px;
-      min-height: 42px;
-      cursor: pointer;
-      font-weight: 800;
-      font-size: 0.9rem;
-      transition: transform 0.1s ease, filter 0.14s ease;
-    }
-
-    .btn:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.03);
-    }
-
-    .btn:disabled {
-      opacity: 0.64;
-      cursor: not-allowed;
-      transform: none;
-      filter: none;
-    }
-
-    .btn-confirm {
-      background: linear-gradient(180deg, #92efbe 0%, var(--ok) 100%);
-      color: var(--ok-ink);
-      border-color: rgba(54, 184, 123, 0.36);
-    }
-
-    .btn-retry {
-      background: linear-gradient(180deg, #6cb4ff 0%, #2f89ef 100%);
-      color: #071d34;
-      border-color: rgba(88, 160, 245, 0.34);
-    }
-
-    .btn-maps {
-      background: linear-gradient(180deg, #ffd47f 0%, var(--accent) 100%);
-      color: #312100;
-      border-color: rgba(255, 173, 50, 0.34);
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 6px;
     }
 
     .confirm-box {
       display: none;
-      margin-top: 10px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: #17212a;
-      padding: 10px;
+      margin-top: 8px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      padding: 8px;
     }
 
-    .confirm-box.active {
-      display: block;
-    }
+    .confirm-box.active { display: block; }
 
     .confirm-box label {
       display: block;
-      font-size: 0.88rem;
-      color: var(--muted);
+      font-size: 12px;
+      color: var(--text-2);
       margin-bottom: 6px;
     }
 
     .confirm-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
-      gap: 8px;
+      gap: 6px;
     }
 
     .confirm-row input {
       width: 100%;
-      min-height: 40px;
-      border-radius: 9px;
-      border: 1px solid var(--line);
-      background: #0f151b;
-      color: var(--text);
-      padding: 9px 10px;
-      font-size: 1rem;
-      letter-spacing: 1px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: #FFFFFF;
+      padding: 8px;
       text-transform: uppercase;
     }
 
-    .confirm-row input:focus {
-      outline: none;
-      border-color: rgba(255, 173, 50, 0.58);
-      box-shadow: 0 0 0 3px rgba(255, 173, 50, 0.15);
-    }
-
-    .inline-btn {
-      min-height: 40px;
-      border-radius: 9px;
-      border: 1px solid transparent;
-      font-weight: 800;
-      cursor: pointer;
-      padding: 0 12px;
-    }
-
-    .inline-submit {
-      background: #36b87b;
-      border-color: rgba(54, 184, 123, 0.35);
-      color: #042012;
-    }
-
-    .inline-cancel {
-      background: #3a4652;
-      border-color: #536170;
-      color: #e8eff5;
-    }
-
-    .route-list {
+    .route-card {
       display: grid;
-      gap: 10px;
-    }
-
-    .route-item {
-      display: grid;
-      grid-template-columns: 30px 1fr auto;
-      gap: 10px;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px;
       align-items: center;
-      border: 1px solid var(--line);
-      border-radius: 11px;
-      background: rgba(13, 20, 27, 0.52);
-      padding: 10px;
     }
 
     .route-order {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      background: rgba(255, 173, 50, 0.18);
-      border: 1px solid rgba(255, 173, 50, 0.42);
-      color: #ffdba1;
-      display: grid;
-      place-items: center;
-      font-weight: 900;
-      font-size: 0.88rem;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #FFFFFF;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 500;
     }
 
     .route-main {
-      font-size: 0.95rem;
-      line-height: 1.35;
+      font-size: 12px;
+      color: var(--text-2);
+      line-height: 1.4;
     }
 
-    .route-main .cp {
-      font-size: 0.84rem;
-      color: var(--muted);
-      margin-top: 2px;
+    .route-main strong {
+      color: var(--text);
+      font-weight: 500;
     }
 
     .empty {
-      border: 1px dashed var(--line);
-      border-radius: 12px;
-      padding: 16px;
+      border: 0.5px dashed var(--line);
+      border-radius: var(--r-sm);
+      color: var(--text-3);
+      font-size: 12px;
       text-align: center;
-      color: var(--muted);
-      font-size: 0.95rem;
+      padding: 12px;
+      background: var(--surface);
     }
 
-    @media (max-width: 1024px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
+    .alert {
+      display: none;
+      border-radius: var(--r-sm);
+      border: 0.5px solid transparent;
+      padding: 8px;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
 
-      .order-grid {
-        grid-template-columns: 1fr;
-      }
+    .alert.show { display: block; }
+    .alert.success { background: var(--green-bg); color: var(--green-fg); border-color: #CDDDBA; }
+    .alert.error { background: var(--red-bg); color: var(--red-fg); border-color: #E3C3C3; }
+
+    @media (max-width: 1080px) {
+      .main { grid-template-columns: 1fr; }
+      .kpis { grid-template-columns: 1fr 1fr; }
+      .actions { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 700px) {
-      body {
-        padding: 14px;
-      }
-
-      .stats {
-        grid-template-columns: 1fr;
-      }
-
-      .actions {
-        grid-template-columns: 1fr;
-      }
-
-      .confirm-row {
-        grid-template-columns: 1fr;
-      }
-    }
-    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
-
-    body {
-      font-family: "Space Grotesk", "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at 8% 0%, rgba(255, 173, 50, 0.18) 0%, transparent 34%),
-        radial-gradient(circle at 92% 16%, rgba(69, 167, 245, 0.2) 0%, transparent 30%),
-        linear-gradient(180deg, #0f151b 0%, #111922 100%);
-    }
-
-    .panel,
-    .order-card,
-    .route-item,
-    .confirm-box,
-    .empty {
-      border-radius: 14px;
-    }
-
-    .panel {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%), #18212b;
-    }
-
-    .order-card {
-      transition: transform 0.12s ease, box-shadow 0.12s ease;
-    }
-
-    .order-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.32);
-    }
-
-    .btn,
-    .inline-btn {
-      border-radius: 11px;
-      letter-spacing: 0.2px;
-    }
-
-    .layout {
-      animation: riseIn 0.35s ease;
-    }
-
-    @keyframes riseIn {
-      from {
-        opacity: 0;
-        transform: translateY(8px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .title h1 {
-      font-size: clamp(1.7rem, 3vw, 2.2rem);
-      letter-spacing: -0.02em;
-    }
-
-    .order-id {
-      letter-spacing: -0.01em;
-    }
-
-    .order-card {
-      background: linear-gradient(180deg, rgba(12, 18, 24, 0.95) 0%, rgba(20, 28, 36, 0.86) 100%);
-    }
-
-    .route-item {
-      background: linear-gradient(180deg, rgba(14, 21, 28, 0.9) 0%, rgba(20, 30, 39, 0.76) 100%);
-    }
-
-    .status {
-      font-size: 0.78rem;
-      letter-spacing: 0.8px;
-    }
-
-    .confirm-row input {
-      font-family: inherit;
-      font-weight: 600;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation: none !important;
-        transition: none !important;
-      }
+      .kpis { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      .confirm-row { grid-template-columns: 1fr; }
+      .route-card { grid-template-columns: auto 1fr; }
+      .route-card .btn { grid-column: 1 / -1; }
     }
   </style>
 </head>
 <body>
-  <main class="layout">
-    <section class="panel header">
-      <div class="title">
-        <h1>Panel de Repartidores</h1>
-        <p>Pedidos listos para entregar, confirmacion por codigo y ruta optimizada.</p>
+  <main class="main">
+    <section class="top">
+      <div>
+        <h1>Panel de Repartidor</h1>
+        <div class="sub">Confirmacion de entregas por codigo y ruta por CP.</div>
       </div>
-      <div class="repartidor-chip">Repartidor: <span id="repartidor-nombre">{{ (user.username if user else 'demo') }}</span></div>
-      <div class="stats" aria-label="Estadisticas del repartidor">
-        <article class="stat">
-          <div class="label">Pedidos listos</div>
-          <div class="value" id="stat-listos">0</div>
-        </article>
-        <article class="stat">
-          <div class="label">Pendientes de confirmar</div>
-          <div class="value" id="stat-pendientes">0</div>
-        </article>
-        <article class="stat">
-          <div class="label">CP unicos en ruta</div>
-          <div class="value" id="stat-cps">0</div>
-        </article>
+      <div class="chip blue">Repartidor: {{ (user.username if user else 'demo') }}</div>
+      <div class="kpis">
+        <article class="kpi"><p>Pedidos listos</p><h2 id="stat-listos">0</h2></article>
+        <article class="kpi"><p>Pendientes confirmar</p><h2 id="stat-pendientes">0</h2></article>
+        <article class="kpi"><p>CP unicos</p><h2 id="stat-cps">0</h2></article>
       </div>
     </section>
 
     <section class="panel">
-      <div id="msg-success" class="alert alert-success" role="status" aria-live="polite"></div>
-      <div id="msg-error" class="alert alert-error" role="alert" aria-live="assertive"></div>
+      <div id="msg-success" class="alert success" role="status" aria-live="polite"></div>
+      <div id="msg-error" class="alert error" role="alert" aria-live="assertive"></div>
 
-      <div class="section-head">
-        <h2>Pedidos asignados (estado listo)</h2>
-        <button class="btn btn-maps" id="btn-refresh" type="button">Actualizar</button>
+      <div class="head">
+        <h3>Pedidos asignados (estado listo)</h3>
+        <button class="btn" id="btn-refresh" type="button">Actualizar</button>
       </div>
 
       <div class="orders" id="orders-container">
-        <div class="empty">Cargando pedidos del repartidor...</div>
+        <div class="empty">Cargando pedidos...</div>
       </div>
     </section>
 
     <aside class="panel">
-      <div class="section-head">
-        <h2>Ruta optimizada</h2>
-        <span class="subtle">Orden por cercania estimada (CP)</span>
+      <div class="head">
+        <h3>Ruta sugerida</h3>
+        <span class="sub">Orden por CP</span>
       </div>
-      <div class="route-list" id="route-container">
+      <div class="route" id="route-container">
         <div class="empty">La ruta aparecera cuando haya pedidos listos.</div>
       </div>
     </aside>
   </main>
 
   <script>
-    let allPedidos = [];
-    let refreshTimer = null;
-    let isLoadingPedidos = false;
+    (function () {
+      let allPedidos = [];
+      let refreshTimer = null;
+      let isLoadingPedidos = false;
 
-    const ordersContainer = document.getElementById("orders-container");
-    const routeContainer = document.getElementById("route-container");
+      const ordersContainer = document.getElementById("orders-container");
+      const routeContainer = document.getElementById("route-container");
 
-    const msgSuccess = document.getElementById("msg-success");
-    const msgError = document.getElementById("msg-error");
+      const msgSuccess = document.getElementById("msg-success");
+      const msgError = document.getElementById("msg-error");
 
-    const statListos = document.getElementById("stat-listos");
-    const statPendientes = document.getElementById("stat-pendientes");
-    const statCps = document.getElementById("stat-cps");
+      const statListos = document.getElementById("stat-listos");
+      const statPendientes = document.getElementById("stat-pendientes");
+      const statCps = document.getElementById("stat-cps");
 
-    const REFRESH_MS = 12000;
+      const REFRESH_MS = 12000;
 
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("btn-refresh").addEventListener("click", loadPedidos);
-      initPolling();
-    });
-
-    function normalizePayload(payload) {
-      const ok = Boolean(payload && (payload.ok === true || payload.success === true));
-      const rawData = payload && (payload.data !== undefined ? payload.data : payload.pedidos);
-      const data = Array.isArray(rawData) ? rawData : [];
-      const error = payload && (payload.error || payload.mensaje);
-      return { ok, data, error };
-    }
-
-    function toText(value, fallback = "-") {
-      return value === null || value === undefined || value === "" ? fallback : String(value);
-    }
-
-    function normalizePedido(p) {
-      const pedidoId = p.pedido_id ?? p.id ?? p.order_id;
-      const direccion = p.direccion_entrega ?? p.direccion ?? p.direccion_texto ?? "Sin direccion";
-      const cliente = p.cliente_nombre ?? p.nombre_cliente ?? p.cliente ?? "Cliente";
-      const cp = p.codigo_postal ?? p.cp ?? p.postal_code ?? "00000";
-
-      let productos = p.productos;
-      if (Array.isArray(productos)) {
-        productos = productos.map((it) => {
-          if (typeof it === "string") return it;
-          const nombre = it.nombre ?? "Producto";
-          const cantidad = it.cantidad ?? 1;
-          return `${cantidad} x ${nombre}`;
-        }).join("\n");
+      function esc(value) {
+        return String(value == null ? "" : value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
       }
 
-      return {
-        id: pedidoId,
-        estado: (p.estado || "").toLowerCase(),
-        direccion: toText(direccion),
-        cliente: toText(cliente),
-        cp: toText(cp),
-        productos: toText(productos, "Sin detalle de productos"),
-        raw: p,
-      };
-    }
-
-    function onlyListos(pedidos) {
-      return pedidos.filter((p) => p.estado === "listo");
-    }
-
-    async function loadPedidos(force = false) {
-      if (isLoadingPedidos && !force) {
-        return;
+      function jsEsc(value) {
+        return String(value == null ? "" : value)
+          .replaceAll("\\", "\\\\")
+          .replaceAll("'", "\\'")
+          .replaceAll("\n", " ");
       }
 
-      isLoadingPedidos = true;
-      hideMessages();
-      try {
-        const res = await fetch("/api/repartidor/pedidos", { method: "GET" });
-        const payload = await res.json();
-        const normalized = normalizePayload(payload);
+      function hideMessages() {
+        msgSuccess.classList.remove("show");
+        msgError.classList.remove("show");
+      }
 
-        if (!res.ok || !normalized.ok) {
-          showError(normalized.error || "No se pudieron cargar los pedidos asignados.");
+      function showSuccess(message) {
+        msgError.classList.remove("show");
+        msgSuccess.textContent = message;
+        msgSuccess.classList.add("show");
+        setTimeout(() => msgSuccess.classList.remove("show"), 4200);
+      }
+
+      function showError(message) {
+        msgSuccess.classList.remove("show");
+        msgError.textContent = message;
+        msgError.classList.add("show");
+        setTimeout(() => msgError.classList.remove("show"), 4600);
+      }
+
+      function normalizePayload(payload) {
+        const ok = Boolean(payload && (payload.ok === true || payload.success === true));
+        const rawData = payload && (payload.data !== undefined ? payload.data : payload.pedidos);
+        const data = Array.isArray(rawData) ? rawData : [];
+        const error = payload && (payload.error || payload.mensaje);
+        return { ok, data, error };
+      }
+
+      function toText(value, fallback) {
+        return value == null || value === "" ? fallback : String(value);
+      }
+
+      function normalizePedido(p) {
+        const pedidoId = p.pedido_id ?? p.id ?? p.order_id;
+        const direccion = p.direccion_entrega ?? p.direccion ?? p.direccion_texto ?? "Sin direccion";
+        const cliente = p.cliente_nombre ?? p.nombre_cliente ?? p.cliente ?? "Cliente";
+        const cp = p.codigo_postal ?? p.cp ?? p.postal_code ?? "00000";
+
+        let productos = p.productos;
+        if (Array.isArray(productos)) {
+          productos = productos.map((it) => {
+            if (typeof it === "string") return it;
+            const nombre = it.producto ?? it.nombre ?? "Producto";
+            const cantidad = it.cantidad ?? 1;
+            return cantidad + " x " + nombre;
+          }).join("\n");
+        }
+
+        return {
+          id: pedidoId,
+          estado: String(p.estado || "").toLowerCase(),
+          direccion: toText(direccion, "Sin direccion"),
+          cliente: toText(cliente, "Cliente"),
+          cp: toText(cp, "00000"),
+          productos: toText(productos, "Sin detalle de productos")
+        };
+      }
+
+      function onlyListos(pedidos) {
+        return pedidos.filter((p) => p.estado === "listo");
+      }
+
+      async function loadPedidos(force) {
+        if (isLoadingPedidos && !force) return;
+        isLoadingPedidos = true;
+        hideMessages();
+        try {
+          const res = await fetch("/api/repartidor/pedidos", {
+            method: "GET",
+            credentials: "same-origin",
+            headers: { "Accept": "application/json" }
+          });
+
+          if (res.redirected && res.url) {
+            window.location.href = res.url;
+            return;
+          }
+
+          const ct = (res.headers.get("content-type") || "").toLowerCase();
+          if (!ct.includes("application/json")) {
+            if (ct.includes("text/html")) window.location.href = "/login";
+            throw new Error("Respuesta no valida");
+          }
+
+          const payload = await res.json();
+          const normalized = normalizePayload(payload);
+
+          if (!res.ok || !normalized.ok) {
+            showError(normalized.error || "No se pudieron cargar los pedidos asignados.");
+            allPedidos = [];
+            render();
+            return;
+          }
+
+          allPedidos = normalized.data.map(normalizePedido).filter((p) => p.id !== undefined && p.id !== null);
+          render();
+        } catch (_err) {
           allPedidos = [];
           render();
+          showError("Error de conexion al cargar pedidos de repartidor.");
+        } finally {
+          isLoadingPedidos = false;
+        }
+      }
+
+      function scheduleRefresh() {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(async () => {
+          if (!document.hidden) {
+            await loadPedidos(false);
+          }
+          scheduleRefresh();
+        }, REFRESH_MS);
+      }
+
+      function render() {
+        const pedidosListos = onlyListos(allPedidos);
+        renderStats(pedidosListos);
+        renderPedidos(pedidosListos);
+        renderRuta(pedidosListos);
+      }
+
+      function renderStats(pedidosListos) {
+        const cps = new Set(pedidosListos.map((p) => p.cp));
+        statListos.textContent = String(pedidosListos.length);
+        statPendientes.textContent = String(pedidosListos.length);
+        statCps.textContent = String(cps.size);
+      }
+
+      function renderPedidos(pedidos) {
+        if (!pedidos.length) {
+          ordersContainer.innerHTML = "<div class='empty'>No hay pedidos en estado listo para este repartidor.</div>";
           return;
         }
 
-        allPedidos = normalized.data.map(normalizePedido).filter((p) => p.id !== undefined && p.id !== null);
-        render();
-      } catch (err) {
-        allPedidos = [];
-        render();
-        showError("Error de conexion al cargar pedidos de repartidor.");
-      } finally {
-        isLoadingPedidos = false;
-      }
-    }
+        ordersContainer.innerHTML = pedidos.map((pedido) => {
+          const inputId = "codigo-" + pedido.id;
+          const boxId = "confirm-" + pedido.id;
+          return (
+            "<article class='order-card' data-pedido-id='" + esc(pedido.id) + "'>" +
+              "<div class='order-head'>" +
+                "<h4 class='order-id'>Pedido #" + esc(pedido.id) + "</h4>" +
+                "<span class='chip green'>listo</span>" +
+              "</div>" +
 
-    function scheduleRefresh() {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
+              "<div class='grid'>" +
+                "<div><span>Cliente:</span> <strong>" + esc(pedido.cliente) + "</strong></div>" +
+                "<div><span>CP:</span> <strong>" + esc(pedido.cp) + "</strong></div>" +
+                "<div style='grid-column:1 / -1;'><span>Direccion:</span> <strong>" + esc(pedido.direccion) + "</strong></div>" +
+              "</div>" +
+
+              "<div class='products'>" + esc(pedido.productos) + "</div>" +
+
+              "<div class='actions'>" +
+                "<button class='btn primary' type='button' onclick='openConfirm(" + Number(pedido.id) + ")'>Confirmar entrega</button>" +
+                "<button class='btn' type='button' onclick='reenviarCodigo(" + Number(pedido.id) + ")'>Reenviar codigo</button>" +
+                "<button class='btn' type='button' onclick='openMaps(\'" + jsEsc(pedido.direccion) + "\')'>Abrir Maps</button>" +
+              "</div>" +
+
+              "<div class='confirm-box' id='" + boxId + "'>" +
+                "<label for='" + inputId + "'>Ingresa el codigo del cliente:</label>" +
+                "<div class='confirm-row'>" +
+                  "<input id='" + inputId + "' type='text' maxlength='12' autocomplete='off' placeholder='Ej: 483920' />" +
+                  "<button class='btn primary' type='button' onclick='confirmarEntrega(" + Number(pedido.id) + ")'>Enviar</button>" +
+                  "<button class='btn' type='button' onclick='closeConfirm(" + Number(pedido.id) + ")'>Cancelar</button>" +
+                "</div>" +
+              "</div>" +
+            "</article>"
+          );
+        }).join("");
       }
 
-      refreshTimer = setTimeout(async () => {
-        if (!document.hidden) {
-          await loadPedidos();
+      function renderRuta(pedidosListos) {
+        if (!pedidosListos.length) {
+          routeContainer.innerHTML = "<div class='empty'>Sin pedidos para calcular ruta.</div>";
+          return;
         }
-        scheduleRefresh();
-      }, REFRESH_MS);
-    }
 
-    function initPolling() {
-      loadPedidos(true).catch(() => {
+        const ordenados = [...pedidosListos].sort((a, b) => String(a.cp).localeCompare(String(b.cp)));
+        routeContainer.innerHTML = ordenados.map((pedido, idx) => (
+          "<article class='route-card'>" +
+            "<div class='route-order'>" + (idx + 1) + "</div>" +
+            "<div class='route-main'><strong>Pedido #" + esc(pedido.id) + "</strong><br>" + esc(pedido.cliente) + "<br>" + esc(pedido.direccion) + "<br><span class='chip amber'>CP " + esc(pedido.cp) + "</span></div>" +
+            "<button class='btn' type='button' onclick='openMaps(\'" + jsEsc(pedido.direccion) + "\')'>Maps</button>" +
+          "</article>"
+        )).join("");
+      }
+
+      function openConfirm(pedidoId) {
+        document.querySelectorAll(".confirm-box.active").forEach((el) => el.classList.remove("active"));
+        const box = document.getElementById("confirm-" + pedidoId);
+        const input = document.getElementById("codigo-" + pedidoId);
+        if (box) box.classList.add("active");
+        if (input) {
+          input.value = "";
+          input.focus();
+        }
+      }
+
+      function closeConfirm(pedidoId) {
+        const box = document.getElementById("confirm-" + pedidoId);
+        if (box) box.classList.remove("active");
+      }
+
+      async function confirmarEntrega(pedidoId) {
+        hideMessages();
+        const input = document.getElementById("codigo-" + pedidoId);
+        const codigo = input && input.value ? input.value.trim() : "";
+        if (!codigo) {
+          showError("Debes ingresar el codigo del cliente para confirmar la entrega.");
+          return;
+        }
+
+        try {
+          const confirmRes = await fetch("/api/pedidos/" + pedidoId + "/confirmar", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ codigo_entrega: codigo })
+          });
+
+          if (confirmRes.redirected && confirmRes.url) {
+            window.location.href = confirmRes.url;
+            return;
+          }
+
+          const confirmPayload = await confirmRes.json().catch(() => ({}));
+          const confirmOk = Boolean(confirmPayload && (confirmPayload.ok === true || confirmPayload.success === true));
+
+          if (!confirmRes.ok || !confirmOk) {
+            const msg = (confirmPayload && (confirmPayload.error || confirmPayload.mensaje)) || "Codigo incorrecto. No se pudo confirmar la entrega.";
+            showError(msg);
+            return;
+          }
+
+          showSuccess("Entrega confirmada correctamente. Pedido marcado como entregado.");
+
+          try {
+            await fetch("/api/evaluaciones/programar", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ pedido_id: pedidoId, retraso_minutos: 15 })
+            });
+          } catch (_e) {
+          }
+
+          closeConfirm(pedidoId);
+          await loadPedidos(true);
+        } catch (_err) {
+          showError("No fue posible confirmar la entrega en este momento.");
+        }
+      }
+
+      async function reenviarCodigo(pedidoId) {
+        hideMessages();
+        try {
+          const res = await fetch("/api/pedidos/" + pedidoId + "/reenviar-codigo", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" }
+          });
+
+          if (res.redirected && res.url) {
+            window.location.href = res.url;
+            return;
+          }
+
+          const payload = await res.json().catch(() => ({}));
+          const ok = Boolean(payload && (payload.ok === true || payload.success === true));
+
+          if (!res.ok || !ok) {
+            const msg = (payload && (payload.error || payload.mensaje)) || "No se pudo reenviar el codigo al cliente.";
+            showError(msg);
+            return;
+          }
+
+          const data = payload && payload.data ? payload.data : {};
+          const codigo = data && data.codigo_entrega ? String(data.codigo_entrega).trim() : "";
+          if (codigo) {
+            showSuccess("Codigo listo para reenviar: " + codigo);
+          } else {
+            showSuccess("Codigo reenviado al cliente por WhatsApp.");
+          }
+        } catch (_err) {
+          showError("Error de red al reenviar el codigo.");
+        }
+      }
+
+      function openMaps(direccion) {
+        const q = encodeURIComponent(direccion || "");
+        window.open("https://www.google.com/maps/search/?api=1&query=" + q, "_blank", "noopener");
+      }
+
+      window.openConfirm = openConfirm;
+      window.closeConfirm = closeConfirm;
+      window.confirmarEntrega = confirmarEntrega;
+      window.reenviarCodigo = reenviarCodigo;
+      window.openMaps = openMaps;
+
+      document.getElementById("btn-refresh").addEventListener("click", () => {
+        loadPedidos(true);
       });
+
+      loadPedidos(true).catch(() => {});
       scheduleRefresh();
 
       document.addEventListener("visibilitychange", () => {
         if (!document.hidden) {
-          loadPedidos(true).catch(() => {
-          });
+          loadPedidos(true).catch(() => {});
         }
       });
 
       window.addEventListener("beforeunload", () => {
-        if (refreshTimer) {
-          clearTimeout(refreshTimer);
-        }
+        if (refreshTimer) clearTimeout(refreshTimer);
       });
-    }
-
-    function render() {
-      const pedidosListos = onlyListos(allPedidos);
-      renderStats(pedidosListos);
-      renderPedidos(pedidosListos);
-      renderRuta(pedidosListos);
-    }
-
-    function renderStats(pedidosListos) {
-      const cps = new Set(pedidosListos.map((p) => p.cp));
-      statListos.textContent = pedidosListos.length;
-      statPendientes.textContent = pedidosListos.length;
-      statCps.textContent = cps.size;
-    }
-
-    function renderPedidos(pedidos) {
-      if (!pedidos.length) {
-        ordersContainer.innerHTML = '<div class="empty">No hay pedidos en estado listo para este repartidor.</div>';
-        return;
-      }
-
-      ordersContainer.innerHTML = pedidos.map((pedido) => {
-        const safeAddress = escapeHtml(pedido.direccion);
-        const safeCliente = escapeHtml(pedido.cliente);
-        const safeProductos = escapeHtml(pedido.productos);
-        const inputId = `codigo-${pedido.id}`;
-        const boxId = `confirm-${pedido.id}`;
-
-        return `
-          <article class="order-card" data-pedido-id="${pedido.id}">
-            <div class="order-head">
-              <div class="order-id">Pedido #${pedido.id}</div>
-              <span class="status">listo</span>
-            </div>
-
-            <div class="order-grid">
-              <div class="order-item">
-                <div class="k">Cliente</div>
-                <div class="v">${safeCliente}</div>
-              </div>
-              <div class="order-item">
-                <div class="k">Codigo Postal</div>
-                <div class="v">${escapeHtml(pedido.cp)}</div>
-              </div>
-              <div class="order-item" style="grid-column: 1 / -1;">
-                <div class="k">Direccion de entrega</div>
-                <div class="v">${safeAddress}</div>
-              </div>
-            </div>
-
-            <div class="products">
-              <div class="k">Productos</div>
-              <div class="v">${safeProductos}</div>
-            </div>
-
-            <div class="actions">
-              <button class="btn btn-confirm" type="button" onclick="openConfirm(${pedido.id})">Confirmar entrega</button>
-              <button class="btn btn-retry" type="button" onclick="reenviarCodigo(${pedido.id})">Reenviar codigo al cliente</button>
-              <button class="btn btn-maps" type="button" onclick="openMaps('${jsStringEscape(pedido.direccion)}')">Abrir Google Maps</button>
-            </div>
-
-            <div class="confirm-box" id="${boxId}">
-              <label for="${inputId}">Ingresa el codigo del cliente:</label>
-              <div class="confirm-row">
-                <input id="${inputId}" type="text" maxlength="12" placeholder="Ej: 483920" autocomplete="off" />
-                <button class="inline-btn inline-submit" type="button" onclick="confirmarEntrega(${pedido.id})">Enviar</button>
-                <button class="inline-btn inline-cancel" type="button" onclick="closeConfirm(${pedido.id})">Cancelar</button>
-              </div>
-            </div>
-          </article>
-        `;
-      }).join("");
-    }
-
-    function renderRuta(pedidosListos) {
-      if (!pedidosListos.length) {
-        routeContainer.innerHTML = '<div class="empty">Sin pedidos para calcular ruta.</div>';
-        return;
-      }
-
-      const ordenados = [...pedidosListos].sort((a, b) => String(a.cp).localeCompare(String(b.cp)));
-      routeContainer.innerHTML = ordenados.map((pedido, idx) => `
-        <article class="route-item">
-          <div class="route-order">${idx + 1}</div>
-          <div class="route-main">
-            <strong>Pedido #${pedido.id}</strong><br />
-            ${escapeHtml(pedido.cliente)}<br />
-            ${escapeHtml(pedido.direccion)}
-            <div class="cp">CP ${escapeHtml(pedido.cp)}</div>
-          </div>
-          <button class="btn btn-maps" type="button" onclick="openMaps('${jsStringEscape(pedido.direccion)}')">Maps</button>
-        </article>
-      `).join("");
-    }
-
-    function openConfirm(pedidoId) {
-      document.querySelectorAll(".confirm-box.active").forEach((el) => el.classList.remove("active"));
-      const box = document.getElementById(`confirm-${pedidoId}`);
-      const input = document.getElementById(`codigo-${pedidoId}`);
-      if (box) {
-        box.classList.add("active");
-      }
-      if (input) {
-        input.value = "";
-        input.focus();
-      }
-    }
-
-    function closeConfirm(pedidoId) {
-      const box = document.getElementById(`confirm-${pedidoId}`);
-      if (box) {
-        box.classList.remove("active");
-      }
-    }
-
-    async function confirmarEntrega(pedidoId) {
-      hideMessages();
-      const input = document.getElementById(`codigo-${pedidoId}`);
-      const codigo = (input && input.value ? input.value.trim() : "");
-
-      if (!codigo) {
-        showError("Debes ingresar el codigo del cliente para confirmar la entrega.");
-        return;
-      }
-
-      try {
-        const confirmRes = await fetch(`/api/pedidos/${pedidoId}/confirmar`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ codigo_entrega: codigo }),
-        });
-
-        const confirmPayload = await confirmRes.json();
-        const confirmOk = Boolean(confirmPayload && (confirmPayload.ok === true || confirmPayload.success === true));
-
-        if (!confirmRes.ok || !confirmOk) {
-          const msg = confirmPayload && (confirmPayload.error || confirmPayload.mensaje) ? (confirmPayload.error || confirmPayload.mensaje) : "Codigo incorrecto. No se pudo confirmar la entrega.";
-          showError(msg);
-          return;
-        }
-
-        showSuccess("Entrega confirmada correctamente. Pedido marcado como entregado.");
-
-        try {
-          // Programa la evaluacion de entrega para dispararse 15 minutos despues.
-          await fetch("/api/evaluaciones/programar", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pedido_id: pedidoId, retraso_minutos: 15 }),
-          });
-        } catch (_e) {
-          // La entrega ya fue confirmada; si falla este paso no se revierte el estado.
-        }
-
-        closeConfirm(pedidoId);
-        await loadPedidos(true);
-      } catch (_err) {
-        showError("No fue posible confirmar la entrega en este momento.");
-      }
-    }
-
-    async function reenviarCodigo(pedidoId) {
-      hideMessages();
-      try {
-        const res = await fetch(`/api/pedidos/${pedidoId}/reenviar-codigo`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
-
-        const payload = await res.json();
-        const ok = Boolean(payload && (payload.ok === true || payload.success === true));
-
-        if (!res.ok || !ok) {
-          const msg = payload && (payload.error || payload.mensaje) ? (payload.error || payload.mensaje) : "No se pudo reenviar el codigo al cliente.";
-          showError(msg);
-          return;
-        }
-
-        showSuccess("Codigo reenviado al cliente por WhatsApp.");
-      } catch (_err) {
-        showError("Error de red al reenviar el codigo.");
-      }
-    }
-
-    function openMaps(direccion) {
-      const q = encodeURIComponent(direccion || "");
-      window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, "_blank", "noopener");
-    }
-
-    function hideMessages() {
-      msgSuccess.classList.remove("show");
-      msgError.classList.remove("show");
-    }
-
-    function showSuccess(message) {
-      msgError.classList.remove("show");
-      msgSuccess.textContent = message;
-      msgSuccess.classList.add("show");
-      setTimeout(() => msgSuccess.classList.remove("show"), 4200);
-    }
-
-    function showError(message) {
-      msgSuccess.classList.remove("show");
-      msgError.textContent = message;
-      msgError.classList.add("show");
-      setTimeout(() => msgError.classList.remove("show"), 4600);
-    }
-
-    function escapeHtml(value) {
-      return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
-    function jsStringEscape(value) {
-      return String(value)
-        .replace(/\\/g, "\\\\")
-        .replace(/'/g, "\\'")
-        .replace(/\n/g, " ");
-    }
+    })();
   </script>
 </body>
 </html>
