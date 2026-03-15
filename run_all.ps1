@@ -77,6 +77,50 @@ if ([string]::IsNullOrWhiteSpace($dbPasswordPlain)) {
     throw "DB_PASSWORD es obligatoria. Define DB_PASSWORD en el entorno o ingresala al ejecutar."
 }
 
+# Exporta variables para que todos los procesos hijos (incluyendo validaciones) usen el mismo contexto.
+$env:DB_HOST = $DbHost
+$env:DB_PORT = $DbPort
+$env:DB_NAME = $DbName
+$env:DB_USER = $dbUserResolved
+$env:DB_PASSWORD = $dbPasswordPlain
+$env:N8N_PEDIDO_WEBHOOK_URL = $N8nWebhookUrl
+$env:TTS_LANG = if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_LANG"))) { "es" } else { [Environment]::GetEnvironmentVariable("TTS_LANG") }
+$env:TTS_TLD = if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_TLD"))) { "com.co" } else { [Environment]::GetEnvironmentVariable("TTS_TLD") }
+
+if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("FLASK_SECRET"))) {
+    $env:FLASK_SECRET = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
+    Write-Warn "FLASK_SECRET no estaba configurado. Se genero uno temporal para esta sesion."
+}
+
+Write-Info "Validando conexion a PostgreSQL (${DbHost}:${DbPort}/${DbName}) con usuario '$dbUserResolved'..."
+$dbCheckCode = @"
+import os
+import psycopg2
+
+conn = psycopg2.connect(
+    host=os.environ['DB_HOST'],
+    port=int(os.environ['DB_PORT']),
+    dbname=os.environ['DB_NAME'],
+    user=os.environ['DB_USER'],
+    password=os.environ['DB_PASSWORD'],
+)
+conn.close()
+print('DB_OK')
+"@
+
+Push-Location $root
+try {
+    & $venvPython -c $dbCheckCode | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "No fue posible validar conexion a PostgreSQL. Verifica DB_USER/DB_PASSWORD/DB_NAME y que PostgreSQL este levantado."
+    }
+}
+finally {
+    Pop-Location
+}
+
+Write-Ok "Conexion a PostgreSQL validada."
+
 if (-not (Test-Path -LiteralPath $bridgeEnv) -and (Test-Path -LiteralPath $bridgeEnvExample)) {
     Copy-Item -LiteralPath $bridgeEnvExample -Destination $bridgeEnv
     Write-Info "Se creo baileys_bridge/.env desde .env.example"
@@ -106,14 +150,6 @@ Start-Process -FilePath "powershell.exe" -ArgumentList @(
 
 Write-Info "Iniciando Flask en una ventana nueva..."
 # Pasa variables por entorno heredado para no exponer secretos en linea de comandos.
-$env:DB_HOST = $DbHost
-$env:DB_PORT = $DbPort
-$env:DB_NAME = $DbName
-$env:DB_USER = $dbUserResolved
-$env:DB_PASSWORD = $dbPasswordPlain
-$env:N8N_PEDIDO_WEBHOOK_URL = $N8nWebhookUrl
-$env:TTS_LANG = if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_LANG"))) { "es" } else { [Environment]::GetEnvironmentVariable("TTS_LANG") }
-$env:TTS_TLD = if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_TLD"))) { "com.co" } else { [Environment]::GetEnvironmentVariable("TTS_TLD") }
 
 $flaskCmd = "Set-Location -LiteralPath '$root'; & '$venvPython' '$flaskApp'"
 Start-Process -FilePath "powershell.exe" -ArgumentList @(

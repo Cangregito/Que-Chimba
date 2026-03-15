@@ -1272,12 +1272,13 @@
             fetch('/api/stats/publicas')
                 .then(response => response.json())
                 .then(data => {
+                    const payload = data && typeof data === 'object' && data.ok === true ? (data.data || {}) : (data || {});
                     document.getElementById('stat-empanadas').textContent = 
-                        data.total_empanadas_vendidas || '0';
+                        payload.total_empanadas_vendidas || '0';
                     document.getElementById('stat-clientes').textContent = 
-                        data.total_clientes_felices || '0';
+                        payload.total_clientes_felices || '0';
                     document.getElementById('stat-eventos').textContent = 
-                        data.total_eventos || '0';
+                        payload.total_eventos || '0';
                 })
                 .catch(error => {
                     console.error('Error cargando estadísticas:', error);
@@ -1292,19 +1293,39 @@
             fetch('/api/productos')
                 .then(response => response.json())
                 .then(data => {
+                    const payload = data && typeof data === 'object' && data.ok === true ? data.data : data;
+                    if (!Array.isArray(payload)) {
+                        throw new Error('La respuesta de productos no es una lista.');
+                    }
+
                     const grid = document.getElementById('products-grid');
                     grid.innerHTML = '';
                     
-                    data.forEach(product => {
-                        const tipoTag = product.tipo === 'carne' ? 'CARNE' : 'POLLO';
+                    payload.forEach(product => {
+                        const nombre = String(product.nombre || 'Empanada').trim();
+                        const variante = String(product.variante || '').trim();
+                        const titulo = variante ? `${nombre} (${variante})` : nombre;
+                        const clave = `${nombre} ${variante}`.toLowerCase();
+                        let tipoTag = 'EMPANADA';
+                        if (clave.includes('carne')) {
+                            tipoTag = 'CARNE';
+                        } else if (clave.includes('pollo')) {
+                            tipoTag = 'POLLO';
+                        }
+
+                        const precioValor = Number(product.precio);
+                        const precioTexto = Number.isFinite(precioValor)
+                            ? `$${precioValor.toFixed(2)} MXN`
+                            : 'Consultar en WhatsApp';
+
                         const card = document.createElement('div');
                         card.className = 'product-card';
                         card.innerHTML = `
                             <div class="product-image">${tipoTag}</div>
                             <div class="product-info">
-                                <div class="product-name">Empanada de ${product.tipo.toUpperCase()}</div>
+                                <div class="product-name">${titulo}</div>
                                 <div class="product-description">${product.descripcion || 'Relleno sabroso y delicioso'}</div>
-                                <div class="product-price">$${product.precio} MXN</div>
+                                <div class="product-price">${precioTexto}</div>
                             </div>
                         `;
                         grid.appendChild(card);
@@ -1339,15 +1360,20 @@
             fetch('/api/evaluaciones/publicas')
                 .then(response => response.json())
                 .then(data => {
+                    const payload = data && typeof data === 'object' && data.ok === true ? data.data : data;
+                    if (!Array.isArray(payload)) {
+                        throw new Error('La respuesta de evaluaciones no es una lista.');
+                    }
+
                     const grid = document.getElementById('reviews-grid');
                     grid.innerHTML = '';
                     
-                    if (data.length === 0) {
+                    if (payload.length === 0) {
                         grid.innerHTML = '<div class="review-loading">Aún no hay evaluaciones. ¡Sé el primero!</div>';
                         return;
                     }
                     
-                    data.forEach(review => {
+                    payload.forEach(review => {
                         const rating = `${Number(review.calificacion || 0)}/5`;
                         const card = document.createElement('div');
                         card.className = 'review-card';

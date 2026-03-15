@@ -8,7 +8,7 @@ Este proyecto fue construido como entrega final de la materia Bases de Datos. El
 
 - recepcion de pedidos por WhatsApp
 - transcripcion de notas de voz con Whisper local
-- respuestas en texto o audio con gTTS
+- respuestas en texto o audio con TTS neural (edge-tts) y fallback a gTTS
 - registro de clientes, pedidos, inventario, pagos y auditoria en PostgreSQL
 - dashboards web para admin, cocina y repartidor
 - automatizacion de alertas mediante n8n
@@ -40,7 +40,7 @@ Flask API + Web (Python)
 | Back-end | Python + Flask | Webhooks, API REST, vistas HTML y autenticacion |
 | Base de datos | PostgreSQL 16 | Modelo relacional, auditoria, inventario y sesiones |
 | STT | openai-whisper local | Transcripcion de notas de voz en espanol |
-| TTS | gTTS | Generacion de respuesta de audio |
+| TTS | edge-tts + gTTS fallback | Generacion de respuesta de audio con acento mas natural |
 | Audio | FFmpeg | Conversion y normalizacion a OGG Opus |
 | Dashboards | HTML + CSS + JS + Chart.js | Panel admin, cocina y repartidor |
 | Pagos | MercadoPago Mexico | Preferencias de pago y webhook |
@@ -52,6 +52,7 @@ Flask API + Web (Python)
 - Ya no se usa Twilio como transporte principal de WhatsApp.
 - El canal actual de WhatsApp corre con Baileys en `baileys_bridge/`.
 - `voice.py` ya no depende de `pydub` en runtime; usa FFmpeg via subprocess.
+- TTS ahora prioriza `edge-tts` (voz neural) y hace fallback a `gTTS` si hay falla temporal.
 - La autenticacion web ya no usa usuarios hardcodeados; ahora sale de PostgreSQL con `usuarios_sistema`.
 - El proyecto incluye auditoria de seguridad y auditoria de negocio.
 
@@ -241,6 +242,11 @@ REPARTIDOR_DEFAULT_PASSWORD=
 MP_ACCESS_TOKEN=
 MP_SANDBOX=true
 WHISPER_MODEL=tiny
+TTS_PROVIDER=auto
+TTS_EDGE_VOICE=es-CO-SalomeNeural
+TTS_EDGE_RATE=+0%
+TTS_EDGE_PITCH=+0Hz
+TTS_PROFILE_ENABLED=1
 BOT_REPLY_MODE=texto
 WHATSAPP_MEDIA_BASIC_USER=
 WHATSAPP_MEDIA_BASIC_PASSWORD=

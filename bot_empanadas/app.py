@@ -366,6 +366,97 @@ def api_productos():
     return _ok(data)
 
 
+@app.get("/api/stats/publicas")
+def api_stats_publicas():
+    """Endpoint publico compatible con la landing antigua."""
+    resumen = db.obtener_resumen_db()
+    if isinstance(resumen, dict) and resumen.get("error"):
+        # Mantiene la landing funcional aunque no haya DB disponible.
+        return jsonify(
+            {
+                "total_empanadas_vendidas": 0,
+                "total_clientes_felices": 0,
+                "total_eventos": 0,
+                "source": "fallback",
+            }
+        )
+
+    total_empanadas = int(resumen.get("pedidos", 0) or 0)
+    total_clientes = int(resumen.get("clientes", 0) or 0)
+    total_eventos = int(resumen.get("campanas", 0) or 0)
+
+    return jsonify(
+        {
+            "total_empanadas_vendidas": total_empanadas,
+            "total_clientes_felices": total_clientes,
+            "total_eventos": total_eventos,
+        }
+    )
+
+
+@app.get("/api/evaluaciones/publicas")
+def api_evaluaciones_publicas():
+    """Endpoint publico para testimonios; tolera esquemas sin tabla de evaluaciones."""
+    conn = None
+    try:
+        conn = db.get_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = 'evaluaciones'
+                LIMIT 1
+                """
+            )
+            if not cur.fetchone():
+                return jsonify([])
+
+            cur.execute(
+                """
+                SELECT
+                    e.calificacion,
+                    COALESCE(NULLIF(TRIM(e.comentario), ''), 'Excelente servicio y sabor.') AS comentario,
+                    COALESCE(NULLIF(TRIM(c.nombre), ''), 'Cliente') AS nombre_cliente
+                FROM evaluaciones e
+                LEFT JOIN pedidos p ON p.pedido_id = e.pedido_id
+                LEFT JOIN clientes c ON c.cliente_id = p.cliente_id
+                WHERE e.calificacion IS NOT NULL
+                ORDER BY COALESCE(e.creado_en, NOW()) DESC
+                LIMIT 12
+                """
+            )
+            rows = cur.fetchall() or []
+
+        payload = []
+        for row in rows:
+            if isinstance(row, dict):
+                payload.append(
+                    {
+                        "calificacion": int(row.get("calificacion") or 0),
+                        "comentario": row.get("comentario") or "Excelente servicio y sabor.",
+                        "nombre_cliente": row.get("nombre_cliente") or "Cliente",
+                    }
+                )
+                continue
+
+            payload.append(
+                {
+                    "calificacion": int(row[0] or 0),
+                    "comentario": row[1] or "Excelente servicio y sabor.",
+                    "nombre_cliente": row[2] or "Cliente",
+                }
+            )
+
+        return jsonify(payload)
+    except Exception:
+        return jsonify([])
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.get("/api/pedidos")
 def api_pedidos():
     estado_raw = request.args.get("estado")

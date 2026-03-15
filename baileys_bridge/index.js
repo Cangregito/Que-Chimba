@@ -74,10 +74,84 @@ function extractText(message) {
   return (
     message?.conversation ||
     message?.extendedTextMessage?.text ||
+    message?.buttonsResponseMessage?.selectedDisplayText ||
+    message?.buttonsResponseMessage?.selectedButtonId ||
+    message?.templateButtonReplyMessage?.selectedDisplayText ||
+    message?.templateButtonReplyMessage?.selectedId ||
+    message?.listResponseMessage?.title ||
+    message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
     message?.imageMessage?.caption ||
     message?.videoMessage?.caption ||
     ""
   );
+}
+
+function extractReplyId(message) {
+  return (
+    message?.buttonsResponseMessage?.selectedButtonId ||
+    message?.templateButtonReplyMessage?.selectedId ||
+    message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    ""
+  );
+}
+
+function sanitizeOptionLabel(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeOptionId(label, index) {
+  const base = sanitizeOptionLabel(label)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  return base ? `opt_${base}` : `opt_${index + 1}`;
+}
+
+function parseQuickReplyOptions(text) {
+  const raw = String(text || "");
+  const marker = "\n\nOpciones:\n";
+  if (!raw.includes(marker)) {
+    return { bodyText: raw.trim(), quickReplies: [], fallbackText: raw.trim() };
+  }
+
+  const [beforeOptions, afterOptions] = raw.split(marker, 2);
+  const bodyText = String(beforeOptions || "").trim();
+  const optionLines = String(afterOptions || "")
+    .split(/\r?\n/)
+    .map((line) => sanitizeOptionLabel(line))
+    .filter(Boolean);
+
+  const denyPrefixes = ["ejemplo", "responde", "formato", "elige"];
+  const quickReplies = [];
+  for (const line of optionLines) {
+    const norm = line.toLowerCase();
+    const isGuidance = denyPrefixes.some((prefix) => norm.startsWith(prefix));
+    const hasPricingOrLabelNoise = line.includes(":") || line.includes("$");
+    if (isGuidance || hasPricingOrLabelNoise || line.length > 24) {
+      continue;
+    }
+
+    if (!quickReplies.find((item) => item.label.toLowerCase() === line.toLowerCase())) {
+      quickReplies.push({ label: line });
+    }
+
+    if (quickReplies.length >= 3) {
+      break;
+    }
+  }
+
+  quickReplies.forEach((item, index) => {
+    item.id = normalizeOptionId(item.label, index);
+  });
+
+  return {
+    bodyText: bodyText || raw.trim(),
+    quickReplies,
+    fallbackText: raw.trim(),
+  };
 }
 
 function extractLocation(message) {
@@ -156,6 +230,49 @@ async function sendText(to, text) {
   await sock.sendMessage(jid, { text: String(text || "") });
 }
 
+async function sendQuickReplies(to, text, options) {
+  if (!sock) {
+    throw new Error("Baileys no esta conectado.");
+  }
+  const jid = toJid(to);
+  if (!jid) {
+    throw new Error("Numero destino invalido.");
+  }
+
+  const normalized = (Array.isArray(options) ? options : [])
+    .map((option, index) => {
+      if (typeof option === "string") {
+        const label = sanitizeOptionLabel(option);
+        return label ? { id: normalizeOptionId(label, index), label } : null;
+      }
+
+      const label = sanitizeOptionLabel(option?.text || option?.label || option?.title || option?.id);
+      if (!label) {
+        return null;
+      }
+      const id = sanitizeOptionLabel(option?.id) || normalizeOptionId(label, index);
+      return { id, label };
+    })
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (!normalized.length) {
+    await sendText(to, text);
+    return;
+  }
+
+  await sock.sendMessage(jid, {
+    text: String(text || ""),
+    footer: "Que Chimba",
+    buttons: normalized.map((item) => ({
+      buttonId: item.id,
+      buttonText: { displayText: item.label },
+      type: 1,
+    })),
+    headerType: 1,
+  });
+}
+
 async function sendAudioFromUrl(to, audioUrl, caption = "") {
   if (!sock) {
     throw new Error("Baileys no esta conectado.");
@@ -193,6 +310,7 @@ async function processIncomingMessage(msg) {
   }
 
   const bodyText = extractText(msg.message);
+  const replyId = extractReplyId(msg.message);
   const { latitude, longitude } = extractLocation(msg.message);
   const { mediaUrl, mediaType } = await saveIncomingMedia(msg);
 
@@ -204,6 +322,7 @@ async function processIncomingMessage(msg) {
     latitude,
     longitude,
     message_id: key.id || "",
+    reply_id: replyId,
   };
 
   let flaskData = null;
@@ -227,6 +346,7 @@ async function processIncomingMessage(msg) {
 
   const tipo = String(flaskData?.tipo || "texto").toLowerCase();
   const contenido = String(flaskData?.contenido || "").trim();
+  const parsed = parseQuickReplyOptions(contenido);
 
   if (tipo === "audio" && flaskData?.audio_url) {
     try {
@@ -237,8 +357,17 @@ async function processIncomingMessage(msg) {
     }
   }
 
-  if (contenido) {
-    await sendText(payload.whatsapp_id, contenido);
+  if (parsed.quickReplies.length >= 2) {
+    try {
+      await sendQuickReplies(payload.whatsapp_id, parsed.bodyText, parsed.quickReplies);
+      return;
+    } catch (error) {
+      logger.error({ err: error?.message }, "No se pudo enviar botones rapidos; se usa fallback texto");
+    }
+  }
+
+  if (parsed.fallbackText) {
+    await sendText(payload.whatsapp_id, parsed.fallbackText);
   }
 }
 
@@ -272,6 +401,22 @@ app.post("/api/send-audio", requireBridgeToken, async (req, res) => {
     }
 
     await sendAudioFromUrl(to, audioUrl, caption);
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/send-options", requireBridgeToken, async (req, res) => {
+  try {
+    const to = req.body?.to;
+    const text = req.body?.text;
+    const options = req.body?.options;
+    if (!to || !text || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({ ok: false, error: "to, text y options(>=2) son obligatorios" });
+    }
+
+    await sendQuickReplies(to, text, options);
     return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ ok: false, error: String(error?.message || error) });
