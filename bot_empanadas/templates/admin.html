@@ -187,6 +187,12 @@
       font-size: 13px;
     }
 
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .section {
       display: none;
       flex-direction: column;
@@ -652,8 +658,13 @@
     <main class="main">
       <div class="main-inner">
         <header class="topbar">
-          <h2 id="page-title">Ventas</h2>
-          <div class="subtle" id="page-subtitle">Vista en tiempo real de ventas y clientes.</div>
+          <div>
+            <h2 id="page-title">Ventas</h2>
+            <div class="subtle" id="page-subtitle">Vista en tiempo real de ventas y clientes.</div>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn" id="btn-logout" type="button">Salir</button>
+          </div>
         </header>
 
         <section class="section active" id="section-ventas">
@@ -2103,6 +2114,24 @@
       }
 
       function wireCommonEvents() {
+        const logoutBtn = qs("btn-logout");
+        if (logoutBtn) {
+          logoutBtn.addEventListener("click", async () => {
+            logoutBtn.disabled = true;
+            logoutBtn.textContent = "Saliendo...";
+            try {
+              await fetch("/logout", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Accept": "application/json" }
+              });
+            } catch (_e) {
+            } finally {
+              window.location.href = "/login";
+            }
+          });
+        }
+
         qs("btn-refresh-ventas-dia").addEventListener("click", () => {
           loadVentasKpisAndCharts(true);
         });

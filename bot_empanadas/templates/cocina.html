@@ -359,6 +359,7 @@
         <h1>Panel de Cocina</h1>
         <div class="sub" id="lastUpdate">Ultima actualizacion: -</div>
       </div>
+      <button class="btn" id="btn-logout" type="button">Salir</button>
       <div class="kpis">
         <article class="kpi"><p>Total en cola</p><h2 id="kpi-total">0</h2></article>
         <article class="kpi"><p>Recibidos</p><h2 id="kpi-recibidos">0</h2></article>
@@ -423,7 +424,8 @@
         zone: document.getElementById("zoneContainer"),
         last: document.getElementById("lastUpdate"),
         err: document.getElementById("errorText"),
-        refresh: document.getElementById("btn-refresh")
+        refresh: document.getElementById("btn-refresh"),
+        logout: document.getElementById("btn-logout")
       };
 
       let currentOrders = [];
@@ -779,6 +781,23 @@
       nodes.refresh.addEventListener("click", () => {
         fetchOrders(true);
       });
+
+      if (nodes.logout) {
+        nodes.logout.addEventListener("click", async () => {
+          nodes.logout.disabled = true;
+          nodes.logout.textContent = "Saliendo...";
+          try {
+            await fetch("/logout", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Accept": "application/json" }
+            });
+          } catch (_e) {
+          } finally {
+            window.location.href = "/login";
+          }
+        });
+      }
 
       fetchOrders(true).catch(() => {});
       scheduleRefresh();

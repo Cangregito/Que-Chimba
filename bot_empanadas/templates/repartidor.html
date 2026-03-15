@@ -343,6 +343,7 @@
         <div class="sub">Confirmacion de entregas por codigo y ruta por CP.</div>
       </div>
       <div class="chip blue">Repartidor: {{ (user.username if user else 'demo') }}</div>
+      <button class="btn" id="btn-logout" type="button">Salir</button>
       <div class="kpis">
         <article class="kpi"><p>Pedidos listos</p><h2 id="stat-listos">0</h2></article>
         <article class="kpi"><p>Pendientes confirmar</p><h2 id="stat-pendientes">0</h2></article>
@@ -390,6 +391,7 @@
       const statListos = document.getElementById("stat-listos");
       const statPendientes = document.getElementById("stat-pendientes");
       const statCps = document.getElementById("stat-cps");
+      const btnLogout = document.getElementById("btn-logout");
 
       const REFRESH_MS = 12000;
 
@@ -711,6 +713,23 @@
       document.getElementById("btn-refresh").addEventListener("click", () => {
         loadPedidos(true);
       });
+
+      if (btnLogout) {
+        btnLogout.addEventListener("click", async () => {
+          btnLogout.disabled = true;
+          btnLogout.textContent = "Saliendo...";
+          try {
+            await fetch("/logout", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Accept": "application/json" }
+            });
+          } catch (_e) {
+          } finally {
+            window.location.href = "/login";
+          }
+        });
+      }
 
       loadPedidos(true).catch(() => {});
       scheduleRefresh();

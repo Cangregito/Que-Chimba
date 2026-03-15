@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Que Chimba | Error {{ status_code }}</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    :root {
+      --bg: #f3eee3;
+      --surface: #fffaf1;
+      --line: #e7d8bf;
+      --ink: #1f1b17;
+      --muted: #6f6253;
+      --brand: #1f6a3b;
+      --warn: #a84a2d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 6%, #ffe4bb 0%, transparent 36%),
+        radial-gradient(circle at 95% 4%, #d8f2e3 0%, transparent 34%),
+        linear-gradient(180deg, #f8f2e6 0%, #f1e8d7 100%);
+    }
+
+    .card {
+      width: min(680px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: 0 20px 34px rgba(50, 35, 12, 0.12);
+      overflow: hidden;
+      animation: rise 220ms ease;
+    }
+
+    .header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #fff6e8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      border: 1px solid #d8c39e;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: #5f4825;
+      background: #fff1d9;
+      font-weight: 700;
+    }
+
+    .content {
+      padding: 24px 20px 22px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.4rem, 3.4vw, 2rem);
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 12px 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .meta {
+      margin-top: 20px;
+      padding: 12px;
+      border: 1px dashed #dcc8a5;
+      border-radius: 12px;
+      background: #fff8ea;
+      color: #5f513d;
+      font-size: 0.92rem;
+    }
+
+    .meta strong {
+      color: var(--ink);
+    }
+
+    .actions {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: #fff;
+      color: var(--ink);
+      text-decoration: none;
+      padding: 10px 14px;
+      font-weight: 700;
+      font-size: 0.92rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, var(--brand), #0f5b31);
+      color: #fff;
+      border-color: #0f5b31;
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: var(--warn);
+      font-size: 0.9rem;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .content,
+      .header {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .actions {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" role="main" aria-labelledby="error-title">
+    <header class="header">
+      <strong>Que Chimba</strong>
+      <span class="badge">Error {{ status_code }}</span>
+    </header>
+
+    <section class="content">
+      <h1 id="error-title">{{ title }}</h1>
+      <p>{{ message }}</p>
+
+      <div class="meta">
+        <div><strong>ID de error:</strong> {{ error_id }}</div>
+        <div><strong>Fecha:</strong> {{ timestamp }}</div>
+      </div>
+
+      <div class="actions">
+        <a class="btn primary" href="/login">Ir a iniciar sesion</a>
+        <a class="btn" href="/">Ir al inicio</a>
+        <a class="btn" href="javascript:history.back()">Volver</a>
+      </div>
+
+      <div class="hint">Si el problema persiste, comparte el ID de error con soporte tecnico.</div>
+    </section>
+  </main>
+</body>
+</html>

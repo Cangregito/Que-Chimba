@@ -136,8 +136,46 @@ def _ok(data, status=200):
     return jsonify({"ok": True, "data": _serialize(data)}), status
 
 
-def _error(message, status=400):
-    return jsonify({"ok": False, "error": message}), status
+def _generar_error_id() -> str:
+    return f"ERR-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3).upper()}"
+
+
+def _espera_json() -> bool:
+    path = request.path or ""
+    if path.startswith("/api/"):
+        return True
+    accept = (request.headers.get("Accept") or "").lower()
+    return "application/json" in accept
+
+
+def _error(message, status=400, code=None, details=None, error_id=None):
+    resolved_error_id = error_id or _generar_error_id()
+    payload = {
+        "ok": False,
+        "error": str(message),
+        "error_id": resolved_error_id,
+    }
+    if code:
+        payload["code"] = str(code)
+    if details is not None:
+        payload["details"] = _serialize(details)
+
+    response = jsonify(payload)
+    response.status_code = status
+    response.headers["X-Error-ID"] = resolved_error_id
+    return response
+
+
+def _validar_requeridos(payload, required_fields):
+    missing = []
+    for field in required_fields:
+        value = payload.get(field)
+        if value is None:
+            missing.append(field)
+            continue
+        if isinstance(value, str) and not value.strip():
+            missing.append(field)
+    return missing
 
 
 def _normalizar_whatsapp_id(raw_value):
@@ -257,9 +295,13 @@ def login_required(roles=None):
         def wrapper(*args, **kwargs):
             usuario = session.get("user")
             if not usuario:
+                if _espera_json():
+                    return _error("Sesion requerida", 401, code="auth_required")
                 return redirect(url_for("login_page", next=request.path))
 
             if roles and usuario.get("rol") not in roles:
+                if _espera_json():
+                    return _error("No autorizado para esta accion", 403, code="forbidden_role")
                 abort(403)
             return view_func(*args, **kwargs)
 
@@ -301,11 +343,20 @@ def login_post():
     password = payload.get("password")
 
     if not isinstance(username, str) or not isinstance(password, str):
-        return _error("Credenciales invalidas", 401)
+        return _error("Credenciales invalidas", 401, code="invalid_credentials")
+
+    username = username.strip()
+    if not username or not password:
+        return _error(
+            "Completa usuario y contrasena",
+            400,
+            code="validation_error",
+            details={"fields": ["username", "password"]},
+        )
 
     user = db.autenticar_usuario(username=username, password=password, direccion_ip=_client_ip())
     if isinstance(user, dict) and user.get("error"):
-        return _error(user["error"], int(user.get("status", 401)))
+        return _error(user["error"], int(user.get("status", 401)), code="auth_failed")
 
     session["user"] = {
         "usuario_id": user.get("usuario_id"),
@@ -319,6 +370,9 @@ def login_post():
 
 @app.post("/logout")
 def logout():
+    if session.get("user") and not _es_origen_valido():
+        return _error("Origen no autorizado", 403, code="forbidden_origin")
+
     actor = session.get("user", {})
     if actor:
         db.registrar_evento_seguridad(
@@ -458,6 +512,7 @@ def api_evaluaciones_publicas():
 
 
 @app.get("/api/pedidos")
+@login_required(roles=["admin", "cocina", "repartidor"])
 def api_pedidos():
     estado_raw = request.args.get("estado")
     estado = None
@@ -485,11 +540,24 @@ def api_crear_pedido():
 
     if not cliente_id:
         if not whatsapp_id:
-            return _error("Debes enviar cliente_id o whatsapp_id")
+            return _error(
+                "Debes enviar cliente_id o whatsapp_id",
+                400,
+                code="validation_error",
+                details={"fields": ["cliente_id", "whatsapp_id"]},
+            )
         cliente = db.obtener_o_crear_cliente(whatsapp_id)
         if isinstance(cliente, dict) and cliente.get("error"):
             return _error(cliente["error"], 500)
         cliente_id = cliente["cliente_id"]
+
+    if not isinstance(items, list) or not items:
+        return _error(
+            "Debes enviar al menos un item en el pedido",
+            400,
+            code="validation_error",
+            details={"fields": ["items"]},
+        )
 
     created = db.crear_pedido(
         cliente_id,
@@ -511,9 +579,14 @@ def api_crear_log_notificacion():
     payload = request.get_json(silent=True) or {}
 
     required = ["pedido_id", "canal", "destino", "tipo", "mensaje"]
-    faltantes = [field for field in required if payload.get(field) in (None, "")]
+    faltantes = _validar_requeridos(payload, required)
     if faltantes:
-        return _error(f"Campos obligatorios faltantes: {', '.join(faltantes)}", 400)
+        return _error(
+            f"Campos obligatorios faltantes: {', '.join(faltantes)}",
+            400,
+            code="validation_error",
+            details={"fields": faltantes},
+        )
 
     created = db.crear_log_notificacion(payload)
     if isinstance(created, dict) and created.get("error"):
@@ -523,13 +596,19 @@ def api_crear_log_notificacion():
 
 
 @app.patch("/api/pedidos/<int:pedido_id>/estado")
+@login_required(roles=["admin", "cocina", "repartidor"])
 def api_actualizar_estado_pedido(pedido_id):
     payload = request.get_json(silent=True) or {}
     nuevo_estado = payload.get("estado")
     motivo = payload.get("motivo")
 
     if nuevo_estado not in ESTADOS_VALIDOS_PEDIDO:
-        return _error("Estado no valido", 400)
+        return _error(
+            "Estado no valido",
+            400,
+            code="validation_error",
+            details={"fields": ["estado"], "allowed": sorted(list(ESTADOS_VALIDOS_PEDIDO))},
+        )
 
     actor = session.get("user", {})
     updated = db.actualizar_estado_pedido(
@@ -727,6 +806,7 @@ def api_programar_evaluacion_entrega():
 
 
 @app.get("/api/clientes/top20")
+@login_required(roles=["admin"])
 def api_top_clientes():
     top = db.obtener_top_clientes(limit=20)
     if isinstance(top, dict) and top.get("error"):
@@ -735,6 +815,7 @@ def api_top_clientes():
 
 
 @app.get("/api/ventas/diarias")
+@login_required(roles=["admin"])
 def api_ventas_diarias():
     data = db.obtener_ventas_diarias()
     if isinstance(data, dict) and data.get("error"):
@@ -743,6 +824,7 @@ def api_ventas_diarias():
 
 
 @app.get("/api/ventas/mensuales")
+@login_required(roles=["admin"])
 def api_ventas_mensuales():
     data = db.obtener_ventas_mensuales()
     if isinstance(data, dict) and data.get("error"):
@@ -751,6 +833,7 @@ def api_ventas_mensuales():
 
 
 @app.get("/api/ventas/anuales")
+@login_required(roles=["admin"])
 def api_ventas_anuales():
     data = db.obtener_ventas_anuales()
     if isinstance(data, dict) and data.get("error"):
@@ -759,6 +842,7 @@ def api_ventas_anuales():
 
 
 @app.get("/api/inventario/alertas")
+@login_required(roles=["admin"])
 def api_alertas_inventario():
     data = db.obtener_alertas_inventario()
     if isinstance(data, dict) and data.get("error"):
@@ -1328,19 +1412,61 @@ def webhook_baileys():
     return _ok(output)
 
 
+def _render_error_page(status_code, title, message, error_id):
+    now_text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    response = make_response(
+        render_template(
+            "error.html",
+            status_code=status_code,
+            title=title,
+            message=message,
+            error_id=error_id,
+            timestamp=now_text,
+        ),
+        status_code,
+    )
+    response.headers["X-Error-ID"] = error_id
+    return response
+
+
+@app.errorhandler(400)
+def handle_400(err):
+    if _espera_json():
+        return _error("Solicitud invalida", 400, code="bad_request")
+    error_id = _generar_error_id()
+    return _render_error_page(400, "Solicitud invalida", "La solicitud no pudo ser procesada. Verifica los datos enviados.", error_id)
+
+
+@app.errorhandler(401)
+def handle_401(err):
+    if _espera_json():
+        return _error("Sesion requerida", 401, code="auth_required")
+    return redirect(url_for("login_page", next=request.path))
+
+
 @app.errorhandler(403)
-def forbidden(_err):
-    return _error("No autorizado para acceder a este recurso", 403)
+def handle_403(err):
+    if _espera_json():
+        return _error("No autorizado para esta accion", 403, code="forbidden")
+    error_id = _generar_error_id()
+    return _render_error_page(403, "Acceso denegado", "No tienes permisos para acceder a esta seccion.", error_id)
 
 
 @app.errorhandler(404)
-def not_found(_err):
-    return _error("Recurso no encontrado", 404)
+def handle_404(err):
+    if _espera_json():
+        return _error("Recurso no encontrado", 404, code="not_found")
+    error_id = _generar_error_id()
+    return _render_error_page(404, "Pagina no encontrada", "La pagina solicitada no existe o fue movida.", error_id)
 
 
 @app.errorhandler(500)
-def server_error(_err):
-    return _error("Error interno del servidor", 500)
+def handle_500(err):
+    error_id = _generar_error_id()
+    app.logger.exception("Error interno no controlado [%s]: %s", error_id, err)
+    if _espera_json():
+        return _error("Error interno del servidor", 500, code="internal_error", error_id=error_id)
+    return _render_error_page(500, "Error interno", "Ocurrio un problema inesperado. Intenta nuevamente en unos minutos.", error_id)
 
 
 if __name__ == "__main__":
