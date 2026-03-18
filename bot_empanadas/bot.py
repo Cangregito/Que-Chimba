@@ -620,15 +620,15 @@ def _respuesta_intencion_comercial(intencion: str, datos_temp: Dict[str, Any]) -
 
 	if intencion == "entrega":
 		return _armar_respuesta_comercial(
-			"hacemos domicilio y tambien recoger en tienda. En domicilio te pedimos GPS para evitar errores.",
+			"hacemos domicilio y tambien recoger en tienda. En domicilio te pedimos direccion completa con calle, numero y codigo postal.",
 			"Responde: domicilio o recoger en tienda",
 			datos_temp,
 		)
 
 	if intencion == "pago":
 		return _armar_respuesta_comercial(
-			"aceptamos efectivo y tarjeta por MercadoPago. El pedido queda registrado al confirmar.",
-			"Responde: efectivo o tarjeta",
+			"aceptamos efectivo, tarjeta por MercadoPago o contra entrega (ficticio demo). El pedido queda registrado al confirmar.",
+			"Responde: efectivo, tarjeta o contra entrega",
 			datos_temp,
 		)
 
@@ -677,7 +677,7 @@ def _normalizar_slots_llm(raw_slots: Dict[str, Any]) -> Dict[str, Any]:
 		slots["metodo_entrega"] = metodo_entrega
 
 	metodo_pago = _normalizar_texto(raw_slots.get("metodo_pago") or "")
-	if metodo_pago in {"efectivo", "mercadopago"}:
+	if metodo_pago in {"efectivo", "mercadopago", "contra_entrega_ficticio"}:
 		slots["metodo_pago"] = metodo_pago
 
 	req_fact = _parsear_bool_flexible(raw_slots.get("requiere_factura"))
@@ -840,7 +840,7 @@ def _extraer_slots_llm(texto: str) -> Dict[str, Any]:
 		"Usa null si no aplica.\n"
 		"Campos esperados: tipo_servicio(individual|evento|null), producto(carne|pollo|null), "
 		"cantidad(numero|null), metodo_entrega(domicilio|recoger_tienda|null), "
-		"metodo_pago(efectivo|mercadopago|null), requiere_factura(boolean|null), "
+		"metodo_pago(efectivo|mercadopago|contra_entrega_ficticio|null), requiere_factura(boolean|null), "
 		"confirmar(boolean|null), cancelar(boolean|null), notas_evento(string|null), "
 		"genero_cliente(mujer|hombre|null).\n"
 		f"Mensaje: {texto}"
@@ -889,7 +889,7 @@ def _extraer_slots_llm_local(texto: str) -> Dict[str, Any]:
 		"Sin markdown ni texto adicional. "
 		"Campos: tipo_servicio(individual|evento|null), producto(carne|pollo|null), "
 		"cantidad(numero|null), metodo_entrega(domicilio|recoger_tienda|null), "
-		"metodo_pago(efectivo|mercadopago|null), requiere_factura(boolean|null), "
+		"metodo_pago(efectivo|mercadopago|contra_entrega_ficticio|null), requiere_factura(boolean|null), "
 		"confirmar(boolean|null), cancelar(boolean|null), notas_evento(string|null), "
 		"genero_cliente(mujer|hombre|null). "
 		"Si no hay evidencia directa usa null. "
@@ -955,6 +955,8 @@ def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], us
 	if not datos.get("metodo_pago"):
 		if "efectivo" in text:
 			datos["metodo_pago"] = "efectivo"
+		elif any(k in text for k in ["contra entrega", "contraentrega", "al entregar", "pago al entregar", "pagar al entregar"]):
+			datos["metodo_pago"] = "contra_entrega_ficticio"
 		elif any(k in text for k in ["tarjeta", "credito", "debito", "mercadopago", "mercado pago", "transferencia"]):
 			datos["metodo_pago"] = "mercadopago"
 
@@ -999,7 +1001,7 @@ def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], us
 				datos["metodo_entrega"] = entrega_llm
 
 			pago_llm = _normalizar_texto(slots.get("metodo_pago") or "")
-			if pago_llm in {"efectivo", "mercadopago"}:
+			if pago_llm in {"efectivo", "mercadopago", "contra_entrega_ficticio"}:
 				datos["metodo_pago"] = pago_llm
 
 			req_fact = _parsear_bool_flexible(slots.get("requiere_factura"))
@@ -1138,6 +1140,32 @@ def _extraer_lat_lng(body, latitude=None, longitude=None) -> Tuple[Optional[floa
 	return None, None
 
 
+def _extraer_direccion_textual(texto: str) -> Tuple[Optional[str], Optional[str]]:
+	raw = (texto or "").strip()
+	if not raw:
+		return None, None
+
+	cp = _extraer_codigo_postal(raw)
+	norm = _normalizar_texto(raw)
+
+	# Requerimos numero exterior para considerar direccion valida.
+	tiene_numero = bool(re.search(r"\b\d{1,6}[a-zA-Z]?\b", norm))
+	if not tiene_numero:
+		return None, cp
+
+	# Requerimos una calle/avenida/referencia textual minima.
+	tiene_via = any(k in norm for k in ["calle", "avenida", "av", "blvd", "boulevard", "colonia", "fracc", "privada"])
+	if not tiene_via and len(norm.split()) < 5:
+		return None, cp
+
+	if not cp:
+		return None, None
+
+	# Limpiamos para guardar una sola linea legible.
+	direccion = re.sub(r"\s+", " ", raw).strip(" ,;")
+	return direccion, cp
+
+
 def _columnas_existentes(conn, tabla):
 	with conn.cursor() as cur:
 		cur.execute(
@@ -1189,16 +1217,21 @@ def _insert_dinamico(tabla, data):
 			conn.close()
 
 
-def _guardar_direccion_en_db(cliente_id, lat, lng, codigo_postal=None):
+def _guardar_direccion_en_db(cliente_id, lat=None, lng=None, codigo_postal=None, direccion_texto=None):
 	cp = _extraer_codigo_postal(codigo_postal or "")
-	direccion = f"GPS {lat},{lng}"
-	if cp:
+	direccion = (direccion_texto or "").strip()
+	if not direccion:
+		if lat is not None and lng is not None:
+			direccion = f"GPS {lat},{lng}"
+		else:
+			direccion = "Direccion compartida por cliente"
+	if cp and "cp" not in _normalizar_texto(direccion):
 		direccion = f"{direccion} CP:{cp}"
 	data = {
 		"cliente_id": cliente_id,
 		"latitud": lat,
 		"longitud": lng,
-		"alias": "Ubicacion WhatsApp",
+		"alias": "Direccion WhatsApp",
 		"direccion_texto": direccion,
 		"codigo_postal": cp,
 		"referencia": "Compartida por cliente en WhatsApp",
@@ -1506,25 +1539,11 @@ def _guardar_pedido_final(cliente, datos_temp):
 
 def _manejar_inicio(_text, datos_temp, cliente):
 	datos = _as_dict(datos_temp)
-	nombre_actual = datos.get("cliente_nombre") or cliente.get("nombre")
-	if _nombre_cliente_es_valido(nombre_actual):
-		datos["cliente_nombre"] = str(nombre_actual).strip()
-		texto = "bienvenido a Que Chimba Empanadas. Te tomo el pedido completo por aqui y queda guardado en el sistema."
-		opciones = (
-			"individual\n"
-			"evento\n\n"
-			"Flujo rapido:\n"
-			"1) individual\n"
-			"2) carne o pollo\n"
-			"3) cantidad\n"
-			"4) domicilio o recoger en tienda\n"
-			"5) efectivo o tarjeta\n"
-			"6) si/no factura\n"
-			"7) confirmar"
-		)
-		return "tipo_servicio", datos, _armar_respuesta_comercial(texto, opciones, datos)
+	# Requisito de negocio: siempre pedir nombre al iniciar una conversacion nueva.
+	datos.pop("cliente_nombre", None)
+	datos.pop("cliente_apellidos", None)
 
-	texto = "antes de arrancar, dime tu nombre porfa para registrar bien tu orden."
+	texto = "antes de arrancar, dime tu nombre completo para registrar bien tu orden."
 	opciones = "Ejemplo: me llamo Ana Torres"
 	return "bienvenida", datos, _armar_respuesta_comercial(texto, opciones, datos)
 
@@ -1578,7 +1597,7 @@ def _manejar_datos_evento(text, datos_temp):
 		datos_temp["cantidad"] = max(int(datos_temp.get("cantidad", 25)), 25)
 
 	texto = "gracias, ya tengo tus datos para cotizar. Te pido metodo de pago preferido para dejar todo listo."
-	opciones = "efectivo\ntarjeta"
+	opciones = "efectivo\ntarjeta\ncontra entrega"
 	return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
@@ -1646,14 +1665,14 @@ def _manejar_metodo_entrega(text, datos_temp):
 
 	if any(k in t for k in ["domicilio", "enviar", "mandar", "delivery", "casa"]):
 		datos_temp["metodo_entrega"] = "domicilio"
-		texto = "comparteme tu ubicacion GPS para el envio."
-		opciones = "Manda ubicacion en WhatsApp o escribe: lat, lng"
+		texto = "comparteme tu direccion completa para envio."
+		opciones = "Formato: Calle, numero, colonia, codigo postal (5 digitos)"
 		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	if any(k in t for k in ["recoger", "tienda", "local", "llevar", "paso por", "voy por", "recojo"]):
 		datos_temp["metodo_entrega"] = "recoger_tienda"
 		texto = "listo, pasamos al pago."
-		opciones = "efectivo\ntarjeta"
+		opciones = "efectivo\ntarjeta\ncontra entrega"
 		return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	texto = "no logre identificar el metodo de entrega."
@@ -1662,51 +1681,29 @@ def _manejar_metodo_entrega(text, datos_temp):
 
 
 def _manejar_solicitar_ubicacion(text, datos_temp, cliente, latitude=None, longitude=None):
-	cp_texto = _extraer_codigo_postal(text)
-	if cp_texto:
-		datos_temp["codigo_postal"] = cp_texto
-
-	if datos_temp.get("esperando_codigo_postal") and datos_temp.get("latitud") is not None and datos_temp.get("longitud") is not None:
-		if not datos_temp.get("codigo_postal"):
-			texto = "me falta el codigo postal para cerrar envio a domicilio."
-			opciones = "Comparte CP de 5 digitos. Ejemplo: 32695"
-			return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
-
-		direccion_id = _guardar_direccion_en_db(
-			cliente["cliente_id"],
-			datos_temp["latitud"],
-			datos_temp["longitud"],
-			codigo_postal=datos_temp.get("codigo_postal"),
-		)
-		if direccion_id:
-			datos_temp["direccion_id"] = direccion_id
-		datos_temp["esperando_codigo_postal"] = False
-		texto = "ubicacion y codigo postal recibidos, seguimos con metodo de pago."
-		opciones = "efectivo\ntarjeta"
-		return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
-
-	lat, lng = _extraer_lat_lng(text, latitude=latitude, longitude=longitude)
-	if lat is None or lng is None:
-		texto = "aun no veo coordenadas validas."
-		opciones = "Comparte ubicacion GPS o escribe: 31.690,-106.424"
+	direccion_texto, cp = _extraer_direccion_textual(text)
+	if not direccion_texto or not cp:
+		texto = "me falta una direccion valida para domicilio."
+		opciones = "Escribe: Calle, numero, colonia, codigo postal (5 digitos). Ejemplo: Calle Naranjo 123, Col. Centro, CP 32695"
 		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
-	datos_temp["latitud"] = lat
-	datos_temp["longitud"] = lng
-	datos_temp["esperando_codigo_postal"] = True
+	datos_temp["direccion_texto"] = direccion_texto
+	datos_temp["codigo_postal"] = cp
 
-	if not datos_temp.get("codigo_postal"):
-		texto = "ya tengo tu ubicacion fija. Ahora comparteme tu codigo postal (5 digitos) para registrar el envio exacto."
-		opciones = "Ejemplo: 32695"
+	direccion_id = _guardar_direccion_en_db(
+		cliente["cliente_id"],
+		codigo_postal=cp,
+		direccion_texto=direccion_texto,
+	)
+	if not direccion_id:
+		texto = "no pude registrar tu direccion en sistema en este momento."
+		opciones = "Reenvia la direccion completa con calle, numero y codigo postal."
 		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
-	direccion_id = _guardar_direccion_en_db(cliente["cliente_id"], lat, lng, codigo_postal=datos_temp.get("codigo_postal"))
-	if direccion_id:
-		datos_temp["direccion_id"] = direccion_id
-	datos_temp["esperando_codigo_postal"] = False
+	datos_temp["direccion_id"] = direccion_id
 
-	texto = "ubicacion y codigo postal recibidos, seguimos con metodo de pago."
-	opciones = "efectivo\ntarjeta"
+	texto = "direccion recibida y registrada. Seguimos con metodo de pago."
+	opciones = "efectivo\ntarjeta\ncontra entrega"
 	return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 
@@ -1714,11 +1711,13 @@ def _manejar_metodo_pago(text, datos_temp):
 	t = _normalizar_texto(text)
 	if "efectivo" in t:
 		datos_temp["metodo_pago"] = "efectivo"
+	elif any(k in t for k in ["contra entrega", "contraentrega", "al entregar", "pago al entregar", "pagar al entregar"]):
+		datos_temp["metodo_pago"] = "contra_entrega_ficticio"
 	elif any(k in t for k in ["tarjeta", "mercadopago", "mercado pago", "credito", "debito", "transferencia"]):
 		datos_temp["metodo_pago"] = "mercadopago"
 	else:
 		texto = "no detecte metodo de pago valido."
-		opciones = "Responde: efectivo o tarjeta"
+		opciones = "Responde: efectivo, tarjeta o contra entrega"
 		return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	texto = "quieres factura?"
@@ -1737,6 +1736,8 @@ def _resumen_pedido(datos_temp):
 		piezas.append(f"Cantidad: {datos_temp['cantidad']}")
 	if datos_temp.get("metodo_entrega"):
 		piezas.append(f"Entrega: {datos_temp['metodo_entrega']}")
+	if datos_temp.get("metodo_entrega") == "domicilio" and datos_temp.get("direccion_texto"):
+		piezas.append(f"Direccion: {datos_temp['direccion_texto']}")
 	if datos_temp.get("metodo_pago"):
 		piezas.append(f"Pago: {datos_temp['metodo_pago']}")
 
@@ -1800,15 +1801,18 @@ def _manejar_confirmacion(text, datos_temp, cliente):
 		opciones = "Escribe tu nombre completo. Ejemplo: Mariana Soto"
 		return "bienvenida", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
-	if datos_temp.get("metodo_entrega") == "domicilio" and not _extraer_codigo_postal(datos_temp.get("codigo_postal") or ""):
-		texto = "para domicilio me falta tu codigo postal exacto."
-		opciones = "Comparte CP de 5 digitos. Ejemplo: 32695"
-		datos_temp["esperando_codigo_postal"] = True
+	if datos_temp.get("metodo_entrega") == "domicilio" and (
+		not datos_temp.get("direccion_id")
+		or not _extraer_codigo_postal(datos_temp.get("codigo_postal") or "")
+		or not (datos_temp.get("direccion_texto") or "").strip()
+	):
+		texto = "para domicilio me falta registrar direccion completa en sistema."
+		opciones = "Comparte: Calle, numero, colonia y codigo postal (5 digitos)."
 		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
-	if datos_temp.get("metodo_pago") not in {"efectivo", "mercadopago"}:
+	if datos_temp.get("metodo_pago") not in {"efectivo", "mercadopago", "contra_entrega_ficticio"}:
 		texto = "me falta metodo de pago valido para cerrar el pedido."
-		opciones = "Responde: efectivo o tarjeta"
+		opciones = "Responde: efectivo, tarjeta o contra entrega"
 		return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	_persistir_datos_cliente(cliente, datos_temp)

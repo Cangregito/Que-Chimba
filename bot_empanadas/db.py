@@ -1861,7 +1861,7 @@ def obtener_pedidos(estado=None, fecha=None):
             conn.close()
 
 
-def confirmar_entrega_pedido(pedido_id, codigo_entrega=None, actor_usuario=None, rol_actor=None):
+def confirmar_entrega_pedido(pedido_id, codigo_entrega=None, numero_confirmacion_pago=None, actor_usuario=None, rol_actor=None):
     conn = None
     try:
         conn = get_connection()
@@ -1878,7 +1878,7 @@ def confirmar_entrega_pedido(pedido_id, codigo_entrega=None, actor_usuario=None,
             if has_codigo:
                 cur.execute(
                     """
-                    SELECT pedido_id, estado, codigo_entrega
+                    SELECT pedido_id, estado, codigo_entrega, COALESCE(metodo_pago, 'efectivo') AS metodo_pago, total
                     FROM pedidos
                     WHERE pedido_id = %s
                     LIMIT 1
@@ -1888,7 +1888,7 @@ def confirmar_entrega_pedido(pedido_id, codigo_entrega=None, actor_usuario=None,
             else:
                 cur.execute(
                     """
-                    SELECT pedido_id, estado
+                    SELECT pedido_id, estado, COALESCE(metodo_pago, 'efectivo') AS metodo_pago, total
                     FROM pedidos
                     WHERE pedido_id = %s
                     LIMIT 1
@@ -1917,6 +1917,67 @@ def confirmar_entrega_pedido(pedido_id, codigo_entrega=None, actor_usuario=None,
 
             if codigo_db != codigo_in:
                 return {"error": "Codigo de entrega incorrecto."}
+
+            metodo_pago = (row.get("metodo_pago") or "efectivo").strip().lower()
+            metodo_pago_contra = metodo_pago in {"contra_entrega_ficticio", "contra_entrega", "pago_entrega_ficticio"}
+            confirmacion_pago = None
+
+            # En pago contra entrega (demo), exigimos folio de confirmacion antes de liberar.
+            if metodo_pago_contra:
+                confirmacion_pago = (numero_confirmacion_pago or "").strip().upper()
+                # Conservamos compatibilidad retro pasando el folio por codigo_entrega cuando venga con prefijo.
+                # El API envia este dato en el campo dedicado, pero este fallback evita ruptura de clientes viejos.
+                if codigo_in.startswith("PAY-"):
+                    confirmacion_pago = codigo_in
+
+                if not confirmacion_pago:
+                    return {"error": "Debes registrar numero de confirmacion de pago para liberar el pedido contra entrega."}
+
+                monto = float(row.get("total") or 0)
+                cur.execute(
+                    """
+                    SELECT pago_id
+                    FROM pagos
+                    WHERE pedido_id = %s
+                    ORDER BY pago_id DESC
+                    LIMIT 1
+                    """,
+                    (pedido_id,),
+                )
+                pago = cur.fetchone()
+
+                if pago and pago.get("pago_id"):
+                    cur.execute(
+                        """
+                        UPDATE pagos
+                        SET
+                            monto = %s,
+                            proveedor = 'contra_entrega_ficticio',
+                            estado = 'pagado',
+                            mp_payment_id = %s,
+                            mp_status_detail = 'pago confirmado al entregar (demo)',
+                            actualizado_en = NOW()
+                        WHERE pago_id = %s
+                        """,
+                        (monto, confirmacion_pago, pago.get("pago_id")),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO pagos (
+                            pedido_id,
+                            monto,
+                            proveedor,
+                            estado,
+                            mp_payment_id,
+                            mp_status_detail,
+                            creado_en,
+                            actualizado_en
+                        )
+                        VALUES (%s, %s, 'contra_entrega_ficticio', 'pagado', %s, 'pago confirmado al entregar (demo)', NOW(), NOW())
+                        """,
+                        (pedido_id, monto, confirmacion_pago),
+                    )
 
             cur.execute(
                 """
@@ -1951,6 +2012,8 @@ def confirmar_entrega_pedido(pedido_id, codigo_entrega=None, actor_usuario=None,
                 (pedido_id,),
             )
             conn.commit()
+            if confirmacion_pago:
+                updated["confirmacion_pago"] = confirmacion_pago
             return updated
     except Exception as exc:
         if conn:
@@ -2150,6 +2213,7 @@ def obtener_pedidos_repartidor(repartidor_usuario=None, area_entrega=None):
                 p.pedido_id,
                 p.estado,
                 p.total,
+                COALESCE(p.metodo_pago, 'efectivo') AS metodo_pago,
                 p.creado_en,
                 c.nombre,
                 c.apellidos,
@@ -2176,7 +2240,7 @@ def obtener_pedidos_repartidor(repartidor_usuario=None, area_entrega=None):
             LEFT JOIN asignaciones_reparto ar ON ar.pedido_id = p.pedido_id AND ar.activo = TRUE
             WHERE p.estado IN (%s, %s)
             {where_assignment}
-            GROUP BY p.pedido_id, p.estado, p.total, p.creado_en, c.nombre, c.apellidos, c.whatsapp_id, dc.direccion_texto, dc.alias, dc.codigo_postal, ar.repartidor_usuario
+            GROUP BY p.pedido_id, p.estado, p.total, p.metodo_pago, p.creado_en, c.nombre, c.apellidos, c.whatsapp_id, dc.direccion_texto, dc.alias, dc.codigo_postal, ar.repartidor_usuario
             ORDER BY p.creado_en ASC
         """
 
@@ -3641,6 +3705,197 @@ def crear_campania(nombre, mensaje, segmento="general", creada_por=None):
                 RETURNING campana_id, nombre, mensaje, segmento, creada_por, creado_en
                 """,
                 (nombre, mensaje, segmento, creada_por),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def _asegurar_tabla_envios_campana(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS campanas_envios (
+                envio_id BIGSERIAL PRIMARY KEY,
+                campana_id BIGINT NOT NULL REFERENCES campanas(campana_id) ON DELETE CASCADE,
+                cliente_id BIGINT,
+                whatsapp_id VARCHAR(50) NOT NULL,
+                estado VARCHAR(20) NOT NULL,
+                error TEXT,
+                enviado_en TIMESTAMP NOT NULL DEFAULT NOW(),
+                CONSTRAINT chk_campanas_envios_estado CHECK (estado IN ('enviado', 'fallido'))
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_campanas_envios_campana
+                ON campanas_envios (campana_id, estado)
+            """
+        )
+
+
+def obtener_campanias(limit=100):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_envios_campana(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                WITH resumen AS (
+                    SELECT
+                        campana_id,
+                        COUNT(*) FILTER (WHERE estado = 'enviado')::INT AS mensajes_enviados,
+                        COUNT(*) FILTER (WHERE estado = 'fallido')::INT AS mensajes_fallidos,
+                        COUNT(*)::INT AS total_intentos
+                    FROM campanas_envios
+                    GROUP BY campana_id
+                )
+                SELECT
+                    c.campana_id,
+                    c.nombre,
+                    c.segmento,
+                    c.creada_por,
+                    c.creado_en,
+                    COALESCE(r.mensajes_enviados, 0)::INT AS mensajes_enviados,
+                    COALESCE(r.mensajes_fallidos, 0)::INT AS mensajes_fallidos,
+                    COALESCE(r.total_intentos, 0)::INT AS total_intentos
+                FROM campanas c
+                LEFT JOIN resumen r ON r.campana_id = c.campana_id
+                ORDER BY c.creado_en DESC
+                LIMIT %s
+                """,
+                (int(limit),),
+            )
+            return cur.fetchall()
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def _build_segmento_where(filtro):
+    filtro_normalizado = (filtro or "todos").strip().lower()
+
+    if filtro_normalizado in {"", "todos", "general"}:
+        return "TRUE", []
+
+    if filtro_normalizado in {"mujeres", "mujer"}:
+        return "LOWER(COALESCE(c.genero_trato, 'neutro')) = 'mujer'", []
+
+    if filtro_normalizado in {"hombres", "hombre"}:
+        return "LOWER(COALESCE(c.genero_trato, 'neutro')) = 'hombre'", []
+
+    if filtro_normalizado == "top":
+        return "COALESCE(st.total_pedidos, 0) > 0", []
+
+    if filtro_normalizado == "inactivos_30d":
+        return "(st.ultima_compra IS NULL OR st.ultima_compra < NOW() - INTERVAL '30 days')", []
+
+    return "TRUE", []
+
+
+def contar_clientes_para_campania(filtro="todos"):
+    conn = None
+    try:
+        conn = get_connection()
+        where_sql, params = _build_segmento_where(filtro)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                WITH stats AS (
+                    SELECT
+                        p.cliente_id,
+                        COUNT(*) FILTER (WHERE p.estado <> 'cancelado')::INT AS total_pedidos,
+                        MAX(p.creado_en) FILTER (WHERE p.estado <> 'cancelado') AS ultima_compra
+                    FROM pedidos p
+                    GROUP BY p.cliente_id
+                )
+                SELECT COUNT(*)::INT AS total
+                FROM clientes c
+                LEFT JOIN stats st ON st.cliente_id = c.cliente_id
+                WHERE COALESCE(NULLIF(TRIM(c.whatsapp_id), ''), '') <> ''
+                  AND ({where_sql})
+                """,
+                tuple(params),
+            )
+            row = cur.fetchone() or {}
+            return {"count": int(row.get("total") or 0), "filtro": (filtro or "todos")}
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_clientes_para_campania(filtro="todos"):
+    conn = None
+    try:
+        conn = get_connection()
+        where_sql, params = _build_segmento_where(filtro)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                WITH stats AS (
+                    SELECT
+                        p.cliente_id,
+                        COUNT(*) FILTER (WHERE p.estado <> 'cancelado')::INT AS total_pedidos,
+                        MAX(p.creado_en) FILTER (WHERE p.estado <> 'cancelado') AS ultima_compra
+                    FROM pedidos p
+                    GROUP BY p.cliente_id
+                )
+                SELECT
+                    c.cliente_id,
+                    c.whatsapp_id,
+                    c.nombre,
+                    c.apellidos,
+                    COALESCE(c.genero_trato, 'neutro') AS genero_trato,
+                    COALESCE(st.total_pedidos, 0)::INT AS total_pedidos,
+                    st.ultima_compra
+                FROM clientes c
+                LEFT JOIN stats st ON st.cliente_id = c.cliente_id
+                WHERE COALESCE(NULLIF(TRIM(c.whatsapp_id), ''), '') <> ''
+                  AND ({where_sql})
+                ORDER BY COALESCE(st.total_pedidos, 0) DESC, st.ultima_compra DESC NULLS LAST, c.cliente_id DESC
+                """,
+                tuple(params),
+            )
+            return cur.fetchall()
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def registrar_envio_campana(campana_id, cliente_id, whatsapp_id, enviado, error=None):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_envios_campana(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO campanas_envios (campana_id, cliente_id, whatsapp_id, estado, error)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING envio_id, campana_id, cliente_id, whatsapp_id, estado, error, enviado_en
+                """,
+                (
+                    int(campana_id),
+                    int(cliente_id) if cliente_id is not None else None,
+                    str(whatsapp_id),
+                    "enviado" if bool(enviado) else "fallido",
+                    (str(error) if error else None),
+                ),
             )
             row = cur.fetchone()
             conn.commit()

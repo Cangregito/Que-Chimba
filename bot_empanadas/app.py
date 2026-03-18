@@ -703,6 +703,7 @@ def api_repartidor_pedidos():
             {
                 "pedido_id": row.get("pedido_id"),
                 "estado": row.get("estado"),
+                "metodo_pago": row.get("metodo_pago") or "efectivo",
                 "cliente_nombre": " ".join(
                     [part for part in [row.get("nombre"), row.get("apellidos")] if part]
                 ).strip()
@@ -722,11 +723,13 @@ def api_repartidor_pedidos():
 def api_confirmar_entrega_pedido(pedido_id):
     payload = request.get_json(silent=True) or {}
     codigo_entrega = payload.get("codigo_entrega")
+    numero_confirmacion_pago = payload.get("numero_confirmacion_pago")
     actor = session.get("user", {})
 
     updated = db.confirmar_entrega_pedido(
         pedido_id=pedido_id,
         codigo_entrega=codigo_entrega,
+        numero_confirmacion_pago=numero_confirmacion_pago,
         actor_usuario=actor.get("username"),
         rol_actor=actor.get("rol"),
     )
@@ -744,10 +747,15 @@ def api_confirmar_entrega_pedido(pedido_id):
     destino_data = db.obtener_destino_whatsapp_por_pedido(pedido_id=pedido_id)
     if isinstance(destino_data, dict) and not destino_data.get("error"):
         destino = _normalizar_whatsapp_id(destino_data.get("whatsapp_id"))
+        confirmacion_pago = (response_data.get("confirmacion_pago") or "").strip()
         mensaje = (
             f"Muchisimas gracias por tu compra, parce. Confirmamos que tu pedido #{pedido_id} "
             "ya fue entregado. Que lo disfrutes."
         )
+        if confirmacion_pago:
+            mensaje = (
+                f"{mensaje} Confirmacion de pago: {confirmacion_pago}."
+            )
         enviado = _enviar_texto_whatsapp(destino=destino, texto=mensaje)
 
         if isinstance(enviado, dict) and enviado.get("error"):
@@ -1481,7 +1489,88 @@ def api_campanias():
     )
     if isinstance(creada, dict) and creada.get("error"):
         return _error(creada["error"], 500)
-    return _ok(creada, 201)
+
+    clientes = db.obtener_clientes_para_campania(filtro=segmento)
+    if isinstance(clientes, dict) and clientes.get("error"):
+        return _error(clientes["error"], 500)
+
+    lista_clientes = clientes if isinstance(clientes, list) else []
+    enviados = 0
+    fallidos = 0
+
+    for cliente in lista_clientes:
+        if not isinstance(cliente, dict):
+            continue
+
+        destino = _normalizar_whatsapp_id(cliente.get("whatsapp_id"))
+        if not destino:
+            fallidos += 1
+            db.registrar_envio_campana(
+                campana_id=creada.get("campana_id"),
+                cliente_id=cliente.get("cliente_id"),
+                whatsapp_id="",
+                enviado=False,
+                error="Cliente sin whatsapp_id valido",
+            )
+            continue
+
+        envio = _enviar_texto_whatsapp(destino=destino, texto=mensaje)
+        if isinstance(envio, dict) and envio.get("error"):
+            fallidos += 1
+            db.registrar_envio_campana(
+                campana_id=creada.get("campana_id"),
+                cliente_id=cliente.get("cliente_id"),
+                whatsapp_id=destino,
+                enviado=False,
+                error=envio.get("error"),
+            )
+            continue
+
+        enviados += 1
+        db.registrar_envio_campana(
+            campana_id=creada.get("campana_id"),
+            cliente_id=cliente.get("cliente_id"),
+            whatsapp_id=destino,
+            enviado=True,
+            error=None,
+        )
+
+    respuesta = dict(creada)
+    respuesta["total_destinatarios"] = len(lista_clientes)
+    respuesta["mensajes_enviados"] = enviados
+    respuesta["mensajes_fallidos"] = fallidos
+    return _ok(respuesta, 201)
+
+
+@app.get("/api/campanias")
+@login_required(roles=["admin"])
+def api_campanias_historial():
+    limit_raw = request.args.get("limit", "80")
+    try:
+        limit = max(1, min(500, int(limit_raw)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_campanias(limit=limit)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/campanias/historial")
+@login_required(roles=["admin"])
+def api_campanias_historial_alias():
+    return api_campanias_historial()
+
+
+@app.get("/api/clientes/count")
+@login_required(roles=["admin"])
+def api_clientes_count():
+    filtro = (request.args.get("filtro") or "todos").strip().lower()
+    data = db.contar_clientes_para_campania(filtro=filtro)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
 
 
 @app.get("/api/empleados")

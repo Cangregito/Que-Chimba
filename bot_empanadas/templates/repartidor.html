@@ -257,6 +257,10 @@
       gap: 6px;
     }
 
+    .confirm-row.two-inputs {
+      grid-template-columns: 1fr 1fr auto auto;
+    }
+
     .confirm-row input {
       width: 100%;
       border: 0.5px solid var(--line);
@@ -264,6 +268,12 @@
       background: #FFFFFF;
       padding: 8px;
       text-transform: uppercase;
+    }
+
+    .small-note {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-3);
     }
 
     .route-card {
@@ -447,6 +457,7 @@
         const direccion = p.direccion_entrega ?? p.direccion ?? p.direccion_texto ?? "Sin direccion";
         const cliente = p.cliente_nombre ?? p.nombre_cliente ?? p.cliente ?? "Cliente";
         const cp = p.codigo_postal ?? p.cp ?? p.postal_code ?? "00000";
+        const metodoPago = p.metodo_pago ?? "efectivo";
 
         let productos = p.productos;
         if (Array.isArray(productos)) {
@@ -464,8 +475,16 @@
           direccion: toText(direccion, "Sin direccion"),
           cliente: toText(cliente, "Cliente"),
           cp: toText(cp, "00000"),
+          metodoPago: toText(metodoPago, "efectivo"),
           productos: toText(productos, "Sin detalle de productos")
         };
+      }
+
+      function pagoLabel(metodoPago) {
+        const m = String(metodoPago || "").toLowerCase();
+        if (m === "mercadopago") return "Tarjeta / MercadoPago";
+        if (m === "contra_entrega_ficticio") return "Contra entrega (ficticio)";
+        return "Efectivo";
       }
 
       function onlyListos(pedidos) {
@@ -558,6 +577,7 @@
               "<div class='grid'>" +
                 "<div><span>Cliente:</span> <strong>" + esc(pedido.cliente) + "</strong></div>" +
                 "<div><span>CP:</span> <strong>" + esc(pedido.cp) + "</strong></div>" +
+                "<div><span>Pago:</span> <strong>" + esc(pagoLabel(pedido.metodoPago)) + "</strong></div>" +
                 "<div style='grid-column:1 / -1;'><span>Direccion:</span> <strong>" + esc(pedido.direccion) + "</strong></div>" +
               "</div>" +
 
@@ -571,11 +591,17 @@
 
               "<div class='confirm-box' id='" + boxId + "'>" +
                 "<label for='" + inputId + "'>Ingresa el codigo del cliente:</label>" +
-                "<div class='confirm-row'>" +
+                "<div class='confirm-row " + (pedido.metodoPago === "contra_entrega_ficticio" ? "two-inputs" : "") + "'>" +
                   "<input id='" + inputId + "' type='text' maxlength='12' autocomplete='off' placeholder='Ej: 483920' />" +
+                  (pedido.metodoPago === "contra_entrega_ficticio"
+                    ? "<input id='pay-" + Number(pedido.id) + "' type='text' maxlength='30' autocomplete='off' placeholder='Confirmacion pago (ej. PAY-000123)' />"
+                    : "") +
                   "<button class='btn primary' type='button' onclick='confirmarEntrega(" + Number(pedido.id) + ")'>Enviar</button>" +
                   "<button class='btn' type='button' onclick='closeConfirm(" + Number(pedido.id) + ")'>Cancelar</button>" +
                 "</div>" +
+                (pedido.metodoPago === "contra_entrega_ficticio"
+                  ? "<div class='small-note'>Primero confirma el pago al entregar y luego libera el pedido.</div>"
+                  : "") +
               "</div>" +
             "</article>"
           );
@@ -618,8 +644,16 @@
         hideMessages();
         const input = document.getElementById("codigo-" + pedidoId);
         const codigo = input && input.value ? input.value.trim() : "";
+        const pedido = allPedidos.find((p) => Number(p.id) === Number(pedidoId));
+        const metodoPago = pedido ? String(pedido.metodoPago || "").toLowerCase() : "efectivo";
+        const pagoInput = document.getElementById("pay-" + pedidoId);
+        const numeroConfirmacionPago = pagoInput && pagoInput.value ? pagoInput.value.trim().toUpperCase() : "";
         if (!codigo) {
           showError("Debes ingresar el codigo del cliente para confirmar la entrega.");
+          return;
+        }
+        if (metodoPago === "contra_entrega_ficticio" && !numeroConfirmacionPago) {
+          showError("Debes capturar el numero de confirmacion de pago para liberar este pedido.");
           return;
         }
 
@@ -628,7 +662,10 @@
             method: "POST",
             credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ codigo_entrega: codigo })
+            body: JSON.stringify({
+              codigo_entrega: codigo,
+              numero_confirmacion_pago: numeroConfirmacionPago || null
+            })
           });
 
           if (confirmRes.redirected && confirmRes.url) {
@@ -645,7 +682,12 @@
             return;
           }
 
-          showSuccess("Entrega confirmada correctamente. Pedido marcado como entregado.");
+          const data = confirmPayload && confirmPayload.data ? confirmPayload.data : {};
+          if (data && data.confirmacion_pago) {
+            showSuccess("Pago confirmado (" + data.confirmacion_pago + ") y entrega liberada correctamente.");
+          } else {
+            showSuccess("Entrega confirmada correctamente. Pedido marcado como entregado.");
+          }
 
           try {
             await fetch("/api/evaluaciones/programar", {

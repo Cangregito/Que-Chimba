@@ -644,7 +644,7 @@
         <button class="nav-item active" data-section="ventas" type="button"><span class="dot blue"></span>Ventas</button>
         <button class="nav-item" data-section="operacion" type="button"><span class="dot green"></span>Operacion DB</button>
         <button class="nav-item" data-section="seguridad" type="button"><span class="dot red"></span>Seguridad</button>
-        <button class="nav-item" data-section="campanas" type="button"><span class="dot amber"></span>Campanas</button>
+        <button class="nav-item" data-section="campanas" type="button"><span class="dot amber"></span>Campañas</button>
         <button class="nav-item" data-section="inventario" type="button"><span class="dot darkgreen"></span>Inventario</button>
       </nav>
 
@@ -959,7 +959,7 @@
 
         <section class="section" id="section-campanas">
           <article class="card">
-            <div class="card-head"><h3>Nueva campana</h3></div>
+            <div class="card-head"><h3>Nueva campaña</h3></div>
             <div class="field" style="margin-bottom:10px;">
               <label>Segmento</label>
               <div class="pill-group" id="campana-segmentos">
@@ -979,7 +979,7 @@
                 <div class="small" id="campana-char-count">0/1000</div>
               </div>
               <div class="field full" style="display:flex; gap:8px; align-items:center;">
-                <button class="btn primary" type="submit">Enviar campana por WhatsApp</button>
+                <button class="btn primary" type="submit">Enviar campaña por WhatsApp</button>
                 <div class="small" id="campana-status">Listo para enviar.</div>
               </div>
             </form>
@@ -988,7 +988,7 @@
           </article>
 
           <article class="card">
-            <div class="card-head"><h3>Historial de campanas</h3></div>
+            <div class="card-head"><h3>Historial de campañas</h3></div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -1066,6 +1066,9 @@
               <div class="field"><label for="receta-producto">Producto</label><select id="receta-producto" required></select></div>
               <div class="field"><label for="receta-insumo">Insumo</label><select id="receta-insumo" required></select></div>
               <div class="field"><label for="receta-cantidad">Cantidad por unidad</label><input id="receta-cantidad" type="number" min="0" step="0.001" required /></div>
+              <div class="field full" id="receta-componentes-extra"></div>
+              <div class="field"><button id="btn-receta-add-comp" class="btn" type="button">Agregar ingrediente</button></div>
+              <div class="field"><button id="btn-receta-template" class="btn" type="button">Plantilla rapida</button></div>
               <div class="field"><label for="receta-activo">Estado</label><select id="receta-activo"><option value="1">activo</option><option value="0">inactivo</option></select></div>
               <div class="field" style="align-self:end;"><button class="btn primary full" type="submit">Guardar receta</button></div>
             </form>
@@ -1194,7 +1197,7 @@
           subtitle: "Usuarios, accesos y bitacoras de auditoria."
         },
         campanas: {
-          title: "Campanas",
+          title: "Campañas",
           subtitle: "Segmentacion y envios por WhatsApp."
         },
         inventario: {
@@ -1248,6 +1251,14 @@
           .replaceAll("'", "&#039;");
       }
 
+      function normalizeText(value) {
+        return String(value || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim();
+      }
+
       async function api(path, options) {
         const cfg = Object.assign({ credentials: "same-origin" }, options || {});
         if (cfg.body && typeof cfg.body !== "string") {
@@ -1263,14 +1274,17 @@
 
         const contentType = (res.headers.get("content-type") || "").toLowerCase();
         if (!contentType.includes("application/json")) {
-          if (contentType.includes("text/html")) {
+          if (contentType.includes("text/html") && (res.status === 401 || res.status === 403)) {
             window.location.href = "/login";
           }
-          throw new Error("Respuesta no valida del servidor");
+          throw new Error("Respuesta no valida del servidor (" + res.status + ")");
         }
 
         const payload = await res.json().catch(() => ({}));
         if (!res.ok || payload.ok === false) {
+          if (res.status === 401 || res.status === 403) {
+            window.location.href = "/login";
+          }
           throw new Error(payload.error || "No se pudo completar la operacion.");
         }
         return Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;
@@ -1828,12 +1842,12 @@
             const rows = await api(endpoint);
             const list = Array.isArray(rows) ? rows : [];
             if (!list.length) {
-              tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin campanas registradas.</td></tr>";
+              tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin campañas registradas.</td></tr>";
               return;
             }
             tb.innerHTML = list.map((r) => (
               "<tr>" +
-                "<td>" + html(r.nombre || "Campana") + "</td>" +
+                "<td>" + html(r.nombre || "Campaña") + "</td>" +
                 "<td>" + html(r.segmento || "-") + "</td>" +
                 "<td>" + num(r.mensajes_enviados || r.total_enviados || 0) + "</td>" +
                 "<td>" + html(dateTime(r.creado_en || r.fecha)) + "</td>" +
@@ -1844,7 +1858,7 @@
           } catch (_e) {
           }
         }
-        tb.innerHTML = "<tr><td colspan='5' class='muted'>El historial no esta disponible por ahora. Las nuevas campanas si se guardan y se envian.</td></tr>";
+        tb.innerHTML = "<tr><td colspan='5' class='muted'>El historial no esta disponible por ahora. Las nuevas campañas sí se guardan y se envian.</td></tr>";
       }
 
       async function updateSegmentCount() {
@@ -1904,6 +1918,107 @@
           const sel = qs(id);
           if (sel) sel.innerHTML = options;
         });
+        document.querySelectorAll(".receta-insumo-extra").forEach((sel) => {
+          const prev = sel.value;
+          sel.innerHTML = options;
+          if (prev) sel.value = prev;
+        });
+      }
+
+      function recipeExtraRowTemplate(selectedInsumoId = "", cantidad = "") {
+        const options = (state.inventoryCache || []).map((r) => (
+          "<option value='" + Number(r.insumo_id) + "'" + (String(Number(r.insumo_id)) === String(selectedInsumoId) ? " selected" : "") + ">" + html(r.nombre) + "</option>"
+        )).join("");
+        return (
+          "<div class='form-grid cols-3 receta-extra-row' style='margin-top:8px;'>" +
+            "<div class='field'><label>Insumo adicional</label><select class='receta-insumo-extra' required>" + options + "</select></div>" +
+            "<div class='field'><label>Cantidad por unidad</label><input class='receta-cantidad-extra' type='number' min='0' step='0.001' value='" + html(String(cantidad || "")) + "' required /></div>" +
+            "<div class='field' style='align-self:end;'><button class='btn btn-receta-remove-comp' type='button'>Quitar</button></div>" +
+          "</div>"
+        );
+      }
+
+      function addRecipeExtraRow(selectedInsumoId = "", cantidad = "") {
+        const box = qs("receta-componentes-extra");
+        if (!box) return;
+        box.insertAdjacentHTML("beforeend", recipeExtraRowTemplate(selectedInsumoId, cantidad));
+      }
+
+      function findInsumoByAliases(aliases) {
+        const list = Array.isArray(state.inventoryCache) ? state.inventoryCache : [];
+        const normalizedAliases = (aliases || []).map((a) => normalizeText(a)).filter(Boolean);
+        for (const row of list) {
+          const nameNorm = normalizeText(row && row.nombre);
+          if (!nameNorm) continue;
+          if (normalizedAliases.some((alias) => nameNorm.includes(alias))) {
+            return row;
+          }
+        }
+        return null;
+      }
+
+      function applyQuickRecipeTemplate() {
+        const productSel = qs("receta-producto");
+        if (!productSel || !productSel.value) {
+          toast("Selecciona un producto primero.", "error");
+          return;
+        }
+
+        const productText = productSel.options[productSel.selectedIndex]
+          ? productSel.options[productSel.selectedIndex].textContent
+          : "";
+        const productNorm = normalizeText(productText);
+
+        let relleno = { aliases: ["carne molida", "carne"], qty: 0.07, label: "carne" };
+        if (productNorm.includes("pollo")) {
+          relleno = { aliases: ["pollo deshebrado", "pechuga de pollo", "pollo"], qty: 0.07, label: "pollo" };
+        } else if (productNorm.includes("queso")) {
+          relleno = { aliases: ["queso"], qty: 0.06, label: "queso" };
+        }
+
+        const plantilla = [
+          { aliases: ["masa de maiz", "harina de maiz", "masa"], qty: 0.08, label: "masa" },
+          relleno,
+          { aliases: ["cebolla"], qty: 0.008, label: "cebolla" },
+          { aliases: ["tomate"], qty: 0.008, label: "tomate" },
+          { aliases: ["ajo"], qty: 0.002, label: "ajo" },
+          { aliases: ["sal"], qty: 0.002, label: "sal" }
+        ];
+
+        const encontrados = [];
+        const faltantes = [];
+        plantilla.forEach((item) => {
+          const row = findInsumoByAliases(item.aliases);
+          if (row && row.insumo_id) {
+            encontrados.push({ insumo_id: Number(row.insumo_id), qty: item.qty });
+          } else {
+            faltantes.push(item.label);
+          }
+        });
+
+        if (!encontrados.length) {
+          toast("No se encontraron insumos para la plantilla rapida.", "error");
+          return;
+        }
+
+        const unique = new Map();
+        encontrados.forEach((comp) => {
+          const key = String(comp.insumo_id);
+          const prev = Number(unique.get(key) || 0);
+          unique.set(key, prev + Number(comp.qty));
+        });
+        const list = Array.from(unique.entries()).map(([insumoId, qty]) => ({ insumo_id: Number(insumoId), qty }));
+
+        qs("receta-insumo").value = String(list[0].insumo_id);
+        qs("receta-cantidad").value = String(list[0].qty);
+        qs("receta-componentes-extra").innerHTML = "";
+        list.slice(1).forEach((comp) => addRecipeExtraRow(String(comp.insumo_id), String(comp.qty)));
+
+        if (faltantes.length) {
+          toast("Plantilla aplicada parcialmente. Faltan insumos: " + faltantes.join(", ") + ".", "warn");
+          return;
+        }
+        toast("Plantilla rapida aplicada.", "success");
       }
 
       async function loadProductosAdmin() {
@@ -2408,14 +2523,14 @@
           event.preventDefault();
           const mensaje = qs("campana-mensaje").value.trim();
           if (!mensaje) {
-            toast("Escribe un mensaje para la campana.", "error");
+            toast("Escribe un mensaje para la campaña.", "error");
             return;
           }
 
           const progress = qs("campana-progress");
           const status = qs("campana-status");
           progress.style.width = "0%";
-          status.textContent = "Enviando campana...";
+          status.textContent = "Enviando campaña...";
           let current = 0;
           clearInterval(state.campanaProgressTimer);
           state.campanaProgressTimer = setInterval(() => {
@@ -2434,16 +2549,16 @@
             });
             clearInterval(state.campanaProgressTimer);
             progress.style.width = "100%";
-            status.textContent = "Campana enviada correctamente.";
-            toast("Campana enviada.", "success");
+            status.textContent = "Campaña enviada correctamente.";
+            toast("Campaña enviada.", "success");
             event.target.reset();
             qs("campana-char-count").textContent = "0/1000";
             await loadCampanas();
           } catch (_e) {
             clearInterval(state.campanaProgressTimer);
             progress.style.width = "0%";
-            status.textContent = "No se pudo enviar la campana. Intenta de nuevo.";
-            toast("No se pudo enviar campana.", "error");
+            status.textContent = "No se pudo enviar la campaña. Intenta de nuevo.";
+            toast("No se pudo enviar campaña.", "error");
           }
         });
 
@@ -2499,25 +2614,75 @@
 
         qs("form-receta").addEventListener("submit", async (event) => {
           event.preventDefault();
+          const componentes = [];
+          const baseInsumoId = Number(qs("receta-insumo").value);
+          const baseCantidad = Number(qs("receta-cantidad").value || 0);
+          if (baseInsumoId > 0 && baseCantidad > 0) {
+            componentes.push({ insumo_id: baseInsumoId, cantidad_por_unidad: baseCantidad });
+          }
+
+          document.querySelectorAll(".receta-extra-row").forEach((row) => {
+            const insumoSel = row.querySelector(".receta-insumo-extra");
+            const qtyInput = row.querySelector(".receta-cantidad-extra");
+            const iid = Number(insumoSel && insumoSel.value);
+            const qty = Number(qtyInput && qtyInput.value || 0);
+            if (iid > 0 && qty > 0) {
+              componentes.push({ insumo_id: iid, cantidad_por_unidad: qty });
+            }
+          });
+
+          if (!componentes.length) {
+            toast("Agrega al menos un ingrediente valido.", "error");
+            return;
+          }
+
+          const agregados = new Map();
+          componentes.forEach((comp) => {
+            const key = String(comp.insumo_id);
+            const prev = Number(agregados.get(key) || 0);
+            agregados.set(key, prev + Number(comp.cantidad_por_unidad));
+          });
+
+          const payloads = Array.from(agregados.entries()).map(([insumoId, qty]) => ({
+            producto_id: Number(qs("receta-producto").value),
+            insumo_id: Number(insumoId),
+            cantidad_por_unidad: qty,
+            activo: qs("receta-activo").value === "1"
+          }));
+
           try {
-            await api("/api/admin/recetas-producto", {
-              method: "POST",
-              body: {
-                producto_id: Number(qs("receta-producto").value),
-                insumo_id: Number(qs("receta-insumo").value),
-                cantidad_por_unidad: Number(qs("receta-cantidad").value || 0),
-                activo: qs("receta-activo").value === "1"
-              }
-            });
+            for (const body of payloads) {
+              await api("/api/admin/recetas-producto", {
+                method: "POST",
+                body
+              });
+            }
             await Promise.allSettled([
               loadRecetas(),
               loadMovimientos(),
               loadProductosSinReceta()
             ]);
-            toast("Receta guardada.", "success");
+            qs("receta-cantidad").value = "";
+            qs("receta-componentes-extra").innerHTML = "";
+            toast("Receta guardada con " + payloads.length + " ingrediente(s).", "success");
           } catch (_e) {
             toast("No se pudo guardar receta.", "error");
           }
+        });
+
+        qs("btn-receta-add-comp").addEventListener("click", () => {
+          addRecipeExtraRow();
+        });
+
+        qs("btn-receta-template").addEventListener("click", () => {
+          applyQuickRecipeTemplate();
+        });
+
+        qs("receta-componentes-extra").addEventListener("click", (event) => {
+          const btn = event.target.closest(".btn-receta-remove-comp");
+          if (!btn) return;
+          const row = btn.closest(".receta-extra-row");
+          if (row) row.remove();
         });
 
         qs("btn-abrir-compra").addEventListener("click", () => {

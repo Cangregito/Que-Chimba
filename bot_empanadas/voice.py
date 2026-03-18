@@ -150,13 +150,23 @@ _TTS_ELEVENLABS_SIMILARITY = _parse_float_env("ELEVENLABS_SIMILARITY", 0.85)
 _TTS_ELEVENLABS_STYLE = _parse_float_env("ELEVENLABS_STYLE", 0.2)
 _TTS_ELEVENLABS_SPEAKER_BOOST = (os.getenv("ELEVENLABS_SPEAKER_BOOST", "1") or "1").strip().lower() in {"1", "true", "yes", "on"}
 
+
+def _mask_voice_id(voice_id: str) -> str:
+    value = (voice_id or "").strip()
+    if not value:
+        return "(vacio)"
+    if len(value) <= 6:
+        return "*" * len(value)
+    return ("*" * (len(value) - 6)) + value[-6:]
+
 logger.info(
-    "TTS config cargada: provider=%s lang=%s tld=%s edge_voice=%s eleven_voice_set=%s",
+    "TTS config cargada: provider=%s lang=%s tld=%s edge_voice=%s eleven_voice_set=%s eleven_voice_id=%s",
     _TTS_PROVIDER,
     _TTS_GTTS_LANG,
     _TTS_GTTS_TLD,
     _TTS_EDGE_VOICE,
     bool(_TTS_ELEVENLABS_VOICE_ID),
+    _mask_voice_id(_TTS_ELEVENLABS_VOICE_ID),
 )
 
 
@@ -438,6 +448,12 @@ def _generar_audio_desde_texto(texto: str) -> str:
             sintetizado = _sintetizar_elevenlabs(texto, mp3_path)
             if sintetizado:
                 proveedor_usado = "elevenlabs"
+
+        if provider == "elevenlabs" and not sintetizado:
+            raise RuntimeError(
+                "TTS_PROVIDER=elevenlabs requiere sintesis exitosa con ELEVENLABS_VOICE_ID; "
+                "no se permite fallback a edge/gTTS en este modo."
+            )
 
         if not sintetizado and provider in {"auto", "edge", "elevenlabs"}:
             sintetizado = _sintetizar_edge_tts(texto, mp3_path)

@@ -49,14 +49,61 @@
       font-size: 0.95rem;
     }
 
-    .hint {
-      margin: 0 0 14px;
-      padding: 10px 12px;
-      background: #fff4df;
-      border: 1px solid #f0dbb4;
-      border-radius: 10px;
+    .support {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid #e8dbc3;
+    }
+
+    .support h2 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      letter-spacing: -0.01em;
+    }
+
+    .support p {
+      margin: 0 0 10px;
       font-size: 0.9rem;
-      color: #5a4829;
+      color: #5a5a5a;
+    }
+
+    .support textarea {
+      width: 100%;
+      border: 1px solid #d2d2d2;
+      border-radius: 10px;
+      padding: 10px 12px;
+      min-height: 88px;
+      resize: vertical;
+      font: inherit;
+      background: #fff;
+    }
+
+    .support textarea:focus {
+      outline: 2px solid rgba(18, 112, 58, 0.25);
+      border-color: var(--brand);
+    }
+
+    .btn-support {
+      margin-top: 10px;
+      width: 100%;
+      border: 1px solid #0d5b2f;
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: #ffffff;
+      color: #0d5b2f;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-support:hover {
+      background: #f4fbf7;
+    }
+
+    .support-msg {
+      margin-top: 8px;
+      color: #5a5a5a;
+      font-size: 0.88rem;
+      min-height: 1.1rem;
     }
 
     label {
@@ -129,13 +176,14 @@
       animation: popIn 0.32s ease;
     }
 
-    .hint {
-      border-radius: 12px;
-      background: #fff6e3;
-    }
-
     input,
     button {
+      border-radius: 12px;
+      font-family: inherit;
+    }
+
+    .support textarea,
+    .btn-support {
       border-radius: 12px;
       font-family: inherit;
     }
@@ -186,11 +234,6 @@
     <h1>Ingresar al panel</h1>
     <p>Acceso con credenciales guardadas en PostgreSQL (hash seguro).</p>
 
-    <div class="hint">
-      Si es tu primera ejecucion, define las variables ADMIN_DEFAULT_PASSWORD,
-      COCINA_DEFAULT_PASSWORD y REPARTIDOR_DEFAULT_PASSWORD antes de iniciar el servidor.
-    </div>
-
     <form id="login-form">
       <label for="username">Usuario</label>
       <input id="username" name="username" autocomplete="username" required />
@@ -202,12 +245,31 @@
       <div id="error" class="error"></div>
     </form>
 
+    <section class="support" aria-labelledby="support-title">
+      <h2 id="support-title">Contacto con soporte</h2>
+      <p>Si tienes problemas de acceso, envia tu solicitud por WhatsApp con motivo y datos de contacto.</p>
+
+      <label for="support-motivo">Motivo</label>
+      <textarea id="support-motivo" name="support-motivo" placeholder="Ejemplo: No puedo ingresar al modulo de campanas." required></textarea>
+
+      <label for="support-contacto">Datos de contacto</label>
+      <input id="support-contacto" name="support-contacto" placeholder="Nombre completo, telefono y correo" required />
+
+      <button type="button" id="btn-support" class="btn-support">Contactar soporte por WhatsApp</button>
+      <div id="support-msg" class="support-msg"></div>
+    </section>
+
     <div class="back"><a href="/">Volver al inicio</a></div>
   </main>
 
   <script>
     const form = document.getElementById("login-form");
     const errorEl = document.getElementById("error");
+    const supportMsgEl = document.getElementById("support-msg");
+    const supportBtn = document.getElementById("btn-support");
+    const supportMotivoEl = document.getElementById("support-motivo");
+    const supportContactoEl = document.getElementById("support-contacto");
+    const supportPhone = "526567751166";
 
     const roleTarget = {
       admin: "/admin",
@@ -241,6 +303,28 @@
       } catch (err) {
         errorEl.textContent = err.message || "No se pudo iniciar sesion";
       }
+    });
+
+    supportBtn.addEventListener("click", () => {
+      const motivo = (supportMotivoEl.value || "").trim();
+      const contacto = (supportContactoEl.value || "").trim();
+
+      if (!motivo || !contacto) {
+        supportMsgEl.textContent = "Completa motivo y datos de contacto para continuar.";
+        return;
+      }
+
+      const now = new Date().toLocaleString("es-MX");
+      const mensaje =
+        "Hola, equipo de soporte de Que Chimba.%0A%0A" +
+        "Solicito apoyo con el acceso al panel.%0A" +
+        "Motivo: " + encodeURIComponent(motivo) + "%0A" +
+        "Datos de contacto: " + encodeURIComponent(contacto) + "%0A" +
+        "Fecha: " + encodeURIComponent(now);
+
+      const waUrl = "https://wa.me/" + supportPhone + "?text=" + mensaje;
+      supportMsgEl.textContent = "Abriendo WhatsApp para enviar tu solicitud de soporte...";
+      window.open(waUrl, "_blank", "noopener");
     });
   </script>
 </body>
