@@ -38,6 +38,7 @@ ESTADOS = {
 	"bienvenida",
 	"tipo_servicio",
 	"seleccion_producto",
+	"confirmar_carrito",
 	"datos_evento",
 	"cantidad",
 	"metodo_entrega",
@@ -50,6 +51,163 @@ ESTADOS = {
 	"evaluar_entrega",
 	"evaluar_producto",
 }
+
+
+def _extraer_items_menu_oficial(texto: str) -> Dict[str, Any]:
+	t = _normalizar_texto(texto)
+	items = []
+	try:
+		catalogo = list(_obtener_catalogo_productos())
+	except Exception:
+		catalogo = []
+
+	if not catalogo:
+		return {"items": [], "total": 0}
+
+	def _resolver_producto_por_alias(alias: str) -> Optional[Dict[str, Any]]:
+		k = _normalizar_texto(alias)
+		if not k:
+			return None
+		for p in catalogo:
+			blob = _normalizar_texto(f"{p.get('nombre', '')} {p.get('variante', '')}")
+			if k in blob:
+				return p
+		return None
+
+	producto_carne = _resolver_producto_por_alias("carne")
+	producto_pollo = _resolver_producto_por_alias("pollo")
+	producto_agua = _resolver_producto_por_alias("agua")
+	producto_refresco = _resolver_producto_por_alias("refresco")
+	producto_jugo = _resolver_producto_por_alias("jugo")
+
+	if not producto_carne and catalogo:
+		producto_carne = catalogo[0]
+	if not producto_pollo:
+		for p in catalogo:
+			if not producto_carne or p.get("producto_id") != producto_carne.get("producto_id"):
+				producto_pollo = p
+				break
+	if not producto_pollo:
+		producto_pollo = producto_carne
+
+	def _push_item(producto: Optional[Dict[str, Any]], cantidad: int):
+		if cantidad <= 0:
+			return
+		if not producto:
+			return
+		precio = _to_float(producto.get("precio"), 0)
+		items.append(
+			{
+				"producto_id": producto.get("producto_id"),
+				"nombre": producto.get("nombre", "Producto"),
+				"variante": producto.get("variante", ""),
+				"producto_nombre": f"{producto.get('nombre', '')} {producto.get('variante', '')}".strip(),
+				"cantidad": int(cantidad),
+				"precio_unit": float(precio),
+			}
+		)
+
+	if "de cada" in t and any(x in t for x in ["carne", "pollo"]):
+		m_total = re.search(r"\b(\d{1,3})\b", t)
+		if m_total:
+			total = int(m_total.group(1))
+			mitad = max(total // 2, 1)
+			resto = total - mitad
+			if "carne" in t:
+				_push_item(producto_carne, mitad)
+			if "pollo" in t:
+				_push_item(producto_pollo, max(resto, 1))
+
+	patrones = [
+		(r"(\d{1,3})\s*(?:de\s+)?carne", producto_carne),
+		(r"(\d{1,3})\s*(?:de\s+)?pollo", producto_pollo),
+		(r"(\d{1,3})\s*(?:de\s+)?agu(?:a|as)", producto_agua),
+		(r"(\d{1,3})\s*(?:de\s+)?refresco(?:s)?", producto_refresco),
+		(r"(\d{1,3})\s*(?:de\s+)?jugo(?:s)?", producto_jugo),
+	]
+
+	for patron, producto in patrones:
+		for match in re.finditer(patron, t):
+			_push_item(producto, int(match.group(1)))
+
+	for producto in catalogo:
+		aliases = []
+		nombre = _normalizar_texto(producto.get("nombre") or "")
+		variante = _normalizar_texto(producto.get("variante") or "")
+		completo = _normalizar_texto(f"{producto.get('nombre', '')} {producto.get('variante', '')}")
+		for alias in [completo, nombre, variante]:
+			if alias and alias not in aliases and len(alias) >= 3:
+				aliases.append(alias)
+		for alias in aliases:
+			patron = rf"(\d{{1,3}})\s*(?:de\s+)?{re.escape(alias)}(?:es|s)?\b"
+			for match in re.finditer(patron, t):
+				_push_item(producto, int(match.group(1)))
+
+	if not items:
+		for producto in catalogo:
+			blob = _normalizar_texto(f"{producto.get('nombre', '')} {producto.get('variante', '')}")
+			nombre = _normalizar_texto(producto.get("nombre") or "")
+			variante = _normalizar_texto(producto.get("variante") or "")
+			if any(alias and alias in t for alias in [blob, nombre, variante]):
+				_push_item(producto, 1)
+
+	consolidado: Dict[int, Dict[str, Any]] = {}
+	for item in items:
+		pid = int(item["producto_id"])
+		if pid not in consolidado:
+			consolidado[pid] = dict(item)
+		else:
+			consolidado[pid]["cantidad"] += int(item["cantidad"])
+
+	items_final = [v for v in consolidado.values() if int(v.get("cantidad") or 0) > 0]
+	total = int(sum(int(i["cantidad"]) * _to_float(i.get("precio_unit"), 0) for i in items_final))
+	return {"items": items_final, "total": total}
+
+
+def _formatear_carrito(items: list, total: int) -> str:
+	try:
+		catalogo = list(_obtener_catalogo_productos())
+	except Exception:
+		catalogo = []
+	by_id = {int(p.get("producto_id") or 0): p for p in catalogo if int(p.get("producto_id") or 0) > 0}
+	lineas = []
+	for i in items:
+		pid = int(i.get("producto_id") or 0)
+		qty = int(i.get("cantidad") or 0)
+		pu = _to_float(i.get("precio_unit"), 0)
+		if qty <= 0:
+			continue
+		p = by_id.get(pid)
+		nombre = i.get("nombre") or i.get("producto_nombre") or (p.get("nombre") if p else "Producto")
+		variante = i.get("variante") or (p.get("variante") if p else "")
+		etiqueta = f"{nombre} {variante}".strip()
+		lineas.append(f"- {qty}x {etiqueta} ${qty * pu:.2f}")
+	lineas.append(f"TOTAL: ${int(total)} MXN")
+	return "\n".join(lineas)
+
+
+def _validar_disponibilidad_producto(producto_id: Any, cantidad: Any) -> Optional[str]:
+	try:
+		resultado = db.obtener_disponibilidad_producto(producto_id=producto_id, cantidad=cantidad)
+	except Exception as exc:
+		logger.warning("No se pudo validar disponibilidad para producto_id=%s: %s", producto_id, exc)
+		return "No pude validar existencias en este momento."
+
+	if not isinstance(resultado, dict):
+		return None
+	if resultado.get("error"):
+		return str(resultado.get("error"))
+	if resultado.get("ok") is False:
+		return str(resultado.get("error") or "Producto no disponible en este momento.")
+	return None
+
+
+def _validar_items_carrito(items: list) -> Optional[str]:
+	for item in items or []:
+		error = _validar_disponibilidad_producto(item.get("producto_id"), item.get("cantidad"))
+		if error:
+			return error
+	return None
 
 
 MODISMOS_SEGUROS = [
@@ -74,6 +232,19 @@ LLM_API_KEY = (os.getenv("LLM_API_KEY", "") or "").strip()
 LLM_LOCAL_ENABLED = (os.getenv("LLM_LOCAL_ENABLED", "1") or "1").strip().lower() in {"1", "true", "yes", "on"}
 LLM_LOCAL_BASE_URL = (os.getenv("LLM_LOCAL_BASE_URL", "http://localhost:11434") or "http://localhost:11434").rstrip("/")
 LLM_LOCAL_MODEL = (os.getenv("LLM_LOCAL_MODEL", "phi3:mini") or "phi3:mini").strip()
+
+
+def _get_timeout_env(name: str, default: float) -> float:
+	raw = (os.getenv(name, str(default)) or str(default)).strip()
+	try:
+		value = float(raw)
+		return value if value > 0 else default
+	except ValueError:
+		return default
+
+
+LLM_REMOTE_TIMEOUT_SEC = _get_timeout_env("LLM_REMOTE_TIMEOUT_SEC", 20.0)
+LLM_LOCAL_TIMEOUT_SEC = _get_timeout_env("LLM_LOCAL_TIMEOUT_SEC", 30.0)
 
 
 def _now_iso():
@@ -153,7 +324,15 @@ def _obtener_catalogo_productos() -> Iterable[Dict[str, Any]]:
 	if _es_error(productos):
 		raise RuntimeError(productos["error"])
 	if isinstance(productos, list):
-		return [p for p in productos if isinstance(p, dict)]
+		limpios = [p for p in productos if isinstance(p, dict)]
+		if limpios:
+			return limpios
+
+	productos_todos = db.obtener_productos(solo_pedibles=False)
+	if _es_error(productos_todos):
+		raise RuntimeError(productos_todos["error"])
+	if isinstance(productos_todos, list):
+		return [p for p in productos_todos if isinstance(p, dict)]
 	return []
 
 
@@ -648,6 +827,8 @@ def _extraer_slots_llm(texto: str) -> Dict[str, Any]:
 
 	if not _llm_disponible():
 		return {}
+	if requests is None:
+		return {}
 
 	system_prompt = (
 		"Eres un extractor de entidades para pedidos por WhatsApp. "
@@ -681,7 +862,12 @@ def _extraer_slots_llm(texto: str) -> Dict[str, Any]:
 	}
 
 	try:
-		resp = requests.post(f"{LLM_BASE_URL}/v1/chat/completions", headers=headers, json=payload, timeout=12)
+		resp = requests.post(
+			f"{LLM_BASE_URL}/v1/chat/completions",
+			headers=headers,
+			json=payload,
+			timeout=LLM_REMOTE_TIMEOUT_SEC,
+		)
 		resp.raise_for_status()
 		body = resp.json()
 		content = (((body.get("choices") or [{}])[0].get("message") or {}).get("content") or "{}").strip()
@@ -694,6 +880,8 @@ def _extraer_slots_llm(texto: str) -> Dict[str, Any]:
 
 def _extraer_slots_llm_local(texto: str) -> Dict[str, Any]:
 	if not _llm_local_disponible():
+		return {}
+	if requests is None:
 		return {}
 
 	prompt = (
@@ -717,7 +905,11 @@ def _extraer_slots_llm_local(texto: str) -> Dict[str, Any]:
 	}
 
 	try:
-		resp = requests.post(f"{LLM_LOCAL_BASE_URL}/api/generate", json=payload, timeout=8)
+		resp = requests.post(
+			f"{LLM_LOCAL_BASE_URL}/api/generate",
+			json=payload,
+			timeout=LLM_LOCAL_TIMEOUT_SEC,
+		)
 		resp.raise_for_status()
 		body = resp.json()
 		content = (body.get("response") or "{}").strip()
@@ -1226,6 +1418,43 @@ def generar_codigo_entrega():
 	return "".join(random.choices(chars, k=6))
 
 
+def _normalizar_items_legacy(datos_temp):
+	"""Construye datos_temp['items'] desde campos legacy de producto individual si no existe ya."""
+	if datos_temp.get("items"):
+		return
+	producto_id = datos_temp.get("producto_id")
+	if not producto_id:
+		return
+	cantidad = int(datos_temp.get("cantidad") or 1)
+	precio_unit = _to_float(datos_temp.get("precio_unitario") or datos_temp.get("precio"), 0)
+	if not precio_unit:
+		# Intentar con catalogo DB (requiere receta).
+		try:
+			catalogo = list(_obtener_catalogo_productos())
+			for p in catalogo:
+				if p.get("producto_id") == producto_id:
+					precio_unit = _to_float(p.get("precio"), 0)
+					break
+		except Exception:
+			pass
+	if not precio_unit:
+		total = _to_float(datos_temp.get("total"), 0)
+		if total > 0 and cantidad > 0:
+			precio_unit = total / cantidad
+	if not precio_unit:
+		precio_unit = 0
+	datos_temp["items"] = [
+		{
+			"producto_id": producto_id,
+			"nombre": datos_temp.get("producto_nombre", "Producto"),
+			"variante": datos_temp.get("variante", ""),
+			"cantidad": cantidad,
+			"precio_unit": precio_unit,
+		}
+	]
+	datos_temp.setdefault("total", precio_unit * cantidad)
+
+
 def _guardar_pedido_final(cliente, datos_temp):
 	catalogo = list(_obtener_catalogo_productos())
 	producto = None
@@ -1323,10 +1552,10 @@ def _manejar_tipo_servicio(text, datos_temp):
 		datos_temp["tipo_servicio"] = "individual"
 		catalogo = list(_obtener_catalogo_productos())
 		_guardar_alias_sabores(datos_temp, catalogo)
-		texto = "de una, elige sabor de empanada."
-		opciones = "carne\npollo\nmenu"
+		texto = "de una, elige un producto del menu."
+		opciones = "menu"
 		if catalogo:
-			opciones = f"carne\npollo\nmenu\n\n{_menu_texto(catalogo)}"
+			opciones = f"menu\n\n{_menu_texto(catalogo)}"
 		return "seleccion_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	if "2" in t or any(k in t for k in ["evento", "cotizacion", "catering", "fiesta", "mayoreo"]):
@@ -1360,7 +1589,7 @@ def _manejar_seleccion_producto(text, datos_temp):
 
 	if "menu" in t:
 		texto = _menu_texto(catalogo)
-		opciones = "Elige: carne o pollo"
+		opciones = "Escribe el producto que quieres"
 		return "seleccion_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	producto = _producto_desde_texto(t, catalogo)
@@ -1369,13 +1598,18 @@ def _manejar_seleccion_producto(text, datos_temp):
 	if not producto and "pollo" in t:
 		producto = _producto_por_id(catalogo, datos_temp.get("alias_pollo_producto_id"))
 	if not producto:
-		texto = "todavia no identifique el sabor."
-		opciones = "Responde: carne o pollo"
+		texto = "todavia no identifique el producto que quieres."
+		opciones = "Escribe el nombre del producto o manda: menu"
 		return "seleccion_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	datos_temp["producto_id"] = producto.get("producto_id")
 	datos_temp["producto_nombre"] = f"{producto.get('nombre', '')} {producto.get('variante', '')}".strip()
 	datos_temp["precio_unitario"] = _to_float(producto.get("precio"), 0)
+	error_stock = _validar_disponibilidad_producto(datos_temp["producto_id"], 1)
+	if error_stock:
+		texto = f"ese producto no esta disponible ahorita. {error_stock}"
+		opciones = "Escribe otro producto o menu"
+		return "seleccion_producto", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	texto = "cuantas empanadas quieres?"
 	opciones = "Escribe un numero. Ejemplo: 6"
@@ -1397,6 +1631,11 @@ def _manejar_cantidad(text, datos_temp):
 		return "datos_evento", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	datos_temp["cantidad"] = qty
+	error_stock = _validar_disponibilidad_producto(datos_temp.get("producto_id"), qty)
+	if error_stock:
+		texto = f"con esa cantidad no tengo existencia suficiente. {error_stock}"
+		opciones = "Prueba con una cantidad menor o elige otro producto"
+		return "cantidad", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 	texto = "super, como prefieres la entrega?"
 	opciones = "domicilio\nrecoger en tienda"
 	return "metodo_entrega", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
@@ -1517,7 +1756,7 @@ def _manejar_preguntar_factura(text, datos_temp):
 		opciones = "Ejemplo: ABC123456T12|QUE CHIMBA SA DE CV|601|G03|correo@mail.com"
 		return "datos_fiscales", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
-	if _es_negativo(t) or t in {"n", "0"}:
+	if _es_negativo(t) or t in {"n", "0", "2"}:
 		datos_temp["requiere_factura"] = False
 		resumen = _resumen_pedido(datos_temp)
 		texto = f"asi va tu pedido:\n{resumen}"
@@ -1574,7 +1813,20 @@ def _manejar_confirmacion(text, datos_temp, cliente):
 
 	_persistir_datos_cliente(cliente, datos_temp)
 
-	pedido_id, codigo_entrega = _guardar_pedido_final(cliente, datos_temp)
+	# Unificar con el flujo FSM nuevo: normalizar items legacy si aun no existen.
+	_normalizar_items_legacy(datos_temp)
+
+	try:
+		resultado = db.crear_pedido_completo(cliente["cliente_id"], datos_temp)
+		if isinstance(resultado, dict) and resultado.get("error"):
+			raise RuntimeError(resultado["error"])
+		pedido_id = resultado["pedido_id"]
+		codigo_entrega = resultado["codigo_entrega"]
+	except Exception as exc:
+		logger.error("Error en _manejar_confirmacion al crear pedido: %s", exc)
+		texto = f"hubo un problema al guardar el pedido ({exc}), intenta confirmarlo de nuevo."
+		return "confirmacion", datos_temp, _armar_respuesta_comercial(texto, "confirmar\ncancelar", datos_temp)
+
 	datos_temp["pedido_id"] = pedido_id
 	datos_temp["codigo_entrega"] = codigo_entrega
 	datos_temp["evaluar_entrega_en"] = (datetime.utcnow() + timedelta(minutes=30)).isoformat()
@@ -1637,6 +1889,451 @@ def _respuesta_menu(datos_temp):
 	return _armar_respuesta_comercial(menu, "Para ordenar escribe: individual", datos_temp)
 
 
+def _respuesta_to_handler_output(response: Dict[str, Any], nuevo_estado: str) -> Dict[str, Any]:
+	contenido = ""
+	audio_filename = None
+	if isinstance(response, dict):
+		contenido = str(response.get("contenido") or "")
+		audio_filename = response.get("audio_filename")
+	return {
+		"texto": contenido,
+		"audio_path": audio_filename,
+		"nuevo_estado": nuevo_estado,
+	}
+
+
+def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	t = _normalizar_texto(mensaje)
+	if any(k in t for k in ["1", "pedir", "quiero", "orden"]):
+		datos_temp["tipo"] = "orden"
+		texto = "Bacano parce. Tengo menu dinamico desde el sistema. Digame que va a querer y cuantas."
+		opciones = "Ejemplo: 3 de carne y 2 de pollo con 2 aguas"
+		response = _armar_respuesta_comercial(texto, opciones, datos_temp)
+		out = _respuesta_to_handler_output(response, "seleccion_producto")
+		out["datos_temp"] = datos_temp
+		return out
+	if any(k in t for k in ["2", "evento", "fiesta", "boda"]):
+		datos_temp["tipo"] = "evento"
+		response = _armar_respuesta_comercial(
+			"Listo mi llave, cuenteme para cuantas personas, fecha y si quiere carne, pollo o mitad y mitad.",
+			"Ejemplo: 60 empanadas para el 25 de marzo, mitad y mitad",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "datos_evento")
+		out["datos_temp"] = datos_temp
+		return out
+	if any(k in t for k in ["3", "menu", "precios", "cuanto"]):
+		menu = _menu_texto(list(_obtener_catalogo_productos()))
+		response = _armar_respuesta_comercial(menu, "1) Pedir empanadas 2) Evento", datos_temp)
+		out = _respuesta_to_handler_output(response, "bienvenida")
+		out["datos_temp"] = datos_temp
+		return out
+
+	response = _armar_respuesta_comercial(
+		"Ey parce, bienvenido a Que Chimba. Elija una opcion para arrancar.",
+		"1) Quiero pedir empanadas\n2) Es para evento\n3) Ver menu y precios",
+		datos_temp,
+	)
+	out = _respuesta_to_handler_output(response, "bienvenida")
+	out["datos_temp"] = datos_temp
+	return out
+
+
+def handle_seleccion_producto(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	extraccion = _extraer_items_menu_oficial(mensaje)
+	items = extraccion.get("items") or []
+	total = int(extraccion.get("total") or 0)
+	if not items:
+		response = _armar_respuesta_comercial(
+			"No le entendi el pedido completo, parce. Digamelo con cantidades.",
+			"Ejemplo: 3 de carne, 2 de pollo y 1 jugo",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "seleccion_producto")
+		out["datos_temp"] = datos_temp
+		return out
+
+	error_stock = _validar_items_carrito(items)
+	if error_stock:
+		response = _armar_respuesta_comercial(
+			f"No puedo confirmar ese carrito ahorita. {error_stock}",
+			"Prueba con otra cantidad, otro producto o escribe menu",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "seleccion_producto")
+		out["datos_temp"] = datos_temp
+		return out
+
+	datos_temp["items"] = items
+	datos_temp["total"] = total
+	resumen = _formatear_carrito(items, total)
+	response = _armar_respuesta_comercial(
+		f"Buena nota parce, confirme su carrito:\n{resumen}",
+		"1) Si, esta bien\n2) Quiero cambiar algo",
+		datos_temp,
+	)
+	out = _respuesta_to_handler_output(response, "confirmar_carrito")
+	out["datos_temp"] = datos_temp
+	return out
+
+
+def handle_confirmar_carrito(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	t = _normalizar_texto(mensaje)
+	if any(k in t for k in ["1", "si", "confirm", "esta bien"]):
+		response = _armar_respuesta_comercial(
+			"Listo mi llave. Como prefiere recibir su pedido?",
+			"1) Domicilio\n2) Recoger en local",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "metodo_entrega")
+		out["datos_temp"] = datos_temp
+		return out
+	if any(k in t for k in ["2", "cambiar", "editar"]):
+		datos_temp.pop("items", None)
+		datos_temp.pop("total", None)
+		response = _armar_respuesta_comercial(
+			"De una parce, ajustemoslo. Digame de nuevo productos y cantidades.",
+			"Ejemplo: 2 de carne y 2 aguas",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "seleccion_producto")
+		out["datos_temp"] = datos_temp
+		return out
+
+	response = _armar_respuesta_comercial(
+		"No le cache esa respuesta. Confirmamos o cambiamos?",
+		"1) Si, esta bien\n2) Quiero cambiar algo",
+		datos_temp,
+	)
+	out = _respuesta_to_handler_output(response, "confirmar_carrito")
+	out["datos_temp"] = datos_temp
+	return out
+
+
+def handle_metodo_entrega(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_metodo_entrega(mensaje, datos_temp)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def handle_solicitar_ubicacion(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_solicitar_ubicacion(mensaje, datos_temp, cliente)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def handle_metodo_pago(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_metodo_pago(mensaje, datos_temp)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def handle_preguntar_factura(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_preguntar_factura(mensaje, datos_temp)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def handle_datos_fiscales(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_datos_fiscales(mensaje, datos_temp, cliente)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def handle_confirmacion(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	t = _normalizar_texto(mensaje)
+
+	if any(k in t for k in ["2", "cambiar", "editar"]):
+		response = _armar_respuesta_comercial(
+			"Dale parce, hacemos el ajuste. Vuelvame a pasar productos y cantidades.",
+			"Ejemplo: 2 de carne y 1 jugo",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "seleccion_producto")
+		out["datos_temp"] = datos_temp
+		return out
+
+	if any(k in t for k in ["1", "si", "confirm", "acepto", "listo"]):
+		response = _armar_respuesta_comercial(
+			"Perfecto parce, voy a confirmar su pedido en sistema.",
+			"Aguanteme un segundo y le comparto folio y codigo de entrega.",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "completado")
+		out["datos_temp"] = datos_temp
+		return out
+
+	items = datos_temp.get("items") or []
+	total = int(datos_temp.get("total") or 0)
+	resumen = _formatear_carrito(items, total) if items else "Aun no tengo items en carrito."
+	response = _armar_respuesta_comercial(
+		f"Revise su pedido final:\n{resumen}",
+		"1) Si, confirmar pedido\n2) Quiero cambiar algo",
+		datos_temp,
+	)
+	out = _respuesta_to_handler_output(response, "confirmacion")
+	out["datos_temp"] = datos_temp
+	return out
+
+
+def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	try:
+		items = datos_temp.get("items") or []
+		if not items:
+			response = _armar_respuesta_comercial(
+				"No encuentro el carrito para cerrar la orden. Armemoslo otra vez rapidito.",
+				"Escriba productos y cantidades. Ejemplo: 3 de carne y 2 de pollo",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "seleccion_producto")
+			out["datos_temp"] = datos_temp
+			return out
+
+		result = db.crear_pedido_completo(cliente_id=cliente.get("cliente_id"), datos_temp=datos_temp)
+		if _es_error(result):
+			raise RuntimeError(result.get("error") or "No se pudo crear pedido completo")
+
+		pedido_id = int(result.get("pedido_id") or 0)
+		codigo = str(result.get("codigo_entrega") or "").strip().upper()
+		nuevos_datos = {}
+
+		if requests is not None and pedido_id > 0:
+			try:
+				requests.post(
+					"http://localhost:5678/webhook/nuevo-pedido",
+					json={
+						"pedido_id": pedido_id,
+						"items": items,
+						"total": datos_temp.get("total"),
+						"entrega": datos_temp.get("metodo_entrega") or datos_temp.get("entrega"),
+						"cliente_whatsapp": cliente.get("whatsapp_id"),
+					},
+					timeout=6,
+				)
+			except Exception:
+				# La notificacion no debe romper la confirmacion de compra.
+				pass
+
+		response = _armar_respuesta_comercial(
+			f"Pedido #{pedido_id} confirmado. Tiempo estimado 20 a 30 minutos. Codigo de entrega: {codigo}",
+			"Guarde ese codigo, el repartidor se lo pedira al entregar.",
+			nuevos_datos,
+		)
+		out = _respuesta_to_handler_output(response, "completado")
+		out["datos_temp"] = nuevos_datos
+		return out
+	except Exception:
+		response = _armar_respuesta_comercial(
+			"Ay parce, hubo un problemita. ¿Puede intentarlo en un momento?",
+			"No perdi su carrito, intentemos confirmar otra vez.",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "confirmacion")
+		out["datos_temp"] = datos_temp
+		return out
+
+
+def handle_evaluar_entrega(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_evaluar_entrega(mensaje, datos_temp)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def handle_evaluar_producto(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_evaluar_producto(mensaje, datos_temp)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def handle_datos_evento(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_datos_evento(mensaje, datos_temp)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def handle_input_inesperado(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	estado = (sesion.get("estado") or "bienvenida").strip().lower()
+	texto = (
+		"No te entendi del todo, parce. Te repito las opciones del paso actual para seguir sin enredos."
+	)
+	if estado in {"inicio", "bienvenida", "tipo_servicio"}:
+		opciones = "1) Quiero pedir empanadas\n2) Es para evento\n3) Ver menu"
+	elif estado == "seleccion_producto":
+		opciones = "Escribe tu pedido. Ejemplo: 3 de carne y 2 de pollo"
+	elif estado in {"confirmacion", "confirmar_carrito"}:
+		opciones = "1) Confirmar\n2) Cambiar algo"
+	elif estado == "metodo_entrega":
+		opciones = "1) Domicilio\n2) Recoger"
+	elif estado == "metodo_pago":
+		opciones = "1) Efectivo\n2) Tarjeta"
+	else:
+		opciones = "Responde con una opcion valida del menu que te mostre."
+	response = _armar_respuesta_comercial(texto, opciones, datos_temp)
+	out = _respuesta_to_handler_output(response, estado)
+	out["datos_temp"] = datos_temp
+	return out
+
+
+def process_message(whatsapp_id, tipo, texto, audio_path=None, lat=None, lng=None):
+	"""
+	Dispatcher principal compatible con contrato Tarea 1.
+	"""
+	try:
+		db.limpiar_sesiones_expiradas()
+		cliente = _obtener_o_crear_cliente(whatsapp_id)
+		sesion = _obtener_sesion(whatsapp_id) or {"estado": "inicio", "datos_temp": {}}
+		estado = str(sesion.get("estado") or "inicio").strip().lower()
+		datos_temp = _as_dict(sesion.get("datos_temp"))
+
+		if estado not in ESTADOS:
+			estado = "inicio"
+
+		mensaje = texto or ""
+		audio_attempted = False
+		tipo_normalizado = _normalizar_texto(tipo or "")
+		if tipo_normalizado == "audio" and audio_path:
+			audio_attempted = True
+			transcrito = _voice_transcribir_audio(audio_path)
+			if transcrito:
+				mensaje = transcrito
+				datos_temp["ultimo_audio_transcrito"] = transcrito
+
+		if audio_attempted and not mensaje.strip():
+			response = _armar_respuesta_comercial(
+				"No pude transcribir ese audio, parce. Escribeme el pedido en texto y lo saco adelante.",
+				"Ejemplo: 2 de carne y 1 jugo",
+				datos_temp,
+			)
+			_guardar_sesion(whatsapp_id, estado, datos_temp)
+			return {
+				"texto": str(response.get("contenido") or ""),
+				"audio_path": response.get("audio_filename"),
+				"nuevo_estado": estado,
+			}
+
+		entrada = _normalizar_texto(mensaje)
+		datos_temp_local = _enriquecer_datos_desde_entrada(entrada, datos_temp, usar_llm=False)
+		usar_llm = _deberia_usar_llm(estado, entrada, datos_temp_local, audio_attempted)
+		if usar_llm and _faltan_slots_clave_por_estado(estado, datos_temp_local):
+			datos_temp = _enriquecer_datos_desde_entrada(entrada, datos_temp_local, usar_llm=True)
+		else:
+			datos_temp = datos_temp_local
+
+		sesion_local = {"estado": estado, "datos_temp": datos_temp}
+		handlers = {
+			"inicio": handle_bienvenida,
+			"bienvenida": handle_bienvenida,
+			"tipo_servicio": lambda s, m, c: _wrap_tipo_servicio_handler(s, m, c),
+			"seleccion_producto": handle_seleccion_producto,
+			"confirmar_carrito": handle_confirmar_carrito,
+			"datos_evento": handle_datos_evento,
+			"cantidad": lambda s, m, c: _wrap_cantidad_handler(s, m, c),
+			"metodo_entrega": handle_metodo_entrega,
+			"solicitar_ubicacion": lambda s, m, c: _wrap_solicitar_ubicacion_handler(s, m, c, lat=lat, lng=lng),
+			"metodo_pago": handle_metodo_pago,
+			"preguntar_factura": handle_preguntar_factura,
+			"datos_fiscales": handle_datos_fiscales,
+			"confirmacion": handle_confirmacion,
+			"completado": handle_completado,
+			"evaluar_entrega": handle_evaluar_entrega,
+			"evaluar_producto": handle_evaluar_producto,
+		}
+
+		handler = handlers.get(estado, handle_input_inesperado)
+		resultado = handler(sesion_local, mensaje, cliente)
+		nuevo_estado = str(resultado.get("nuevo_estado") or estado)
+		nuevos_datos = _as_dict(resultado.get("datos_temp"))
+
+		if nuevo_estado not in ESTADOS:
+			nuevo_estado = estado
+
+		# Generar audio colombiano de bienvenida al nuevo estado cuando hay transicion.
+		audio_colombiano = None
+		if voice and nuevo_estado != estado:
+			try:
+				audio_colombiano = voice.generar_audio_colombiano(
+					nuevo_estado,
+					{"pedido_id": nuevos_datos.get("pedido_id"), "nombre": cliente.get("nombre")},
+				)
+			except Exception as _exc_audio:
+				logger.debug("generar_audio_colombiano omitido para estado %s: %s", nuevo_estado, _exc_audio)
+
+		_guardar_sesion(whatsapp_id, nuevo_estado, nuevos_datos)
+		return {
+			"texto": str(resultado.get("texto") or ""),
+			"audio_path": resultado.get("audio_path"),
+			"audio_colombiano_path": audio_colombiano,
+			"nuevo_estado": nuevo_estado,
+		}
+
+	except Exception:
+		return {
+			"texto": "Ay parce, tuvimos un problemita. ¿Puede intentarlo en un momento?",
+			"audio_path": None,
+			"nuevo_estado": "confirmacion",
+		}
+
+
+def _wrap_inicio_handler(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_inicio(mensaje, datos_temp, cliente)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def _wrap_tipo_servicio_handler(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_tipo_servicio(mensaje, datos_temp)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def _wrap_cantidad_handler(sesion: dict, mensaje: str, cliente: dict) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_cantidad(mensaje, datos_temp)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
+def _wrap_solicitar_ubicacion_handler(sesion: dict, mensaje: str, cliente: dict, lat=None, lng=None) -> dict:
+	datos_temp = _as_dict(sesion.get("datos_temp"))
+	nuevo_estado, nuevos_datos, response = _manejar_solicitar_ubicacion(
+		mensaje,
+		datos_temp,
+		cliente,
+		latitude=lat,
+		longitude=lng,
+	)
+	out = _respuesta_to_handler_output(response, nuevo_estado)
+	out["datos_temp"] = nuevos_datos
+	return out
+
+
 def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=None, longitude=None):
 	"""
 	Procesa mensajes entrantes de WhatsApp (texto, audio, ubicacion) con FSM persistida en PostgreSQL.
@@ -1692,7 +2389,8 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 				datos_temp,
 			)
 
-		datos_temp["modo_respuesta_turno"] = "audio" if audio_attempted else "texto"
+		modo_demo_audio = BOT_REPLY_MODE == "audio"
+		datos_temp["modo_respuesta_turno"] = "audio" if (audio_attempted or modo_demo_audio) else "texto"
 
 		entrada = _normalizar_texto(texto_entrada)
 		datos_temp = _aplicar_preferencia_trato(entrada, datos_temp)
@@ -1726,7 +2424,21 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 
 		if _debe_confirmar_rapido(entrada) and _puede_cierre_rapido(datos_temp):
 			_persistir_datos_cliente(cliente, datos_temp)
-			pedido_id, codigo_entrega = _guardar_pedido_final(cliente, datos_temp)
+			_normalizar_items_legacy(datos_temp)
+			try:
+				resultado = db.crear_pedido_completo(cliente["cliente_id"], datos_temp)
+				if isinstance(resultado, dict) and resultado.get("error"):
+					raise RuntimeError(resultado["error"])
+				pedido_id = resultado["pedido_id"]
+				codigo_entrega = resultado["codigo_entrega"]
+			except Exception as exc:
+				logger.error("Error en cierre rapido al crear pedido: %s", exc)
+				_guardar_sesion(whatsapp_id, "confirmacion", datos_temp)
+				return _armar_respuesta_comercial(
+					f"hubo un problema al guardar el pedido ({exc}), intenta confirmarlo de nuevo.",
+					"confirmar\ncancelar",
+					datos_temp,
+				)
 			datos_temp["pedido_id"] = pedido_id
 			datos_temp["codigo_entrega"] = codigo_entrega
 			datos_temp["evaluar_entrega_en"] = (datetime.utcnow() + timedelta(minutes=30)).isoformat()
@@ -1847,13 +2559,43 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 
 def procesar_mensaje_whatsapp(whatsapp_id, mensaje, media_url=None, media_type=None, latitude=None, longitude=None):
 	"""
-	Alias compatible con app.py actual.
+	Puerta de entrada desde app.py. Enruta al nuevo dispatcher FSM (process_message)
+	y convierte la salida al formato legacy {"tipo", "contenido", "audio_filename"}
+	que app.py / webhook_baileys ya conoce; ademas incluye audio_colombiano_path.
 	"""
-	return procesar_mensaje(
-		from_num=whatsapp_id,
-		body=mensaje,
-		media_url=media_url,
-		media_type=media_type,
-		latitude=latitude,
-		longitude=longitude,
+	from_id = _numero_desde_from(whatsapp_id)
+
+	# Determinar tipo de entrada para process_message.
+	if media_url and (media_type or "").startswith("audio"):
+		tipo = "audio"
+		audio_path = media_url
+	else:
+		tipo = "text"
+		audio_path = None
+
+	resultado = process_message(
+		whatsapp_id=from_id,
+		tipo=tipo,
+		texto=mensaje or "",
+		audio_path=audio_path,
+		lat=latitude,
+		lng=longitude,
 	)
+
+	texto_salida = str(resultado.get("texto") or "")
+	audio_path_salida = resultado.get("audio_path")
+	audio_colombiano_path = resultado.get("audio_colombiano_path")
+
+	if audio_path_salida:
+		return {
+			"tipo": "audio",
+			"contenido": texto_salida,
+			"audio_filename": os.path.basename(str(audio_path_salida)),
+			"audio_colombiano_path": audio_colombiano_path,
+		}
+
+	return {
+		"tipo": "texto",
+		"contenido": texto_salida,
+		"audio_colombiano_path": audio_colombiano_path,
+	}

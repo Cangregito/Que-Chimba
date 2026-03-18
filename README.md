@@ -247,10 +247,23 @@ TTS_EDGE_VOICE=es-CO-SalomeNeural
 TTS_EDGE_RATE=+0%
 TTS_EDGE_PITCH=+0Hz
 TTS_PROFILE_ENABLED=1
+ELEVENLABS_API_KEY=
+ELEVENLABS_VOICE_ID=
+ELEVENLABS_MODEL_ID=eleven_multilingual_v2
+ELEVENLABS_STABILITY=0.45
+ELEVENLABS_SIMILARITY=0.85
+ELEVENLABS_STYLE=0.2
+ELEVENLABS_SPEAKER_BOOST=1
 BOT_REPLY_MODE=texto
 WHATSAPP_MEDIA_BASIC_USER=
 WHATSAPP_MEDIA_BASIC_PASSWORD=
 ```
+
+Notas de TTS:
+
+- `TTS_PROVIDER=auto`: intenta ElevenLabs, luego edge-tts y por ultimo gTTS.
+- `TTS_PROVIDER=elevenlabs`: prioriza ElevenLabs y si falla usa fallback local para no romper la demo.
+- Para clonacion de voz usa solo audio propio o con consentimiento explicito de la persona.
 
 ### Baileys Bridge
 

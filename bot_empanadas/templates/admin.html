@@ -1042,6 +1042,25 @@
           </div>
 
           <article class="card">
+            <div class="card-head"><h3>Catalogo de productos</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Variante</th>
+                    <th>Precio</th>
+                    <th>Estado</th>
+                    <th>Receta</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-productos-admin"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
             <div class="card-head"><h3>Gestion de recetas</h3></div>
             <form id="form-receta" class="form-grid cols-3" style="margin-bottom:10px;">
               <div class="field"><label for="receta-producto">Producto</label><select id="receta-producto" required></select></div>
@@ -1072,6 +1091,26 @@
               <button id="btn-abrir-compra" class="btn" type="button">Registrar compra</button>
             </div>
             <div class="grid-stock" id="grid-stock"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><h3>Control operativo de insumos</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Insumo</th>
+                    <th>Unidad</th>
+                    <th>Stock actual</th>
+                    <th>Stock minimo</th>
+                    <th>Proveedor</th>
+                    <th>Ajuste</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-insumos-admin"></tbody>
+              </table>
+            </div>
           </article>
 
           <article class="card">
@@ -1137,7 +1176,8 @@
         },
         campanaSegmento: "todos",
         campanaProgressTimer: null,
-        inventoryCache: []
+        inventoryCache: [],
+        productCache: []
       };
 
       const sectionMeta = {
@@ -1866,6 +1906,116 @@
         });
       }
 
+      async function loadProductosAdmin() {
+        showTableLoading("tbody-productos-admin", 6);
+        try {
+          const rows = await api("/api/admin/productos?limit=300");
+          const list = Array.isArray(rows) ? rows : [];
+          state.productCache = list;
+          const tb = qs("tbody-productos-admin");
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin productos.</td></tr>";
+            return;
+          }
+          tb.innerHTML = list.map((p) => (
+            "<tr>" +
+              "<td><input class='prod-nombre' data-id='" + Number(p.producto_id) + "' value='" + html(p.nombre || "") + "' /></td>" +
+              "<td><input class='prod-variante' data-id='" + Number(p.producto_id) + "' value='" + html(p.variante || "") + "' /></td>" +
+              "<td><input class='prod-precio' data-id='" + Number(p.producto_id) + "' type='number' min='0' step='0.01' value='" + Number(p.precio || 0) + "' /></td>" +
+              "<td><select class='prod-activo' data-id='" + Number(p.producto_id) + "'><option value='1'" + (p.activo ? " selected" : "") + ">activo</option><option value='0'" + (!p.activo ? " selected" : "") + ">inactivo</option></select></td>" +
+              "<td>" + qualityBadge(p.tiene_receta_activa ? "completo" : "sin_receta") + "</td>" +
+              "<td><button class='btn btn-prod-save' data-id='" + Number(p.producto_id) + "' type='button'>Guardar</button></td>" +
+            "</tr>"
+          )).join("");
+
+          tb.querySelectorAll(".btn-prod-save").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = Number(btn.getAttribute("data-id"));
+              try {
+                await api("/api/admin/productos/" + id, {
+                  method: "PATCH",
+                  body: {
+                    nombre: tb.querySelector(".prod-nombre[data-id='" + id + "']").value.trim(),
+                    variante: tb.querySelector(".prod-variante[data-id='" + id + "']").value.trim(),
+                    precio: Number(tb.querySelector(".prod-precio[data-id='" + id + "']").value || 0),
+                    activo: tb.querySelector(".prod-activo[data-id='" + id + "']").value === "1"
+                  }
+                });
+                await Promise.allSettled([loadProductosAdmin(), loadCatalogosInventario(), loadProductosSinReceta(), loadRentabilidad()]);
+                toast("Producto actualizado.", "success");
+              } catch (_e) {
+                toast("No se pudo actualizar producto.", "error");
+              }
+            });
+          });
+        } catch (_e) {
+          qs("tbody-productos-admin").innerHTML = "<tr><td colspan='6' class='muted'>Error al cargar productos.</td></tr>";
+        }
+      }
+
+      function renderInsumosAdmin(items) {
+        const tb = qs("tbody-insumos-admin");
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='7' class='muted'>Sin insumos.</td></tr>";
+          return;
+        }
+        tb.innerHTML = list.map((r) => (
+          "<tr>" +
+            "<td><strong>" + html(r.nombre || "-") + "</strong></td>" +
+            "<td><input class='ins-unidad' data-id='" + Number(r.insumo_id) + "' value='" + html(r.unidad_medida || "") + "' /></td>" +
+            "<td>" + num(r.stock_actual) + "</td>" +
+            "<td><input class='ins-min' data-id='" + Number(r.insumo_id) + "' type='number' min='0' step='0.001' value='" + Number(r.stock_minimo || 0) + "' /></td>" +
+            "<td><input class='ins-prov' data-id='" + Number(r.insumo_id) + "' value='" + html(r.proveedor || "") + "' /></td>" +
+            "<td><input class='ins-ajuste' data-id='" + Number(r.insumo_id) + "' type='number' step='0.001' placeholder='+ / -' /></td>" +
+            "<td><button class='btn btn-ins-save' data-id='" + Number(r.insumo_id) + "' type='button'>Guardar</button> <button class='btn btn-ins-adjust' data-id='" + Number(r.insumo_id) + "' type='button'>Ajustar</button></td>" +
+          "</tr>"
+        )).join("");
+
+        tb.querySelectorAll(".btn-ins-save").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = Number(btn.getAttribute("data-id"));
+            try {
+              await api("/api/admin/insumos/" + id, {
+                method: "PATCH",
+                body: {
+                  unidad_medida: tb.querySelector(".ins-unidad[data-id='" + id + "']").value.trim(),
+                  stock_minimo: Number(tb.querySelector(".ins-min[data-id='" + id + "']").value || 0),
+                  proveedor: tb.querySelector(".ins-prov[data-id='" + id + "']").value.trim() || null
+                }
+              });
+              await Promise.allSettled([loadInventarioStock(), loadMovimientos()]);
+              toast("Insumo actualizado.", "success");
+            } catch (_e) {
+              toast("No se pudo actualizar insumo.", "error");
+            }
+          });
+        });
+
+        tb.querySelectorAll(".btn-ins-adjust").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = Number(btn.getAttribute("data-id"));
+            const input = tb.querySelector(".ins-ajuste[data-id='" + id + "']");
+            const ajuste = Number(input.value || 0);
+            if (!ajuste) {
+              toast("Captura un ajuste valido distinto de 0.", "error");
+              return;
+            }
+            const motivo = window.prompt("Motivo del ajuste de stock:", "ajuste manual admin") || "ajuste manual admin";
+            try {
+              await api("/api/admin/insumos/" + id + "/ajuste-stock", {
+                method: "POST",
+                body: { cantidad_ajuste: ajuste, motivo }
+              });
+              await Promise.allSettled([loadInventarioStock(), loadMovimientos()]);
+              toast("Stock ajustado.", "success");
+            } catch (_e) {
+              toast("No se pudo ajustar stock.", "error");
+            }
+          });
+        });
+      }
+
       async function loadInventarioStock() {
         const grid = qs("grid-stock");
         grid.innerHTML = "";
@@ -1875,6 +2025,7 @@
           const list = Array.isArray(rows) ? rows : [];
           state.inventoryCache = list;
           fillInsumoSelects(list);
+          renderInsumosAdmin(list);
           if (!list.length) {
             grid.innerHTML = "<div class='muted'>Sin insumos.</div>";
             return;
@@ -1891,6 +2042,7 @@
           }).join("");
         } catch (_e) {
           grid.innerHTML = "<div class='muted'>No se pudo cargar stock.</div>";
+          qs("tbody-insumos-admin").innerHTML = "<tr><td colspan='7' class='muted'>No se pudo cargar control de insumos.</td></tr>";
         }
       }
 
@@ -2076,6 +2228,7 @@
 
         if (sectionName === "inventario") {
           await Promise.allSettled([
+            loadProductosAdmin(),
             loadInventarioStock(),
             loadCatalogosInventario(),
             loadRecetas(),
@@ -2307,7 +2460,12 @@
               }
             });
             event.target.reset();
-            await loadCatalogosInventario();
+            await Promise.allSettled([
+              loadProductosAdmin(),
+              loadCatalogosInventario(),
+              loadProductosSinReceta(),
+              loadRentabilidad()
+            ]);
             toast("Producto guardado.", "success");
           } catch (_e) {
             toast("No se pudo guardar producto.", "error");

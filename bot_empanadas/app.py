@@ -8,6 +8,7 @@ import secrets
 from datetime import date, datetime
 from decimal import Decimal
 from functools import wraps
+from typing import Any, cast
 from urllib.parse import quote
 from xml.sax.saxutils import escape as xml_escape
 
@@ -287,6 +288,44 @@ def _enviar_texto_whatsapp(destino, texto):
     return {"ok": True}
 
 
+def _enviar_audio_whatsapp(destino, audio_path, caption=""):
+    """Envia una nota de voz al usuario via el bridge de Baileys."""
+    bridge_url = app.config.get("BAILEYS_BRIDGE_URL", "")
+    if not bridge_url or not audio_path:
+        return {"error": "BAILEYS_BRIDGE_URL o audio_path no configurados."}
+
+    bridge_token = app.config.get("BAILEYS_BRIDGE_API_TOKEN", "")
+    headers = {"Content-Type": "application/json"}
+    if bridge_token:
+        headers["x-bridge-token"] = bridge_token
+
+    # Convertir ruta local a URL publica para que el bridge la descargue.
+    audio_filename = os.path.basename(str(audio_path))
+    base_url = app.config.get("PUBLIC_BASE_URL") or "http://localhost:5000"
+    audio_url = f"{base_url}/audio/{audio_filename}"
+
+    try:
+        resp = requests.post(
+            f"{bridge_url}/api/send-audio",
+            json={"to": destino, "audioUrl": audio_url, "caption": caption},
+            timeout=10,
+            headers=headers,
+        )
+    except Exception as exc:
+        return {"error": f"No se pudo enviar audio al bridge: {exc}"}
+
+    try:
+        payload = resp.json()
+    except Exception:
+        payload = {}
+
+    if not resp.ok or payload.get("ok") is not True:
+        msg = payload.get("error") or f"Bridge respondio HTTP {resp.status_code}"
+        return {"error": str(msg)}
+
+    return {"ok": True}
+
+
 def login_required(roles=None):
     roles = roles or []
 
@@ -358,14 +397,15 @@ def login_post():
     if isinstance(user, dict) and user.get("error"):
         return _error(user["error"], int(user.get("status", 401)), code="auth_failed")
 
-    session["user"] = {
+    user_session = {
         "usuario_id": user.get("usuario_id"),
         "username": user.get("username"),
         "rol": user.get("rol"),
         "nombre_mostrar": user.get("nombre_mostrar"),
         "area_entrega": user.get("area_entrega"),
     }
-    return _ok(session["user"])
+    cast(Any, session)["user"] = user_session
+    return _ok(user_session)
 
 
 @app.post("/logout")
@@ -694,7 +734,63 @@ def api_confirmar_entrega_pedido(pedido_id):
         msg = updated["error"].lower()
         status = 404 if "no encontrado" in msg else 400
         return _error(updated["error"], status)
-    return _ok(updated)
+
+    response_data: dict[str, Any] = dict(updated or {})
+    response_data["notificacion_cliente"] = {
+        "enviado": False,
+        "motivo": "No se intento enviar notificacion.",
+    }
+
+    destino_data = db.obtener_destino_whatsapp_por_pedido(pedido_id=pedido_id)
+    if isinstance(destino_data, dict) and not destino_data.get("error"):
+        destino = _normalizar_whatsapp_id(destino_data.get("whatsapp_id"))
+        mensaje = (
+            f"Muchisimas gracias por tu compra, parce. Confirmamos que tu pedido #{pedido_id} "
+            "ya fue entregado. Que lo disfrutes."
+        )
+        enviado = _enviar_texto_whatsapp(destino=destino, texto=mensaje)
+
+        if isinstance(enviado, dict) and enviado.get("error"):
+            app.logger.warning(
+                "Pedido %s liberado, pero no se pudo enviar agradecimiento al cliente (%s): %s",
+                pedido_id,
+                destino,
+                enviado["error"],
+            )
+            response_data["notificacion_cliente"] = {
+                "enviado": False,
+                "motivo": enviado["error"],
+                "destino": destino,
+            }
+        else:
+            db.crear_log_notificacion(
+                {
+                    "pedido_id": pedido_id,
+                    "canal": "whatsapp",
+                    "destino": destino,
+                    "tipo": "agradecimiento_entrega",
+                    "mensaje": mensaje,
+                    "total": None,
+                    "direccion": None,
+                }
+            )
+            response_data["notificacion_cliente"] = {
+                "enviado": True,
+                "destino": destino,
+            }
+    else:
+        motivo = destino_data.get("error") if isinstance(destino_data, dict) else "Sin detalle."
+        app.logger.warning(
+            "Pedido %s liberado, pero no se encontro WhatsApp destino para agradecimiento: %s",
+            pedido_id,
+            motivo,
+        )
+        response_data["notificacion_cliente"] = {
+            "enviado": False,
+            "motivo": motivo,
+        }
+
+    return _ok(response_data)
 
 
 @app.post("/api/repartidor/asignaciones")
@@ -921,6 +1017,21 @@ def api_admin_rentabilidad_productos():
     return _ok(data)
 
 
+@app.get("/api/admin/productos")
+@login_required(roles=["admin"])
+def api_admin_productos_listar():
+    limit = request.args.get("limit", "200")
+    try:
+        limit_int = max(1, min(500, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_productos_admin(limit=limit_int)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
 @app.post("/api/admin/productos")
 @login_required(roles=["admin"])
 def api_admin_productos_crear_actualizar():
@@ -934,6 +1045,24 @@ def api_admin_productos_crear_actualizar():
     if isinstance(created, dict) and created.get("error"):
         return _error(created["error"], 400)
     return _ok(created, 201)
+
+
+@app.patch("/api/admin/productos/<int:producto_id>")
+@login_required(roles=["admin"])
+def api_admin_productos_actualizar(producto_id):
+    payload = request.get_json(silent=True) or {}
+    updated = db.actualizar_producto_admin(
+        producto_id=producto_id,
+        nombre=payload.get("nombre") if "nombre" in payload else None,
+        variante=payload.get("variante") if "variante" in payload else None,
+        precio=payload.get("precio") if "precio" in payload else None,
+        activo=payload.get("activo") if "activo" in payload else None,
+    )
+    if isinstance(updated, dict) and updated.get("error"):
+        msg = updated["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(updated["error"], status)
+    return _ok(updated)
 
 
 @app.post("/api/admin/insumos")
@@ -953,6 +1082,42 @@ def api_admin_insumos_crear_actualizar():
     if isinstance(created, dict) and created.get("error"):
         return _error(created["error"], 400)
     return _ok(created, 201)
+
+
+@app.patch("/api/admin/insumos/<int:insumo_id>")
+@login_required(roles=["admin"])
+def api_admin_insumos_actualizar(insumo_id):
+    payload = request.get_json(silent=True) or {}
+    updated = db.actualizar_insumo_admin(
+        insumo_id=insumo_id,
+        unidad_medida=payload.get("unidad_medida") if "unidad_medida" in payload else None,
+        stock_minimo=payload.get("stock_minimo") if "stock_minimo" in payload else None,
+        proveedor=payload.get("proveedor") if "proveedor" in payload else None,
+    )
+    if isinstance(updated, dict) and updated.get("error"):
+        msg = updated["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(updated["error"], status)
+    return _ok(updated)
+
+
+@app.post("/api/admin/insumos/<int:insumo_id>/ajuste-stock")
+@login_required(roles=["admin"])
+def api_admin_insumos_ajustar_stock(insumo_id):
+    payload = request.get_json(silent=True) or {}
+    actor = session.get("user", {})
+    updated = db.ajustar_stock_insumo(
+        insumo_id=insumo_id,
+        cantidad_ajuste=payload.get("cantidad_ajuste"),
+        motivo=payload.get("motivo"),
+        actor_username=actor.get("username"),
+        actor_rol=actor.get("rol", "admin"),
+    )
+    if isinstance(updated, dict) and updated.get("error"):
+        msg = updated["error"].lower()
+        status = 404 if "no encontrado" in msg else 400
+        return _error(updated["error"], status)
+    return _ok(updated, 201)
 
 
 @app.post("/api/admin/recetas-producto")
@@ -1182,6 +1347,8 @@ def api_admin_auditoria_seguridad_csv():
     ])
 
     for row in data:
+        if not isinstance(row, dict):
+            continue
         writer.writerow([
             row.get("auditoria_id"),
             row.get("creado_en"),
@@ -1275,6 +1442,8 @@ def api_admin_auditoria_negocio_csv():
     ])
 
     for row in data:
+        if not isinstance(row, dict):
+            continue
         writer.writerow([
             row.get("auditoria_negocio_id"),
             row.get("creado_en"),
@@ -1382,7 +1551,7 @@ def webhook_baileys():
     if not whatsapp_id:
         return _error("whatsapp_id es obligatorio", 400)
 
-    result = procesar_mensaje_whatsapp(
+    output = procesar_mensaje_whatsapp(
         whatsapp_id=whatsapp_id,
         mensaje=mensaje,
         media_url=media_url,
@@ -1390,23 +1559,31 @@ def webhook_baileys():
         latitude=latitude,
         longitude=longitude,
     )
-    if not isinstance(result, dict):
-        result = {"tipo": "texto", "contenido": str(result)}
+    if not isinstance(output, dict):
+        output = {"tipo": "texto", "contenido": str(output)}
 
-    output = {
-        "tipo": result.get("tipo", "texto"),
-        "contenido": result.get("contenido", "Listo parce, mensaje recibido."),
-    }
-
-    if output["tipo"] == "audio" and result.get("audio_filename"):
+    if output.get("tipo") == "audio" and output.get("audio_filename") and not output.get("audio_url"):
         base_url = app.config["PUBLIC_BASE_URL"] or request.url_root.rstrip("/")
-        output["audio_url"] = f"{base_url}/audio/{result['audio_filename']}"
+        output["audio_url"] = f"{base_url}/audio/{output['audio_filename']}"
+
+    # Si el dispatcher genero audio colombiano de transicion de estado, enviarlo
+    # como nota de voz adicional en segundo plano (fire-and-forget).
+    audio_colombiano = output.get("audio_colombiano_path")
+    if audio_colombiano and whatsapp_id:
+        import threading
+        def _enviar_colombiano_bg():
+            try:
+                _enviar_audio_whatsapp(whatsapp_id, audio_colombiano)
+            except Exception as _exc:
+                app.logger.debug("audio_colombiano bg error: %s", _exc)
+        threading.Thread(target=_enviar_colombiano_bg, daemon=True).start()
 
     app.logger.info(
-        "Webhook Baileys respuesta: whatsapp_id=%s tipo=%s has_audio_url=%s",
+        "Webhook Baileys respuesta: whatsapp_id=%s tipo=%s has_audio_url=%s has_audio_colombiano=%s",
         whatsapp_id,
         output.get("tipo", "texto"),
         bool(output.get("audio_url")),
+        bool(audio_colombiano),
     )
 
     return _ok(output)

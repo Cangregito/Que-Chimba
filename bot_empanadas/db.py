@@ -1465,6 +1465,208 @@ def crear_pedido(cliente_id, items, direccion_id, metodo_pago, actor_usuario="si
             conn.close()
 
 
+def crear_pedido_completo(cliente_id, datos_temp):
+    """
+    Crea el pedido completo en una sola transaccion.
+
+    Flujo esperado:
+      1) Verificar stock por item usando verificar_stock_suficiente(producto_id, cantidad)
+      2) Insertar pedido principal
+      3) Insertar detalle_pedido (el trigger descuenta inventario automaticamente)
+      4) Vincular pago pendiente (si aplica)
+      5) Incrementar total_compras del cliente (si la columna existe)
+      6) Limpiar sesion del cliente (si existe por whatsapp_id)
+      7) Commit
+    """
+    conn = None
+    try:
+        datos = datos_temp if isinstance(datos_temp, dict) else {}
+        items = datos.get("items") or []
+        if not isinstance(items, list) or not items:
+            return {"error": "No hay items en datos_temp para crear el pedido."}
+
+        conn = get_connection()
+        conn.autocommit = False
+
+        _asegurar_tablas_operacion_pedidos(conn)
+        _asegurar_tablas_inventario_real(conn)
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Paso 1: validar stock por cada item antes de insertar.
+            for item in items:
+                producto_id = int(item.get("producto_id") or 0)
+                cantidad = int(item.get("cantidad") or 0)
+                if producto_id <= 0 or cantidad <= 0:
+                    raise RuntimeError("Item invalido en carrito: producto_id/cantidad requeridos.")
+
+                cur.execute(
+                    "SELECT verificar_stock_suficiente(%s, %s) AS ok",
+                    (producto_id, cantidad),
+                )
+                row_ok = cur.fetchone() or {}
+                if not bool(row_ok.get("ok")):
+                    raise RuntimeError(f"Stock insuficiente para producto_id={producto_id}.")
+
+            # Preparar campos base del pedido.
+            total = float(datos.get("total") or 0)
+            if total <= 0:
+                total = sum(float(item.get("precio_unit") or item.get("precio_unitario") or 0) * int(item.get("cantidad") or 0) for item in items)
+
+            metodo_entrega = str(datos.get("metodo_entrega") or datos.get("entrega") or "recoger_tienda")
+            metodo_pago = str(datos.get("metodo_pago") or datos.get("pago") or "efectivo")
+            requiere_factura = bool(datos.get("factura") if "factura" in datos else datos.get("requiere_factura"))
+            direccion_id = datos.get("direccion_id")
+            datos_fiscales_id = datos.get("datos_fiscales_id")
+
+            # Si requiere factura y no hay fiscal_id, intentamos crearlo desde datos_fiscales temporal.
+            if requiere_factura and not datos_fiscales_id:
+                datos_fiscales = datos.get("datos_fiscales") if isinstance(datos.get("datos_fiscales"), dict) else {}
+                if datos_fiscales:
+                    cur.execute(
+                        """
+                        INSERT INTO datos_fiscales (cliente_id, rfc, razon_social, regimen_fiscal, uso_cfdi, email, actualizado_en)
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                        RETURNING fiscal_id
+                        """,
+                        (
+                            cliente_id,
+                            datos_fiscales.get("rfc"),
+                            datos_fiscales.get("razon_social"),
+                            datos_fiscales.get("regimen_fiscal"),
+                            datos_fiscales.get("uso_cfdi"),
+                            datos_fiscales.get("email"),
+                        ),
+                    )
+                    datos_fiscales_id = (cur.fetchone() or {}).get("fiscal_id")
+
+            # Generar codigo en SQL (fallback a helper Python si no existe funcion SQL).
+            try:
+                cur.execute("SELECT generar_codigo_entrega() AS codigo")
+                codigo_entrega = (cur.fetchone() or {}).get("codigo")
+            except Exception:
+                codigo_entrega = _generar_codigo_entrega_db(cur)
+
+            cols_pedidos = {
+                "tipo": _tabla_tiene_columna(conn, "pedidos", "tipo"),
+                "metodo_entrega": _tabla_tiene_columna(conn, "pedidos", "metodo_entrega"),
+                "metodo_pago": _tabla_tiene_columna(conn, "pedidos", "metodo_pago"),
+                "requiere_factura": _tabla_tiene_columna(conn, "pedidos", "requiere_factura"),
+                "datos_fiscales_id": _tabla_tiene_columna(conn, "pedidos", "datos_fiscales_id"),
+                "direccion_id": _tabla_tiene_columna(conn, "pedidos", "direccion_id"),
+                "codigo_entrega": _tabla_tiene_columna(conn, "pedidos", "codigo_entrega"),
+                "creado_en": _tabla_tiene_columna(conn, "pedidos", "creado_en"),
+            }
+
+            fields = ["cliente_id", "estado", "total"]
+            values = [cliente_id, "recibido", total]
+            placeholders = ["%s", "%s", "%s"]
+
+            if cols_pedidos["tipo"]:
+                fields.append("tipo")
+                values.append("orden")
+                placeholders.append("%s")
+            if cols_pedidos["metodo_entrega"]:
+                fields.append("metodo_entrega")
+                values.append(metodo_entrega)
+                placeholders.append("%s")
+            if cols_pedidos["metodo_pago"]:
+                fields.append("metodo_pago")
+                values.append(metodo_pago)
+                placeholders.append("%s")
+            if cols_pedidos["requiere_factura"]:
+                fields.append("requiere_factura")
+                values.append(requiere_factura)
+                placeholders.append("%s")
+            if cols_pedidos["datos_fiscales_id"]:
+                fields.append("datos_fiscales_id")
+                values.append(datos_fiscales_id)
+                placeholders.append("%s")
+            if cols_pedidos["direccion_id"]:
+                fields.append("direccion_id")
+                values.append(direccion_id)
+                placeholders.append("%s")
+            if cols_pedidos["codigo_entrega"]:
+                fields.append("codigo_entrega")
+                values.append(codigo_entrega)
+                placeholders.append("%s")
+            if cols_pedidos["creado_en"]:
+                fields.append("creado_en")
+                values.append(datetime.utcnow())
+                placeholders.append("%s")
+
+            # Paso 2: pedido principal.
+            cur.execute(
+                f"INSERT INTO pedidos ({', '.join(fields)}) VALUES ({', '.join(placeholders)}) RETURNING pedido_id",
+                tuple(values),
+            )
+            pedido_id = int((cur.fetchone() or {}).get("pedido_id") or 0)
+            if pedido_id <= 0:
+                raise RuntimeError("No se pudo crear pedido en tabla pedidos.")
+
+            # Paso 3: detalle por item (trigger SQL maneja inventario).
+            for item in items:
+                producto_id = int(item.get("producto_id") or 0)
+                cantidad = int(item.get("cantidad") or 0)
+                precio_unitario = float(item.get("precio_unit") or item.get("precio_unitario") or 0)
+                cur.execute(
+                    """
+                    INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (pedido_id, producto_id, cantidad, precio_unitario),
+                )
+
+            # Paso 4: vincular pago pendiente si fue tarjeta.
+            if metodo_pago in {"tarjeta", "mercadopago"}:
+                mp_ref = (str(datos.get("mp_ref") or "")).strip()
+                if mp_ref:
+                    has_ref_externa = _tabla_tiene_columna(conn, "pagos", "referencia_externa")
+                    has_mp_preference = _tabla_tiene_columna(conn, "pagos", "mp_preference_id")
+                    if has_ref_externa:
+                        cur.execute(
+                            "UPDATE pagos SET pedido_id = %s WHERE referencia_externa = %s",
+                            (pedido_id, mp_ref),
+                        )
+                    elif has_mp_preference:
+                        cur.execute(
+                            "UPDATE pagos SET pedido_id = %s WHERE mp_preference_id = %s",
+                            (pedido_id, mp_ref),
+                        )
+
+            # Paso 5: contador de compras del cliente (si existe la columna).
+            if _tabla_tiene_columna(conn, "clientes", "total_compras"):
+                cur.execute(
+                    "UPDATE clientes SET total_compras = COALESCE(total_compras, 0) + 1 WHERE cliente_id = %s",
+                    (cliente_id,),
+                )
+
+            # Paso 6: limpiar sesion de este cliente por whatsapp_id.
+            cur.execute("SELECT whatsapp_id FROM clientes WHERE cliente_id = %s LIMIT 1", (cliente_id,))
+            row_cli = cur.fetchone() or {}
+            whatsapp_id = row_cli.get("whatsapp_id")
+            if whatsapp_id:
+                cur.execute(
+                    "UPDATE sesiones_bot SET estado = 'completado', datos_temp = '{}'::jsonb WHERE whatsapp_id = %s",
+                    (whatsapp_id,),
+                )
+
+        # Paso 8: commit.
+        conn.commit()
+        return {
+            "pedido_id": pedido_id,
+            "codigo_entrega": codigo_entrega,
+            "total": round(float(total), 2),
+        }
+
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
 def actualizar_estado_pedido(pedido_id, nuevo_estado, actor_usuario=None, rol_actor=None, motivo=None):
     conn = None
     try:
@@ -2689,6 +2891,96 @@ def crear_producto_manual(nombre, variante, precio, activo=True):
             conn.close()
 
 
+def obtener_productos_admin(limit=200):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tablas_inventario_real(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    p.producto_id,
+                    p.nombre,
+                    p.variante,
+                    p.precio,
+                    p.activo,
+                    COUNT(r.receta_id) FILTER (WHERE r.activo = TRUE)::INT AS componentes_activos,
+                    CASE WHEN COUNT(r.receta_id) FILTER (WHERE r.activo = TRUE) > 0 THEN TRUE ELSE FALSE END AS tiene_receta_activa
+                FROM productos p
+                LEFT JOIN recetas_producto_insumo r ON r.producto_id = p.producto_id
+                GROUP BY p.producto_id, p.nombre, p.variante, p.precio, p.activo
+                ORDER BY p.activo DESC, p.nombre, p.variante
+                LIMIT %s
+                """,
+                (int(limit),),
+            )
+            return cur.fetchall()
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def actualizar_producto_admin(producto_id, nombre=None, variante=None, precio=None, activo=None):
+    conn = None
+    try:
+        pid = int(producto_id)
+        updates = []
+        params = []
+
+        if nombre is not None:
+            nom = str(nombre).strip()
+            if not nom:
+                return {"error": "nombre es obligatorio"}
+            updates.append("nombre = %s")
+            params.append(nom)
+
+        if variante is not None:
+            updates.append("variante = %s")
+            params.append(str(variante).strip())
+
+        if precio is not None:
+            pre = float(precio)
+            if pre <= 0:
+                return {"error": "precio debe ser mayor a 0"}
+            updates.append("precio = %s")
+            params.append(pre)
+
+        if activo is not None:
+            updates.append("activo = %s")
+            params.append(bool(activo))
+
+        if not updates:
+            return {"error": "No hay campos para actualizar"}
+
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            params.append(pid)
+            cur.execute(
+                f"""
+                UPDATE productos
+                SET {', '.join(updates)}
+                WHERE producto_id = %s
+                RETURNING producto_id, nombre, variante, precio, activo
+                """,
+                tuple(params),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": "Producto no encontrado"}
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
 def crear_insumo_manual(nombre, unidad_medida, stock_minimo=0, stock_inicial=0, proveedor=None, actor_username=None, actor_rol="admin"):
     conn = None
     try:
@@ -2764,6 +3056,229 @@ def crear_insumo_manual(nombre, unidad_medida, stock_minimo=0, stock_inicial=0, 
     except Exception as exc:
         if conn:
             conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def actualizar_insumo_admin(insumo_id, unidad_medida=None, stock_minimo=None, proveedor=None):
+    conn = None
+    try:
+        iid = int(insumo_id)
+        updates = []
+        params = []
+        proveedor_nombre = (proveedor or "").strip() or None
+
+        conn = get_connection()
+        _asegurar_tablas_inventario_real(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            proveedor_id = _obtener_o_crear_proveedor(cur, proveedor_nombre)
+
+            if unidad_medida is not None:
+                unidad = str(unidad_medida).strip()
+                if not unidad:
+                    return {"error": "unidad_medida es obligatoria"}
+                updates.append("unidad_medida = %s")
+                params.append(unidad)
+
+            if stock_minimo is not None:
+                minimo = float(stock_minimo)
+                if minimo < 0:
+                    return {"error": "stock_minimo no puede ser negativo"}
+                updates.append("stock_minimo = %s")
+                params.append(minimo)
+
+            if proveedor is not None:
+                updates.append("proveedor_id = %s")
+                params.append(proveedor_id)
+
+            if not updates:
+                return {"error": "No hay campos para actualizar"}
+
+            params.append(iid)
+            cur.execute(
+                f"""
+                UPDATE insumos
+                SET {', '.join(updates)}
+                WHERE insumo_id = %s
+                RETURNING insumo_id, nombre, unidad_medida, stock_actual, stock_minimo, proveedor_id
+                """,
+                tuple(params),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": "Insumo no encontrado"}
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def ajustar_stock_insumo(insumo_id, cantidad_ajuste, motivo=None, actor_username=None, actor_rol="admin"):
+    conn = None
+    try:
+        iid = int(insumo_id)
+        ajuste = float(cantidad_ajuste or 0)
+        if ajuste == 0:
+            return {"error": "cantidad_ajuste no puede ser 0"}
+
+        conn = get_connection()
+        _asegurar_tablas_inventario_real(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT insumo_id, nombre, unidad_medida, stock_actual, stock_minimo
+                FROM insumos
+                WHERE insumo_id = %s
+                FOR UPDATE
+                """,
+                (iid,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": "Insumo no encontrado"}
+
+            stock_antes = float(row["stock_actual"])
+            stock_despues = stock_antes + ajuste
+            if stock_despues < 0:
+                return {"error": f"Ajuste invalido: el stock de {row['nombre']} no puede quedar negativo."}
+
+            cur.execute(
+                """
+                UPDATE insumos
+                SET stock_actual = %s
+                WHERE insumo_id = %s
+                RETURNING insumo_id, nombre, unidad_medida, stock_actual, stock_minimo
+                """,
+                (stock_despues, iid),
+            )
+            updated = cur.fetchone()
+
+            _registrar_movimiento_inventario_cur(
+                cur,
+                insumo_id=iid,
+                tipo="ajuste_entrada" if ajuste > 0 else "ajuste_salida",
+                cantidad_movimiento=ajuste,
+                stock_antes=stock_antes,
+                stock_despues=stock_despues,
+                referencia_tipo="ajuste_manual",
+                referencia_id=iid,
+                detalle={"motivo": (motivo or "").strip() or "ajuste manual admin"},
+                actor_username=actor_username,
+                actor_rol=actor_rol,
+            )
+            conn.commit()
+            return updated
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_disponibilidad_producto(producto_id, cantidad=1):
+    conn = None
+    try:
+        pid = int(producto_id)
+        qty = float(cantidad or 0)
+        if pid <= 0:
+            return {"error": "producto_id invalido"}
+        if qty <= 0:
+            return {"error": "cantidad invalida"}
+
+        conn = get_connection()
+        _asegurar_tablas_inventario_real(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT producto_id, nombre, variante, precio, activo
+                FROM productos
+                WHERE producto_id = %s
+                LIMIT 1
+                """,
+                (pid,),
+            )
+            producto = cur.fetchone()
+            if not producto:
+                return {"ok": False, "error": "Producto no encontrado", "producto_id": pid}
+            if not bool(producto.get("activo")):
+                return {
+                    "ok": False,
+                    "error": f"{producto.get('nombre')} {producto.get('variante') or ''}".strip() + " esta inactivo.",
+                    "producto_id": pid,
+                    "producto": producto,
+                }
+
+            cur.execute(
+                """
+                SELECT
+                    r.insumo_id,
+                    i.nombre AS insumo,
+                    i.unidad_medida,
+                    i.stock_actual,
+                    i.stock_minimo,
+                    r.cantidad_por_unidad,
+                    (r.cantidad_por_unidad * %s)::NUMERIC(12,3) AS requerido
+                FROM recetas_producto_insumo r
+                JOIN insumos i ON i.insumo_id = r.insumo_id
+                WHERE r.producto_id = %s
+                  AND r.activo = TRUE
+                ORDER BY i.nombre
+                """,
+                (qty, pid),
+            )
+            componentes = cur.fetchall() or []
+            if not componentes:
+                return {
+                    "ok": False,
+                    "error": f"{producto.get('nombre')} {producto.get('variante') or ''}".strip() + " no tiene receta activa.",
+                    "producto_id": pid,
+                    "producto": producto,
+                }
+
+            faltantes = []
+            for comp in componentes:
+                disponible = float(comp.get("stock_actual") or 0)
+                requerido = float(comp.get("requerido") or 0)
+                if disponible < requerido:
+                    faltantes.append(
+                        {
+                            "insumo_id": comp.get("insumo_id"),
+                            "insumo": comp.get("insumo"),
+                            "disponible": disponible,
+                            "requerido": requerido,
+                            "unidad_medida": comp.get("unidad_medida"),
+                        }
+                    )
+
+            if faltantes:
+                detalle = " | ".join(
+                    f"{f['insumo']}: disponible={f['disponible']:.3f} / requerido={f['requerido']:.3f} {f['unidad_medida']}"
+                    for f in faltantes
+                )
+                return {
+                    "ok": False,
+                    "error": f"Stock insuficiente para {producto.get('nombre')} {producto.get('variante') or ''}. {detalle}".strip(),
+                    "producto_id": pid,
+                    "producto": producto,
+                    "faltantes": faltantes,
+                }
+
+            return {
+                "ok": True,
+                "producto_id": pid,
+                "producto": producto,
+                "cantidad": qty,
+            }
+    except Exception as exc:
         return {"error": str(exc)}
     finally:
         if conn:

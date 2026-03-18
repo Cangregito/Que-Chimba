@@ -8,9 +8,16 @@ import asyncio
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import requests
 from gtts import gTTS
+
+try:
+    from elevenlabs import ElevenLabs, VoiceSettings
+except Exception:
+    ElevenLabs = None
+    VoiceSettings = None
 
 try:
     import edge_tts
@@ -25,9 +32,79 @@ AUDIO_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 FRASES_COLOMBIANAS = {
     "bienvenida": [
-        "Ey parce, que mas. Bienvenido a Que Chimba empanadas. Hagamosle con tu pedido.",
-        "Buenas mi llave, aca en Que Chimba estamos listos pa atenderte con toda la buena nota.",
-        "Que mas mi rey/reina, llegaste a Que Chimba. Dale que si y te armo el pedido rapidito.",
+        "Ey parce, que mas. Bienvenido a Que Chimba, pidamos esas empanadas de una.",
+        "Quiubo mi llave, llegaste a Que Chimba. Elige una opcion y hagamosle pues.",
+        "Buenas mi rey/reina, aqui estamos al pie del canon. Dime si vas por pedido o evento.",
+    ],
+    "seleccion_producto": [
+        "Bacano parce, tenemos carne y pollo a treinta y cinco. Manda cantidades y te lo armo.",
+        "Listo mi llave, suelteme el combo: cuantas de carne, cuantas de pollo y si le metemos bebida.",
+        "Que chimba, ya estamos cocinando antojo. Escriba su pedido completo y seguimos.",
+    ],
+    "confirmar_carrito": [
+        "Buena nota parce, revise su carrito y me confirma si asi queda.",
+        "Listo mi rey/reina, ya lo cuadre. Confirmamos o cambiamos algo.",
+        "Uy que chimba va ese pedido. Mire el resumen y me dice si le damos confirmar.",
+    ],
+    "metodo_entrega": [
+        "Dale parce, ahora elija como le queda mejor, domicilio o recoger en local.",
+        "Listo mi llave, digame si se lo llevamos o si pasa por Que Chimba.",
+        "Berraco, vamos bien. Elija metodo de entrega para cerrar este paso.",
+    ],
+    "solicitar_ubicacion": [
+        "Hagamosle pues, comparta su ubicacion o escriba direccion completica para caerle.",
+        "Buena nota, mi rey/reina, suelteme la ubicacion por WhatsApp y seguimos con pago.",
+        "Parce, para no perdernos en la Juarez necesito su punto exacto. Mande ubicacion ahora.",
+    ],
+    "metodo_pago": [
+        "Listo mi llave, como va a pagar, efectivo o tarjeta con link seguro.",
+        "Bacano parce, toca cuadrar pago. Diga uno: efectivo o tarjeta.",
+        "Que chimba, ya casi. Elija metodo de pago y le sigo con lo ultimo.",
+    ],
+    "preguntar_factura": [
+        "Mi rey/reina, necesita factura o se va sin factura esta vez.",
+        "Parce, antes de confirmar, me dice si requiere factura, si o no.",
+        "Dale que si, pregunta rapida: le genero factura o no hace falta.",
+    ],
+    "datos_fiscales": [
+        "Listo parce, paseme su RFC y razon social para facturar sin enredos.",
+        "Buena nota, mi llave, vamos con datos fiscales paso a paso. Empecemos por el RFC.",
+        "Hagamosle, mi rey/reina, deme los datos de factura y le cierro eso bonito.",
+    ],
+    "confirmacion": [
+        "Perfecto parce, revise resumen final y confirmamos ese pedido de una.",
+        "Listo mi llave, todo esta cuadrado. Si esta bien, confirme y salimos volando.",
+        "Uy que chimba, ya quedo armado. Mire total, entrega y pago, y me confirma.",
+    ],
+    "completado": [
+        "Ay que chimba parce, pedido confirmado en Que Chimba. Guarde su codigo y pendiente del reparto.",
+        "Listo mi rey/reina, su pedido quedo confirmado. Guarde ese codigo de entrega y fresco.",
+        "Bacano mi llave, ya entro a cocina. Tenga a la mano su codigo cuando llegue el repartidor.",
+    ],
+    "en_camino": [
+        "Ey parce, buenas noticias, su pedido ya va en camino. Tenga listo su codigo.",
+        "Mi llave, arrancamos moto. Su pedido va pa alla, tenga su codigo a la mano.",
+        "Que chimba, ya salio el repartidor. Preparese que en nada le timbran.",
+    ],
+    "entrega_confirmada": [
+        "Listo parce, entrega confirmada. Buen provecho y gracias por pedir en Que Chimba.",
+        "Buena nota mi rey/reina, ya quedo entregado. Que disfrute esas empanadas.",
+        "Dale mi llave, pedido entregado al cien. En un rato le pedimos su opinion.",
+    ],
+    "evaluar_entrega": [
+        "Parce, del uno al cinco, como le fue con la rapidez de la entrega. Cuenteme.",
+        "Mi rey/reina, regaleme una calificacion de entrega del uno al cinco.",
+        "Buena nota, hagamos una mini encuesta. Marque su rating de entrega y seguimos.",
+    ],
+    "evaluar_producto": [
+        "Buenos dias parce, del uno al cinco, como le parecieron las empanadas. Lo leo.",
+        "Mi llave, cuenteme si estuvo bacano el sabor, califique del uno al cinco.",
+        "Que mas mi rey/reina, cierre con broche de oro y deje su calificacion del producto.",
+    ],
+    "datos_evento": [
+        "Berraco parce, para evento le ayudo de una. Digame cantidad, fecha y tipo.",
+        "Que chimba esa celebracion, mi llave. Paseme datos del evento y se lo mando al admin.",
+        "Listo mi rey/reina, armemos su cotizacion. Escriba personas, fecha y requisito especial.",
     ],
     "confirmacion_pedido": [
         "Uy que chimba de pedido, {nombre}. Te dejo confirmado: {productos}. Total: {total}.",
@@ -40,25 +117,55 @@ FRASES_COLOMBIANAS = {
         "Chevere mi llave, ya tienes tus empanadas contigo. Gracias por la confianza.",
     ],
     "error": [
-        "Ay parce, no te entendi bien. Me repites porfa para ayudarte mejor.",
-        "Mi llave, hubo un enredo tecnico pequeno. Dame otro intento y lo sacamos.",
-        "Listo mi rey/reina, se me cruzaron los cables. Escribeme de nuevo y seguimos.",
+        "Ay parce, no te entendi bien. Me repites clarito y lo sacamos de una.",
+        "Mi llave, hubo un enredo tecnico pequeno. Dame otro intento y seguimos bacano.",
+        "Listo mi rey/reina, se me cruzaron los cables. Escribeme de nuevo para continuar.",
     ],
 }
 
 _WHISPER_MODEL = None
+_WHISPER_MODEL_NAME = (os.getenv("WHISPER_MODEL", "tiny") or "tiny").strip().lower()
 _TTS_PROVIDER = (os.getenv("TTS_PROVIDER", "auto") or "auto").strip().lower()
+_TTS_GTTS_LANG = (os.getenv("TTS_LANG", "es") or "es").strip()
+_TTS_GTTS_TLD = (os.getenv("TTS_TLD", "com.co") or "com.co").strip().lower()
 _TTS_EDGE_VOICE = (os.getenv("TTS_EDGE_VOICE", "es-CO-SalomeNeural") or "es-CO-SalomeNeural").strip()
 _TTS_EDGE_RATE = (os.getenv("TTS_EDGE_RATE", "+0%") or "+0%").strip()
 _TTS_EDGE_PITCH = (os.getenv("TTS_EDGE_PITCH", "+0Hz") or "+0Hz").strip()
 _TTS_PROFILE_ENABLED = (os.getenv("TTS_PROFILE_ENABLED", "1") or "1").strip().lower() in {"1", "true", "yes", "on"}
+_TTS_ELEVENLABS_API_KEY = (os.getenv("ELEVENLABS_API_KEY", "") or "").strip()
+_TTS_ELEVENLABS_VOICE_ID = (os.getenv("ELEVENLABS_VOICE_ID", "") or "").strip()
+_TTS_ELEVENLABS_MODEL_ID = (os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2") or "eleven_multilingual_v2").strip()
+
+
+def _parse_float_env(name: str, default: float) -> float:
+    raw = (os.getenv(name, str(default)) or str(default)).strip()
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+_TTS_ELEVENLABS_STABILITY = _parse_float_env("ELEVENLABS_STABILITY", 0.45)
+_TTS_ELEVENLABS_SIMILARITY = _parse_float_env("ELEVENLABS_SIMILARITY", 0.85)
+_TTS_ELEVENLABS_STYLE = _parse_float_env("ELEVENLABS_STYLE", 0.2)
+_TTS_ELEVENLABS_SPEAKER_BOOST = (os.getenv("ELEVENLABS_SPEAKER_BOOST", "1") or "1").strip().lower() in {"1", "true", "yes", "on"}
+
+logger.info(
+    "TTS config cargada: provider=%s lang=%s tld=%s edge_voice=%s eleven_voice_set=%s",
+    _TTS_PROVIDER,
+    _TTS_GTTS_LANG,
+    _TTS_GTTS_TLD,
+    _TTS_EDGE_VOICE,
+    bool(_TTS_ELEVENLABS_VOICE_ID),
+)
 
 
 def _load_whisper_model():
     global _WHISPER_MODEL
     if _WHISPER_MODEL is None:
         whisper_module = importlib.import_module("whisper")
-        _WHISPER_MODEL = whisper_module.load_model("small")
+        logger.info("Cargando Whisper model=%s", _WHISPER_MODEL_NAME)
+        _WHISPER_MODEL = whisper_module.load_model(_WHISPER_MODEL_NAME)
     return _WHISPER_MODEL
 
 
@@ -68,6 +175,24 @@ def _get_twilio_auth() -> tuple[str, str]:
     if not account_sid or not auth_token:
         raise ValueError("Faltan TWILIO_ACCOUNT_SID o TWILIO_AUTH_TOKEN en variables de entorno.")
     return account_sid, auth_token
+
+
+def _get_basic_media_auth() -> Optional[tuple[str, str]]:
+    username = (os.getenv("WHATSAPP_MEDIA_BASIC_USER", "") or "").strip()
+    password = (os.getenv("WHATSAPP_MEDIA_BASIC_PASSWORD", "") or "").strip()
+    if username and password:
+        return username, password
+    return None
+
+
+def _resolver_auth_media(media_url: str) -> Optional[tuple[str, str]]:
+    host = (urlparse(media_url).netloc or "").lower()
+    if any(part in host for part in {"twilio.com", "api.twilio.com", "mms.twiliocdn.com"}):
+        try:
+            return _get_twilio_auth()
+        except ValueError:
+            return None
+    return _get_basic_media_auth()
 
 
 def _detect_extension(url_twilio: str, content_type: str) -> str:
@@ -100,7 +225,11 @@ def _safe_format(template: str, datos_dinamicos: Dict[str, Any]) -> str:
 
 async def _edge_tts_save_async(texto: str, mp3_path: Path) -> None:
     texto_tts, rate, pitch = _preparar_texto_para_tts(texto)
-    communicator = edge_tts.Communicate(
+    edge_tts_module = edge_tts
+    if edge_tts_module is None:
+        raise RuntimeError("edge_tts no esta disponible")
+
+    communicator = edge_tts_module.Communicate(
         text=texto_tts,
         voice=_TTS_EDGE_VOICE,
         rate=rate,
@@ -177,11 +306,49 @@ def _sintetizar_edge_tts(texto: str, mp3_path: Path) -> bool:
 def _sintetizar_gtts(texto: str, mp3_path: Path) -> bool:
     try:
         texto_tts, _rate, _pitch = _preparar_texto_para_tts(texto)
-        tts = gTTS(text=texto_tts, lang="es", tld="com.mx", slow=False)
+        tts = gTTS(text=texto_tts, lang=_TTS_GTTS_LANG, tld=_TTS_GTTS_TLD, slow=False)
         tts.save(str(mp3_path))
         return mp3_path.exists() and mp3_path.stat().st_size > 0
     except Exception as exc:
         logger.warning("TTS gTTS fallo: %s", exc)
+        return False
+
+
+def _sintetizar_elevenlabs(texto: str, mp3_path: Path) -> bool:
+    if ElevenLabs is None or VoiceSettings is None:
+        logger.info("ElevenLabs deshabilitado: libreria no disponible")
+        return False
+    if not _TTS_ELEVENLABS_API_KEY or not _TTS_ELEVENLABS_VOICE_ID:
+        logger.info("ElevenLabs deshabilitado: faltan ELEVENLABS_API_KEY o ELEVENLABS_VOICE_ID")
+        return False
+
+    try:
+        texto_tts, _rate, _pitch = _preparar_texto_para_tts(texto)
+        client = ElevenLabs(api_key=_TTS_ELEVENLABS_API_KEY)
+        audio = client.text_to_speech.convert(
+            text=texto_tts,
+            voice_id=_TTS_ELEVENLABS_VOICE_ID,
+            model_id=_TTS_ELEVENLABS_MODEL_ID,
+            output_format="mp3_44100_128",
+            voice_settings=VoiceSettings(
+                stability=_TTS_ELEVENLABS_STABILITY,
+                similarity_boost=_TTS_ELEVENLABS_SIMILARITY,
+                style=_TTS_ELEVENLABS_STYLE,
+                use_speaker_boost=_TTS_ELEVENLABS_SPEAKER_BOOST,
+            ),
+        )
+
+        with mp3_path.open("wb") as f:
+            if isinstance(audio, (bytes, bytearray)):
+                f.write(audio)
+            else:
+                for chunk in audio:
+                    if chunk:
+                        f.write(chunk)
+
+        return mp3_path.exists() and mp3_path.stat().st_size > 0
+    except Exception as exc:
+        logger.warning("TTS ElevenLabs fallo: %s", exc)
         return False
 
 
@@ -206,14 +373,14 @@ def transcribir_audio(url_twilio: str) -> str:
     if not url_twilio:
         return ""
 
-    account_sid, auth_token = _get_twilio_auth()
     temp_input_path: Optional[Path] = None
     temp_wav_path: Optional[Path] = None
 
     try:
+        auth = _resolver_auth_media(url_twilio)
         response = requests.get(
             url_twilio,
-            auth=(account_sid, auth_token),
+            auth=auth,
             timeout=40,
             allow_redirects=True,
         )
@@ -265,15 +432,27 @@ def _generar_audio_desde_texto(texto: str) -> str:
     try:
         provider = _TTS_PROVIDER
         sintetizado = False
+        proveedor_usado = ""
 
-        if provider in {"auto", "edge"}:
+        if provider in {"auto", "elevenlabs"}:
+            sintetizado = _sintetizar_elevenlabs(texto, mp3_path)
+            if sintetizado:
+                proveedor_usado = "elevenlabs"
+
+        if not sintetizado and provider in {"auto", "edge", "elevenlabs"}:
             sintetizado = _sintetizar_edge_tts(texto, mp3_path)
+            if sintetizado:
+                proveedor_usado = "edge-tts"
 
-        if not sintetizado and provider in {"auto", "edge", "gtts"}:
+        if not sintetizado and provider in {"auto", "edge", "gtts", "elevenlabs"}:
             sintetizado = _sintetizar_gtts(texto, mp3_path)
+            if sintetizado:
+                proveedor_usado = "gTTS"
 
         if not sintetizado:
             raise RuntimeError("No se pudo sintetizar audio con los proveedores disponibles")
+
+        logger.info("TTS sintetizado con proveedor=%s (modo=%s)", proveedor_usado or "desconocido", provider)
 
         subprocess.run(
             [
