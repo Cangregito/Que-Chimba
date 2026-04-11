@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Que Chimba | Soporte</title>
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --surface: #F8F8F7;
+      --line: #E5E5E3;
+      --text: #1A1A1A;
+      --text-2: #6B6B6B;
+      --text-3: #9B9B9B;
+      --accent: #1F2328;
+      --green-bg: #EAF3DE;
+      --green-fg: #27500A;
+      --amber-bg: #FAEEDA;
+      --amber-fg: #633806;
+      --red-bg: #FCEBEB;
+      --red-fg: #791F1F;
+      --blue-bg: #E6F1FB;
+      --blue-fg: #0C447C;
+      --r-sm: 8px;
+      --r-lg: 12px;
+      --t: 120ms ease;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 400;
+    }
+
+    button, input, select, textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────── */
+    .app {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      border-right: 0.5px solid var(--line);
+      background: var(--surface);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .brand {
+      padding: 8px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--text-2);
+      font-size: 12px;
+    }
+
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-item {
+      width: 100%;
+      border: 0.5px solid transparent;
+      background: transparent;
+      border-radius: var(--r-sm);
+      text-align: left;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-2);
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background var(--t);
+    }
+
+    .nav-item:hover {
+      background: var(--bg);
+    }
+
+    .nav-item.active {
+      background: var(--bg);
+      color: var(--text);
+      border-color: var(--line);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .dot.green  { background: #3F7A13; }
+    .dot.blue   { background: #185FA5; }
+    .dot.amber  { background: #9A6A22; }
+    .dot.red    { background: #B64A4A; }
+
+    .nav-back {
+      margin-top: auto;
+    }
+
+    /* ── Main ────────────────────────────────────────────────── */
+    .main {
+      overflow: auto;
+      background: var(--bg);
+    }
+
+    .main-inner {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .topbar {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .subtle {
+      color: var(--text-2);
+      font-size: 13px;
+    }
+
+    /* ── Card ────────────────────────────────────────────────── */
+    .card {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--bg);
+      padding: 16px;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .card-head h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* ── Form fields ─────────────────────────────────────────── */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .field input,
+    .field textarea {
+      width: 100%;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 9px 11px;
+      font-size: 14px;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color var(--t), box-shadow var(--t);
+    }
+
+    .field input:focus,
+    .field textarea:focus {
+      outline: none;
+      border-color: #999;
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+    }
+
+    .field textarea { resize: vertical; min-height: 96px; }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* ── Segment controls ───────────────────────────────────── */
+    .seg-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .seg {
+      display: flex;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      overflow: hidden;
+    }
+
+    .seg-btn {
+      flex: 1;
+      padding: 8px 10px;
+      border: none;
+      border-right: 0.5px solid var(--line);
+      background: var(--surface);
+      color: var(--text-2);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background var(--t), color var(--t);
+      white-space: nowrap;
+    }
+
+    .seg-btn:last-child { border-right: none; }
+
+    .seg-btn:hover { background: #EFEFEE; }
+
+    .seg-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* Priority color overrides when active */
+    .seg-btn[data-prio="baja"].active    { background: #2D6A4F; }
+    .seg-btn[data-prio="media"].active   { background: #7A5C00; color: #fff; }
+    .seg-btn[data-prio="alta"].active    { background: #9A3412; }
+    .seg-btn[data-prio="urgente"].active { background: #7F1D1D; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 14px;
+      min-height: 34px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background var(--t);
+    }
+
+    .btn:hover { background: #EFEFEE; }
+
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .btn.primary:hover { opacity: 0.9; }
+
+    .btn.primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn.full { width: 100%; }
+
+    /* ── Badge ───────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 0.5px solid transparent;
+      white-space: nowrap;
+    }
+
+    .badge.green { background: var(--green-bg); color: var(--green-fg); }
+    .badge.amber { background: var(--amber-bg); color: var(--amber-fg); }
+    .badge.red   { background: var(--red-bg);   color: var(--red-fg);   }
+    .badge.blue  { background: var(--blue-bg);  color: var(--blue-fg);  }
+
+    /* ── Success state ───────────────────────────────────────── */
+    .success-card {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--green-bg);
+      padding: 20px;
+    }
+
+    .success-card.show { display: flex; }
+
+    .ticket-num {
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--green-fg);
+    }
+
+    .success-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--green-fg);
+      line-height: 1.6;
+    }
+
+    .success-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* ── Table (ticket history) ──────────────────────────────── */
+    .table-wrap {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      overflow: auto;
+      background: var(--bg);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      border-bottom: 0.5px solid var(--line);
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 13px;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--surface);
+      color: var(--text-2);
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Error text ──────────────────────────────────────────── */
+    .error-text {
+      font-size: 13px;
+      color: var(--red-fg);
+    }
+
+    /* ── Divider ─────────────────────────────────────────────── */
+    .divider {
+      height: 0.5px;
+      background: var(--line);
+      border: none;
+      margin: 6px 0;
+    }
+
+    /* ── Status section tabs ─────────────────────────────────── */
+    .tab-strip {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--text-2);
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background var(--t), color var(--t);
+    }
+
+    .tab:hover { background: #EFEFEE; }
+
+    .tab.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .muted { color: var(--text-3); font-style: italic; }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px;
+        border-right: none;
+        border-bottom: 0.5px solid var(--line);
+      }
+      .nav { flex-direction: row; flex-wrap: wrap; }
+      .nav-back { margin-top: 0; }
+      .row-2 { grid-template-columns: 1fr; }
+      .seg { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Que Chimba</h1>
+      <p>Soporte tecnico</p>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-section="nuevo-ticket">
+        <span class="dot green"></span>Nuevo ticket
+      </button>
+      <button class="nav-item" data-section="consultar-ticket">
+        <span class="dot blue"></span>Consultar ticket
+      </button>
+    </nav>
+
+    <div class="nav-back">
+      <a href="/login" class="nav-item">
+        <span class="dot"></span>Volver al login
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="main-inner">
+
+      <!-- Topbar -->
+      <div class="topbar">
+        <div>
+          <h2>Centro de soporte</h2>
+          <div class="subtle">Registra y consulta solicitudes de ayuda</div>
+        </div>
+      </div>
+
+      <!-- Section: Nuevo ticket -->
+      <div id="section-nuevo-ticket" class="section-content">
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Crear solicitud de soporte</h3>
+          </div>
+
+          <!-- Category segment -->
+          <div style="margin-bottom: 14px;">
+            <div class="seg-label">Categoria</div>
+            <div class="seg" id="cat-seg" role="group" aria-label="Categoria">
+              <button class="seg-btn active" data-cat="acceso">Acceso</button>
+              <button class="seg-btn" data-cat="tecnico">Tecnico</button>
+              <button class="seg-btn" data-cat="pedido">Pedido</button>
+              <button class="seg-btn" data-cat="facturacion">Facturacion</button>
+              <button class="seg-btn" data-cat="otro">Otro</button>
+            </div>
+          </div>
+
+          <!-- Priority segment -->
+          <div style="margin-bottom: 16px;">
+            <div class="seg-label">Prioridad</div>
+            <div class="seg" id="prio-seg" role="group" aria-label="Prioridad">
+              <button class="seg-btn" data-prio="baja">Baja</button>
+              <button class="seg-btn active" data-prio="media">Media</button>
+              <button class="seg-btn" data-prio="alta">Alta</button>
+              <button class="seg-btn" data-prio="urgente">Urgente</button>
+            </div>
+          </div>
+
+          <hr class="divider" />
+
+          <!-- Contact fields -->
+          <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div class="row-2">
+              <div class="field">
+                <label for="tk-nombre">Nombre completo</label>
+                <input id="tk-nombre" type="text" placeholder="Tu nombre" autocomplete="name" />
+              </div>
+              <div class="field">
+                <label for="tk-whatsapp">WhatsApp (opcional)</label>
+                <input id="tk-whatsapp" type="tel" placeholder="526561234567" autocomplete="tel" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="tk-desc">Descripcion del problema</label>
+              <textarea id="tk-desc"
+                placeholder="Describe con detalle el problema, que pantalla ves, que accion intentabas hacer, desde cuando ocurre."></textarea>
+            </div>
+
+            <div id="ticket-error" class="error-text"></div>
+
+            <button class="btn primary full" id="btn-enviar-ticket" type="button">
+              Enviar solicitud
+            </button>
+          </div>
+        </div>
+
+        <!-- Success card -->
+        <div class="success-card" id="ticket-success" role="alert">
+          <div class="ticket-num" id="ticket-number-display"></div>
+          <p>Solicitud registrada correctamente. Guarda este numero de ticket para hacer
+             seguimiento. El equipo se pondra en contacto contigo a la brevedad.</p>
+          <div class="success-actions">
+            <a href="#" id="btn-wa-followup" target="_blank" rel="noopener noreferrer"
+               class="btn">Seguimiento por WhatsApp</a>
+            <button class="btn" id="btn-nuevo-ticket" type="button">
+              Crear otro ticket
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Section: Consultar ticket -->
+      <div id="section-consultar-ticket" class="section-content" style="display:none;">
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Buscar por numero de ticket</h3>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: flex-start;">
+            <div class="field" style="flex: 1;">
+              <label for="buscar-ticket-input">Numero de ticket</label>
+              <input id="buscar-ticket-input" type="text"
+                     placeholder="TKT-20260318-001" style="text-transform: uppercase;" />
+            </div>
+            <div style="padding-top: 22px;">
+              <button class="btn primary" id="btn-buscar-ticket" type="button">Buscar</button>
+            </div>
+          </div>
+          <div id="buscar-error" class="error-text" style="margin-top: 8px;"></div>
+        </div>
+
+        <!-- Result card -->
+        <div class="card" id="ticket-result-card" style="display: none;">
+          <div class="card-head">
+            <h3 id="result-numero"></h3>
+            <span id="result-badge" class="badge"></span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+            <div>
+              <div style="color: var(--text-2); font-size: 12px; margin-bottom: 2px;">Solicitante</div>
+              <div id="result-nombre"></div>
+            </div>
+            <div>
+              <div style="color: var(--text-2); font-size: 12px; margin-bottom: 2px;">Categoria</div>
+              <div id="result-categoria"></div>
+            </div>
+            <div>
+              <div style="color: var(--text-2); font-size: 12px; margin-bottom: 2px;">Prioridad</div>
+              <div id="result-prioridad"></div>
+            </div>
+            <div>
+              <div style="color: var(--text-2); font-size: 12px; margin-bottom: 2px;">Creado</div>
+              <div id="result-fecha"></div>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <div style="color: var(--text-2); font-size: 12px; margin-bottom: 2px;">Descripcion</div>
+              <div id="result-desc" style="line-height: 1.55;"></div>
+            </div>
+            <div id="result-notas-wrap" style="grid-column: 1 / -1; display: none;">
+              <div style="color: var(--text-2); font-size: 12px; margin-bottom: 2px;">Notas de resolucion</div>
+              <div id="result-notas" style="line-height: 1.55;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- /main-inner -->
+  </div><!-- /main -->
+
+</div><!-- /app -->
+
+<script>
+  const SUPPORT_PHONE = "526567751166";
+
+  // ── Navigation ──────────────────────────────────────────────────────────────
+  document.getElementById("nav").addEventListener("click", (e) => {
+    const btn = e.target.closest(".nav-item[data-section]");
+    if (!btn) return;
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    btn.classList.add("active");
+    const target = btn.dataset.section;
+    document.querySelectorAll(".section-content").forEach(s => {
+      s.style.display = s.id === "section-" + target ? "" : "none";
+    });
+  });
+
+  // ── Segment helpers ─────────────────────────────────────────────────────────
+  function makeSegment(containerId) {
+    let selected = null;
+    const el = document.getElementById(containerId);
+    el.addEventListener("click", (e) => {
+      const btn = e.target.closest(".seg-btn");
+      if (!btn) return;
+      el.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      selected = btn.dataset.cat || btn.dataset.prio;
+    });
+    // Read initial active
+    const active = el.querySelector(".seg-btn.active");
+    if (active) selected = active.dataset.cat || active.dataset.prio;
+    return { get: () => selected };
+  }
+
+  const catSeg  = makeSegment("cat-seg");
+  const prioSeg = makeSegment("prio-seg");
+
+  // ── Create ticket ───────────────────────────────────────────────────────────
+  const btnEnviar    = document.getElementById("btn-enviar-ticket");
+  const ticketError  = document.getElementById("ticket-error");
+  const successCard  = document.getElementById("ticket-success");
+  const formCards    = document.querySelector("#section-nuevo-ticket .card");
+  const ticketNumEl  = document.getElementById("ticket-number-display");
+  const waFollowup   = document.getElementById("btn-wa-followup");
+
+  btnEnviar.addEventListener("click", async () => {
+    ticketError.textContent = "";
+    const nombre   = document.getElementById("tk-nombre").value.trim();
+    const whatsapp = document.getElementById("tk-whatsapp").value.trim();
+    const desc     = document.getElementById("tk-desc").value.trim();
+
+    if (!nombre) {
+      ticketError.textContent = "El nombre es obligatorio.";
+      document.getElementById("tk-nombre").focus();
+      return;
+    }
+    if (!desc) {
+      ticketError.textContent = "La descripcion del problema es obligatoria.";
+      document.getElementById("tk-desc").focus();
+      return;
+    }
+
+    btnEnviar.disabled = true;
+    btnEnviar.textContent = "Enviando...";
+
+    try {
+      const res = await fetch("/api/soporte/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoria: catSeg.get(),
+          prioridad: prioSeg.get(),
+          nombre_contacto: nombre,
+          whatsapp_contacto: whatsapp || null,
+          descripcion: desc,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "No se pudo crear el ticket");
+      }
+
+      const num = data.data.numero_ticket;
+      ticketNumEl.textContent = num;
+
+      const waMsg =
+        "Hola, soporte de Que Chimba.%0A%0A" +
+        "Registre un ticket de soporte.%0A" +
+        "Numero: *" + encodeURIComponent(num) + "*%0A" +
+        "Categoria: " + encodeURIComponent(catSeg.get()) + "%0A" +
+        "Prioridad: " + encodeURIComponent(prioSeg.get()) + "%0A" +
+        "Descripcion: " + encodeURIComponent(desc);
+      waFollowup.href = "https://wa.me/" + SUPPORT_PHONE + "?text=" + waMsg;
+
+      formCards.style.display = "none";
+      successCard.classList.add("show");
+
+    } catch (err) {
+      ticketError.textContent = err.message;
+      btnEnviar.disabled = false;
+      btnEnviar.textContent = "Enviar solicitud";
+    }
+  });
+
+  document.getElementById("btn-nuevo-ticket").addEventListener("click", () => {
+    successCard.classList.remove("show");
+    formCards.style.display = "";
+    document.getElementById("tk-nombre").value = "";
+    document.getElementById("tk-whatsapp").value = "";
+    document.getElementById("tk-desc").value = "";
+    ticketError.textContent = "";
+    btnEnviar.disabled = false;
+    btnEnviar.textContent = "Enviar solicitud";
+  });
+
+  // ── Consult ticket ──────────────────────────────────────────────────────────
+  const statusLabels = {
+    abierto:    { text: "Abierto",     cls: "blue" },
+    en_proceso: { text: "En proceso",  cls: "amber" },
+    resuelto:   { text: "Resuelto",    cls: "green" },
+    cerrado:    { text: "Cerrado",     cls: "red" },
+  };
+
+  document.getElementById("btn-buscar-ticket").addEventListener("click", buscarTicket);
+  document.getElementById("buscar-ticket-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") buscarTicket();
+  });
+
+  async function buscarTicket() {
+    const input  = document.getElementById("buscar-ticket-input");
+    const errEl  = document.getElementById("buscar-error");
+    const result = document.getElementById("ticket-result-card");
+    errEl.textContent = "";
+    result.style.display = "none";
+
+    const num = input.value.trim().toUpperCase();
+    if (!num) {
+      errEl.textContent = "Ingresa el numero de ticket.";
+      return;
+    }
+
+    try {
+      const res  = await fetch("/api/soporte/tickets/public/" + encodeURIComponent(num));
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Error al consultar");
+
+      const tk = data.data || {};
+
+      const s = statusLabels[tk.estado] || { text: tk.estado, cls: "blue" };
+      document.getElementById("result-numero").textContent    = tk.numero_ticket;
+      document.getElementById("result-badge").textContent     = s.text;
+      document.getElementById("result-badge").className       = "badge " + s.cls;
+      document.getElementById("result-nombre").textContent    = tk.nombre_contacto || "-";
+      document.getElementById("result-categoria").textContent = tk.categoria || "-";
+      document.getElementById("result-prioridad").textContent = tk.prioridad || "-";
+      document.getElementById("result-fecha").textContent     = tk.creado_en
+        ? new Date(tk.creado_en).toLocaleString("es-MX") : "-";
+      document.getElementById("result-desc").textContent      = tk.descripcion || "-";
+
+      const notasWrap = document.getElementById("result-notas-wrap");
+      if (tk.notas_resolucion) {
+        document.getElementById("result-notas").textContent = tk.notas_resolucion;
+        notasWrap.style.display = "";
+      } else {
+        notasWrap.style.display = "none";
+      }
+
+      result.style.display = "";
+    } catch (err) {
+      errEl.textContent = err.message;
+    }
+  }
+</script>
+</body>
+</html>

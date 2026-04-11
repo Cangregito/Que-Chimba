@@ -52,17 +52,124 @@ ESTADOS = {
 	"evaluar_producto",
 }
 
+# ─── Numeros autorizados para comandos de admin por WhatsApp ──────────────────
+_ADMIN_PHONES_RAW = os.getenv("WHATSAPP_ADMIN", "") or ""
+_WHATSAPP_ADMINS = {
+	p.strip().lstrip("+").replace(" ", "").replace("-", "")
+	for p in _ADMIN_PHONES_RAW.split(",")
+	if p.strip()
+}
+_TICKET_COMMANDS_ENABLED = (os.getenv("WHATSAPP_TICKET_COMMANDS_ENABLED", "0") or "0").strip().lower() in {"1", "true", "yes", "on"}
+# Patron: RESOLVER TKT-20260318-001 [notas opcionales]
+_TICKET_RESOLVE_RE = re.compile(
+	r"^RESOLVER\s+(TKT-\d{8}-\d{3,})(?:\s+(.+))?$",
+	re.IGNORECASE | re.DOTALL,
+)
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 def _extraer_items_menu_oficial(texto: str) -> Dict[str, Any]:
 	t = _normalizar_texto(texto)
 	items = []
+	matched_mentions = set()
+	nombre_frecuencia: Dict[str, int] = {}
+	fallback_match_count = 0
+	explicit_match_count = 0
 	try:
 		catalogo = list(_obtener_catalogo_productos())
 	except Exception:
 		catalogo = []
 
 	if not catalogo:
-		return {"items": [], "total": 0}
+		return {
+			"items": [],
+			"total": 0,
+			"needs_confirmation": False,
+			"needs_clarification": False,
+			"clarification_message": "",
+			"confidence_score": 0.0,
+			"parse_mode": "empty_catalog",
+			"signals": ["empty_catalog"],
+		}
+
+	def _construir_items_desde_config(items_config: list) -> tuple[list, int]:
+		by_id = {int(p.get("producto_id") or 0): p for p in catalogo if int(p.get("producto_id") or 0) > 0}
+		items_curados = []
+		for raw in items_config or []:
+			if not isinstance(raw, dict):
+				continue
+			pid = int(raw.get("producto_id") or 0)
+			cantidad = int(raw.get("cantidad") or 0)
+			producto = by_id.get(pid)
+			if pid <= 0 or cantidad <= 0 or not producto:
+				continue
+			precio = _to_float(producto.get("precio"), 0)
+			items_curados.append(
+				{
+					"producto_id": pid,
+					"nombre": producto.get("nombre", "Producto"),
+					"variante": producto.get("variante", ""),
+					"producto_nombre": f"{producto.get('nombre', '')} {producto.get('variante', '')}".strip(),
+					"cantidad": cantidad,
+					"precio_unit": float(precio),
+				}
+			)
+		total_curado = int(sum(int(i["cantidad"]) * _to_float(i.get("precio_unit"), 0) for i in items_curados))
+		return items_curados, total_curado
+
+	try:
+		regla_curada = db.buscar_regla_curada_parser(t)
+	except Exception:
+		regla_curada = None
+	if isinstance(regla_curada, dict):
+		items_regla, total_regla = _construir_items_desde_config(regla_curada.get("items_json") or [])
+		needs_clarification = bool(regla_curada.get("needs_clarification"))
+		confidence_score = 1.0 if items_regla and not needs_clarification else 0.3
+		return {
+			"items": items_regla,
+			"total": total_regla,
+			"needs_confirmation": bool(regla_curada.get("needs_confirmation")),
+			"needs_clarification": needs_clarification,
+			"clarification_message": str(regla_curada.get("clarification_message") or ""),
+			"confidence_score": confidence_score,
+			"parse_mode": "curated_rule",
+			"signals": ["curated_rule"],
+			"matched_rule_id": int(regla_curada.get("regla_id") or 0),
+			"matched_rule_phrase": str(regla_curada.get("frase_original") or ""),
+		}
+
+	for p in catalogo:
+		nombre_norm = _normalizar_texto(p.get("nombre") or "")
+		if nombre_norm:
+			nombre_frecuencia[nombre_norm] = nombre_frecuencia.get(nombre_norm, 0) + 1
+
+	cantidad_palabras = {
+		"un": 1,
+		"uno": 1,
+		"una": 1,
+		"dos": 2,
+		"tres": 3,
+		"cuatro": 4,
+		"cinco": 5,
+		"seis": 6,
+		"siete": 7,
+		"ocho": 8,
+		"nueve": 9,
+		"diez": 10,
+		"once": 11,
+		"doce": 12,
+		"docena": 12,
+		"media docena": 6,
+	}
+	qty_token_re = r"(?:\d{1,3}|media\s+docena|docena|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)"
+
+	def _parse_qty_token(token: str) -> Optional[int]:
+		tok = _normalizar_texto(token)
+		if not tok:
+			return None
+		if re.fullmatch(r"\d{1,3}", tok):
+			return int(tok)
+		return cantidad_palabras.get(tok)
 
 	def _resolver_producto_por_alias(alias: str) -> Optional[Dict[str, Any]]:
 		k = _normalizar_texto(alias)
@@ -89,16 +196,78 @@ def _extraer_items_menu_oficial(texto: str) -> Dict[str, Any]:
 				break
 	if not producto_pollo:
 		producto_pollo = producto_carne
+	producto_carne_id = int(producto_carne.get("producto_id") or 0) if producto_carne else 0
+	producto_pollo_id = int(producto_pollo.get("producto_id") or 0) if producto_pollo else 0
 
-	def _push_item(producto: Optional[Dict[str, Any]], cantidad: int):
+	tiene_variante_empanada = bool(producto_carne and producto_pollo and producto_carne.get("producto_id") != producto_pollo.get("producto_id"))
+	if tiene_variante_empanada:
+		menciones_ambiguas_empanada = list(
+			re.finditer(
+				rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,2}}?empanada(?:s)?\b(?!\s+de\s+(?:carne|pollo)\b)",
+				t,
+			)
+		)
+		if menciones_ambiguas_empanada:
+			cantidad_empanadas = sum(int(_parse_qty_token(m.group(1)) or 0) for m in menciones_ambiguas_empanada) or len(menciones_ambiguas_empanada)
+			items_parciales = []
+			for patron, producto in [
+				(rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,2}}?(?:de\s+)?agu(?:a|as)\b", producto_agua),
+				(rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,2}}?(?:de\s+)?refresco(?:s)?\b", producto_refresco),
+				(rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,2}}?(?:de\s+)?jugo(?:s)?\b", producto_jugo),
+			]:
+				for match in re.finditer(patron, t):
+					cantidad = _parse_qty_token(match.group(1))
+					if cantidad and producto:
+						precio = _to_float(producto.get("precio"), 0)
+						items_parciales.append(
+							{
+								"producto_id": int(producto.get("producto_id") or 0),
+								"nombre": producto.get("nombre", "Producto"),
+								"variante": producto.get("variante", ""),
+								"producto_nombre": f"{producto.get('nombre', '')} {producto.get('variante', '')}".strip(),
+								"cantidad": int(cantidad),
+								"precio_unit": float(precio),
+							}
+						)
+			total_parcial = int(sum(int(i["cantidad"]) * _to_float(i.get("precio_unit"), 0) for i in items_parciales))
+			resumen_parcial = _formatear_carrito(items_parciales, total_parcial) if items_parciales else ""
+			texto_clarificacion = f"Te entendi {cantidad_empanadas} empanada"
+			if cantidad_empanadas != 1:
+				texto_clarificacion += "s"
+			texto_clarificacion += ", pero me falta saber si la quieres de carne o de pollo."
+			if resumen_parcial:
+				texto_clarificacion = f"{texto_clarificacion}\n\nLo demas si te lo entendi:\n{resumen_parcial}"
+			return {
+				"items": items_parciales,
+				"total": total_parcial,
+				"needs_confirmation": False,
+				"needs_clarification": True,
+				"clarification_message": texto_clarificacion,
+				"confidence_score": 0.2 if items_parciales else 0.0,
+				"parse_mode": "clarification_required",
+				"signals": ["ambiguous_empanada"] + (["partial_items_detected"] if items_parciales else []),
+			}
+
+	def _push_item(producto: Optional[Dict[str, Any]], cantidad: int, span: Optional[Tuple[int, int]] = None, source: str = "explicit"):
+		nonlocal fallback_match_count, explicit_match_count
 		if cantidad <= 0:
 			return
 		if not producto:
 			return
+		pid = int(producto.get("producto_id") or 0)
+		if span and pid > 0:
+			key = (pid, int(span[0]), int(span[1]))
+			if key in matched_mentions:
+				return
+			matched_mentions.add(key)
+		if source == "fallback":
+			fallback_match_count += 1
+		else:
+			explicit_match_count += 1
 		precio = _to_float(producto.get("precio"), 0)
 		items.append(
 			{
-				"producto_id": producto.get("producto_id"),
+				"producto_id": pid,
 				"nombre": producto.get("nombre", "Producto"),
 				"variante": producto.get("variante", ""),
 				"producto_nombre": f"{producto.get('nombre', '')} {producto.get('variante', '')}".strip(),
@@ -107,9 +276,11 @@ def _extraer_items_menu_oficial(texto: str) -> Dict[str, Any]:
 			}
 		)
 
+	handled_de_cada = False
 	if "de cada" in t and any(x in t for x in ["carne", "pollo"]):
 		m_total = re.search(r"\b(\d{1,3})\b", t)
 		if m_total:
+			handled_de_cada = True
 			total = int(m_total.group(1))
 			mitad = max(total // 2, 1)
 			resto = total - mitad
@@ -119,37 +290,52 @@ def _extraer_items_menu_oficial(texto: str) -> Dict[str, Any]:
 				_push_item(producto_pollo, max(resto, 1))
 
 	patrones = [
-		(r"(\d{1,3})\s*(?:de\s+)?carne", producto_carne),
-		(r"(\d{1,3})\s*(?:de\s+)?pollo", producto_pollo),
-		(r"(\d{1,3})\s*(?:de\s+)?agu(?:a|as)", producto_agua),
-		(r"(\d{1,3})\s*(?:de\s+)?refresco(?:s)?", producto_refresco),
-		(r"(\d{1,3})\s*(?:de\s+)?jugo(?:s)?", producto_jugo),
+		(rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,3}}?(?:de\s+)?carne\b", producto_carne),
+		(rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,3}}?(?:de\s+)?pollo\b", producto_pollo),
+		(rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,2}}?(?:de\s+)?agu(?:a|as)\b", producto_agua),
+		(rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,2}}?(?:de\s+)?refresco(?:s)?\b", producto_refresco),
+		(rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,2}}?(?:de\s+)?jugo(?:s)?\b", producto_jugo),
 	]
 
 	for patron, producto in patrones:
+		producto_id_actual = int(producto.get("producto_id") or 0) if producto else 0
+		if handled_de_cada and producto_id_actual in {producto_carne_id, producto_pollo_id}:
+			continue
 		for match in re.finditer(patron, t):
-			_push_item(producto, int(match.group(1)))
+			cantidad = _parse_qty_token(match.group(1))
+			if cantidad:
+				_push_item(producto, int(cantidad), span=(match.start(), match.end()))
 
 	for producto in catalogo:
+		producto_id_actual = int(producto.get("producto_id") or 0)
+		if handled_de_cada and producto_id_actual in {producto_carne_id, producto_pollo_id}:
+			continue
 		aliases = []
 		nombre = _normalizar_texto(producto.get("nombre") or "")
 		variante = _normalizar_texto(producto.get("variante") or "")
 		completo = _normalizar_texto(f"{producto.get('nombre', '')} {producto.get('variante', '')}")
-		for alias in [completo, nombre, variante]:
+		for alias in [completo, variante]:
 			if alias and alias not in aliases and len(alias) >= 3:
 				aliases.append(alias)
+		if nombre and len(nombre) >= 3 and nombre_frecuencia.get(nombre, 0) == 1 and nombre not in aliases:
+			aliases.append(nombre)
 		for alias in aliases:
-			patron = rf"(\d{{1,3}})\s*(?:de\s+)?{re.escape(alias)}(?:es|s)?\b"
+			patron = rf"\b({qty_token_re})\s+(?:[a-z]+\s+){{0,2}}?(?:de\s+)?{re.escape(alias)}(?:es|s)?\b"
 			for match in re.finditer(patron, t):
-				_push_item(producto, int(match.group(1)))
+				cantidad = _parse_qty_token(match.group(1))
+				if cantidad:
+					_push_item(producto, int(cantidad), span=(match.start(), match.end()))
 
 	if not items:
 		for producto in catalogo:
 			blob = _normalizar_texto(f"{producto.get('nombre', '')} {producto.get('variante', '')}")
 			nombre = _normalizar_texto(producto.get("nombre") or "")
 			variante = _normalizar_texto(producto.get("variante") or "")
-			if any(alias and alias in t for alias in [blob, nombre, variante]):
-				_push_item(producto, 1)
+			if any(alias and alias in t for alias in [blob, variante]):
+				_push_item(producto, 1, source="fallback")
+				continue
+			if nombre and nombre_frecuencia.get(nombre, 0) == 1 and nombre in t:
+				_push_item(producto, 1, source="fallback")
 
 	consolidado: Dict[int, Dict[str, Any]] = {}
 	for item in items:
@@ -161,7 +347,33 @@ def _extraer_items_menu_oficial(texto: str) -> Dict[str, Any]:
 
 	items_final = [v for v in consolidado.values() if int(v.get("cantidad") or 0) > 0]
 	total = int(sum(int(i["cantidad"]) * _to_float(i.get("precio_unit"), 0) for i in items_final))
-	return {"items": items_final, "total": total}
+	signals = []
+	if explicit_match_count > 0:
+		signals.append("explicit_match")
+	if fallback_match_count > 0:
+		signals.append("fallback_match")
+	if handled_de_cada:
+		signals.append("split_de_cada")
+	if items_final and fallback_match_count == 0:
+		confidence_score = 0.98
+		parse_mode = "explicit"
+	elif items_final:
+		confidence_score = max(0.55, min(0.84, 0.72 + (0.06 * min(explicit_match_count, 2)) - (0.08 * fallback_match_count)))
+		parse_mode = "inferred"
+	else:
+		confidence_score = 0.0
+		parse_mode = "not_understood"
+		signals.append("no_items")
+	return {
+		"items": items_final,
+		"total": total,
+		"needs_confirmation": fallback_match_count > 0,
+		"needs_clarification": False,
+		"clarification_message": "",
+		"confidence_score": round(confidence_score, 3),
+		"parse_mode": parse_mode,
+		"signals": signals,
+	}
 
 
 def _formatear_carrito(items: list, total: int) -> str:
@@ -184,6 +396,45 @@ def _formatear_carrito(items: list, total: int) -> str:
 		lineas.append(f"- {qty}x {etiqueta} ${qty * pu:.2f}")
 	lineas.append(f"TOTAL: ${int(total)} MXN")
 	return "\n".join(lineas)
+
+
+def _registrar_observabilidad_parser(cliente: dict, mensaje: str, extraccion: Dict[str, Any], estado_origen: str = "seleccion_producto") -> None:
+	confidence_score = float(extraccion.get("confidence_score") or 0)
+	needs_clarification = bool(extraccion.get("needs_clarification"))
+	needs_confirmation = bool(extraccion.get("needs_confirmation"))
+	items = extraccion.get("items") or []
+	parse_mode = str(extraccion.get("parse_mode") or "unknown")
+	if not needs_clarification and not needs_confirmation and items and confidence_score >= 0.9:
+		return
+	evento = "parser_not_understood"
+	if needs_clarification:
+		evento = "parser_needs_clarification"
+	elif needs_confirmation:
+		evento = "parser_needs_confirmation"
+	elif items:
+		evento = "parser_low_confidence"
+	try:
+		db.registrar_observacion_parser_pedido(
+			tipo_evento=evento,
+			cliente_id=cliente.get("cliente_id"),
+			whatsapp_id=cliente.get("whatsapp_id"),
+			estado_origen=estado_origen,
+			texto_usuario=mensaje,
+			confidence_score=confidence_score,
+			parse_mode=parse_mode,
+			needs_clarification=needs_clarification,
+			needs_confirmation=needs_confirmation,
+			items_detectados=items,
+			signals=extraccion.get("signals") or [],
+			metadata={
+				"total": int(extraccion.get("total") or 0),
+				"clarification_message": extraccion.get("clarification_message") or "",
+				"matched_rule_id": int(extraccion.get("matched_rule_id") or 0),
+				"matched_rule_phrase": extraccion.get("matched_rule_phrase") or "",
+			},
+		)
+	except Exception as exc:
+		logger.debug("No se pudo registrar observabilidad del parser: %s", exc)
 
 
 def _validar_disponibilidad_producto(producto_id: Any, cantidad: Any) -> Optional[str]:
@@ -232,6 +483,7 @@ LLM_API_KEY = (os.getenv("LLM_API_KEY", "") or "").strip()
 LLM_LOCAL_ENABLED = (os.getenv("LLM_LOCAL_ENABLED", "1") or "1").strip().lower() in {"1", "true", "yes", "on"}
 LLM_LOCAL_BASE_URL = (os.getenv("LLM_LOCAL_BASE_URL", "http://localhost:11434") or "http://localhost:11434").rstrip("/")
 LLM_LOCAL_MODEL = (os.getenv("LLM_LOCAL_MODEL", "phi3:mini") or "phi3:mini").strip()
+LLM_STYLE_ENABLED = (os.getenv("LLM_STYLE_ENABLED", "1") or "1").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _get_timeout_env(name: str, default: float) -> float:
@@ -245,6 +497,7 @@ def _get_timeout_env(name: str, default: float) -> float:
 
 LLM_REMOTE_TIMEOUT_SEC = _get_timeout_env("LLM_REMOTE_TIMEOUT_SEC", 20.0)
 LLM_LOCAL_TIMEOUT_SEC = _get_timeout_env("LLM_LOCAL_TIMEOUT_SEC", 30.0)
+LLM_STYLE_TIMEOUT_SEC = _get_timeout_env("LLM_STYLE_TIMEOUT_SEC", 3.5)
 
 
 def _now_iso():
@@ -294,6 +547,13 @@ def _obtener_o_crear_cliente(whatsapp_id):
 	if _es_error(result):
 		raise RuntimeError(result["error"])
 	return result
+
+
+def _obtener_contexto_cliente(cliente_id):
+	result = db.obtener_contexto_cliente(cliente_id)
+	if _es_error(result):
+		return {}
+	return result if isinstance(result, dict) else {}
 
 
 def _actualizar_cliente_basico(cliente_id, nombre=None, apellidos=None, genero_trato=None):
@@ -349,6 +609,22 @@ def _menu_texto(productos):
 	return "\n".join(lines)
 
 
+def _resumen_items_breve(items: list, limite: int = 2) -> str:
+	if not items:
+		return ""
+	partes = []
+	for item in items[:limite]:
+		qty = int(item.get("cantidad") or 0)
+		nombre = str(item.get("nombre") or item.get("producto_nombre") or "Producto").strip()
+		variante = str(item.get("variante") or "").strip()
+		nom = f"{nombre} {variante}".strip()
+		if qty > 0:
+			partes.append(f"{qty}x {nom}")
+	if len(items) > limite:
+		partes.append("...")
+	return ", ".join(partes)
+
+
 def _voice_transcribir_audio(media_url):
 	if not media_url or not voice:
 		if not media_url:
@@ -381,6 +657,22 @@ def _voice_transcribir_audio(media_url):
 				continue
 	logger.warning("No se pudo transcribir audio con ningun adaptador de voz")
 	return ""
+
+
+def _es_media_audio(media_url: Any, media_type: Any = None, media_kind: Any = None) -> bool:
+	url = str(media_url or "").strip().lower()
+	mtype = str(media_type or "").strip().lower()
+	mkind = str(media_kind or "").strip().lower()
+
+	if mkind == "audio":
+		return True
+	if mtype.startswith("audio/"):
+		return True
+	if any(token in mtype for token in ("audio", "opus", "ogg", "mpeg", "mp3", "wav", "amr", "m4a")):
+		return True
+	if any(url.endswith(ext) for ext in (".ogg", ".opus", ".mp3", ".wav", ".amr", ".m4a")):
+		return True
+	return False
 
 
 def _voice_generar_audio(texto):
@@ -544,10 +836,102 @@ def _trato_cliente(datos_temp: Dict[str, Any]) -> str:
 	return TRATO_POR_GENERO["neutro"]
 
 
+def _texto_tiene_datos_numericos_preservados(base: str, candidato: str) -> bool:
+	numeros_base = re.findall(r"\d+[\d.,]*", base or "")
+	if not numeros_base:
+		return True
+	lc = (candidato or "").lower()
+	return all(n.lower() in lc for n in numeros_base)
+
+
+def _pulir_texto_con_ia(texto: str, datos_temp: Dict[str, Any]) -> str:
+	base = (texto or "").strip()
+	if not base:
+		return base
+	if not LLM_STYLE_ENABLED or requests is None:
+		return base
+	# Evita latencia alta en mensajes largos o estructurados como menu/listados.
+	if len(base) > 420 or "\n-" in base:
+		return base
+
+	trato = _trato_cliente(datos_temp)
+	prompt = (
+		"Reescribe este mensaje para WhatsApp en espanol mexicano natural, cercano y profesional. "
+		"Debe sonar humano y claro. Mantener exactamente datos clave (numeros, montos, folios, codigos, direcciones y nombres de producto). "
+		"No agregues datos ni cambies el sentido. No uses markdown. Responde solo el texto final en maximo 2 frases. "
+		f"Trato sugerido: {trato}. Mensaje base: {base}"
+	)
+
+	def _validar_candidato(candidato: str) -> Optional[str]:
+		c = (candidato or "").strip()
+		if not c:
+			return None
+		if "```" in c:
+			return None
+		if len(c) < 8 or len(c) > 520:
+			return None
+		if not _texto_tiene_datos_numericos_preservados(base, c):
+			return None
+		return c
+
+	if _llm_local_disponible():
+		try:
+			resp = requests.post(
+				f"{LLM_LOCAL_BASE_URL}/api/generate",
+				json={
+					"model": LLM_LOCAL_MODEL,
+					"prompt": prompt,
+					"stream": False,
+					"options": {"temperature": 0.55},
+				},
+				timeout=LLM_STYLE_TIMEOUT_SEC,
+			)
+			resp.raise_for_status()
+			body = resp.json()
+			candidato = _validar_candidato((body.get("response") or "").strip())
+			if candidato:
+				return candidato
+		except Exception as exc:
+			logger.info("Pulido IA local no disponible: %s", exc)
+
+	if _llm_disponible():
+		try:
+			resp = requests.post(
+				f"{LLM_BASE_URL}/v1/chat/completions",
+				headers={
+					"Authorization": f"Bearer {LLM_API_KEY}",
+					"Content-Type": "application/json",
+				},
+				json={
+					"model": LLM_MODEL,
+					"temperature": 0.5,
+					"messages": [
+						{
+							"role": "system",
+							"content": "Reescribes mensajes de negocio para WhatsApp. Mantienes datos exactos y no inventas informacion.",
+						},
+						{"role": "user", "content": prompt},
+					],
+				},
+				timeout=LLM_STYLE_TIMEOUT_SEC,
+			)
+			resp.raise_for_status()
+			body = resp.json()
+			content = (((body.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+			candidato = _validar_candidato(content)
+			if candidato:
+				return candidato
+		except Exception as exc:
+			logger.info("Pulido IA remoto no disponible: %s", exc)
+
+	return base
+
+
 def _armar_respuesta_comercial(texto: str, opciones: Optional[str], datos_temp: Dict[str, Any]) -> Dict[str, Any]:
 	trato = _trato_cliente(datos_temp)
 	prefijo = random.choice(MODISMOS_SEGUROS)
-	texto_final = f"{trato}, {texto}" if trato else texto
+	texto_humano = _pulir_texto_con_ia(texto, datos_temp)
+	texto_final = f"{trato}, {texto_humano}" if trato else texto_humano
 	cuerpo = f"{prefijo} {texto_final}".strip()
 	if opciones:
 		cuerpo = f"{cuerpo}\n\nOpciones:\n{opciones}"
@@ -1665,6 +2049,10 @@ def _manejar_metodo_entrega(text, datos_temp):
 
 	if any(k in t for k in ["domicilio", "enviar", "mandar", "delivery", "casa"]):
 		datos_temp["metodo_entrega"] = "domicilio"
+		if datos_temp.get("preferir_ultimo_domicilio") and datos_temp.get("direccion_id") and (datos_temp.get("direccion_texto") or "").strip():
+			texto = f"listo, usamos tu ultimo domicilio: {datos_temp.get('direccion_texto')}"
+			opciones = "efectivo\ntarjeta\ncontra entrega"
+			return "metodo_pago", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 		texto = "comparteme tu direccion completa para envio."
 		opciones = "Formato: Calle, numero, colonia, codigo postal (5 digitos)"
 		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
@@ -1908,10 +2296,82 @@ def _respuesta_to_handler_output(response: Dict[str, Any], nuevo_estado: str) ->
 
 def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 	datos_temp = _as_dict(sesion.get("datos_temp"))
+	contexto = _obtener_contexto_cliente(cliente.get("cliente_id")) if cliente.get("cliente_id") else {}
+	if contexto:
+		datos_temp["contexto_cliente"] = contexto
+		nombre_ctx = (contexto.get("nombre") or "").strip()
+		if _nombre_cliente_es_valido(nombre_ctx) and not _nombre_cliente_es_valido(datos_temp.get("cliente_nombre")):
+			datos_temp["cliente_nombre"] = nombre_ctx
+			apellidos_ctx = (contexto.get("apellidos") or "").strip()
+			if apellidos_ctx and not datos_temp.get("cliente_apellidos"):
+				datos_temp["cliente_apellidos"] = apellidos_ctx
+
 	t = _normalizar_texto(mensaje)
+	if any(k in t for k in ["4", "repetir", "ultima compra", "mismo pedido"]):
+		items_prev = contexto.get("ultimo_items") if isinstance(contexto, dict) else None
+		if not isinstance(items_prev, list) or not items_prev:
+			response = _armar_respuesta_comercial(
+				"No tengo una compra anterior para repetir todavia.",
+				"1) Quiero pedir empanadas\n3) Ver menu y precios",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "bienvenida")
+			out["datos_temp"] = datos_temp
+			return out
+
+		error_stock = _validar_items_carrito(items_prev)
+		if error_stock:
+			response = _armar_respuesta_comercial(
+				f"No pude repetir tu ultima compra completa por disponibilidad. {error_stock}",
+				"Escribe tu pedido manual o pide menu",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "seleccion_producto")
+			out["datos_temp"] = datos_temp
+			return out
+
+		total_prev = int(sum(int(i.get("cantidad") or 0) * _to_float(i.get("precio_unit"), 0) for i in items_prev))
+		datos_temp["items"] = items_prev
+		datos_temp["total"] = total_prev
+		resumen = _formatear_carrito(items_prev, total_prev)
+		response = _armar_respuesta_comercial(
+			f"Te arme tu ultima compra para confirmar:\n{resumen}",
+			"1) Si, esta bien\n2) Quiero cambiar algo",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "confirmar_carrito")
+		out["datos_temp"] = datos_temp
+		return out
+
+	if any(k in t for k in ["5", "ultimo domicilio", "mismo domicilio", "direccion anterior"]):
+		ultima = (contexto or {}).get("ultima_direccion") if isinstance(contexto, dict) else None
+		if not isinstance(ultima, dict) or not int(ultima.get("direccion_id") or 0):
+			response = _armar_respuesta_comercial(
+				"Todavia no tengo un domicilio previo guardado.",
+				"1) Quiero pedir empanadas\n2) Es para evento",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "bienvenida")
+			out["datos_temp"] = datos_temp
+			return out
+
+		datos_temp["preferir_ultimo_domicilio"] = True
+		datos_temp["direccion_id"] = int(ultima.get("direccion_id") or 0)
+		datos_temp["direccion_texto"] = str(ultima.get("direccion_texto") or "").strip()
+		datos_temp["codigo_postal"] = str(ultima.get("codigo_postal") or "").strip()
+		response = _armar_respuesta_comercial(
+			f"Perfecto, usare tu ultimo domicilio cuando confirmes entrega: {datos_temp.get('direccion_texto')}",
+			"Ahora arma tu pedido. Ejemplo: 3 de carne y 2 de pollo",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "seleccion_producto")
+		out["datos_temp"] = datos_temp
+		return out
+
 	if any(k in t for k in ["1", "pedir", "quiero", "orden"]):
 		datos_temp["tipo"] = "orden"
-		texto = "Bacano parce. Tengo menu dinamico desde el sistema. Digame que va a querer y cuantas."
+		menu = _menu_texto(list(_obtener_catalogo_productos()))
+		texto = f"Bacano parce. Tengo menu dinamico desde el sistema:\n{menu}\n\nDigame que va a querer y cuantas."
 		opciones = "Ejemplo: 3 de carne y 2 de pollo con 2 aguas"
 		response = _armar_respuesta_comercial(texto, opciones, datos_temp)
 		out = _respuesta_to_handler_output(response, "seleccion_producto")
@@ -1934,9 +2394,34 @@ def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 		out["datos_temp"] = datos_temp
 		return out
 
+	nombre_saludo = (datos_temp.get("cliente_nombre") or cliente.get("nombre") or "").strip()
+	if not _nombre_cliente_es_valido(nombre_saludo):
+		nombre_saludo = "parce"
+	resumen_ultima = _resumen_items_breve((contexto or {}).get("ultimo_items") or []) if isinstance(contexto, dict) else ""
+	ultima_dir = ""
+	if isinstance(contexto, dict) and isinstance(contexto.get("ultima_direccion"), dict):
+		ultima_dir = str((contexto.get("ultima_direccion") or {}).get("direccion_texto") or "").strip()
+
+	lineas = [f"Ey {nombre_saludo}, bienvenido a Que Chimba. Elija una opcion para arrancar."]
+	if resumen_ultima:
+		lineas.append(f"Ultima compra: {resumen_ultima}")
+	if ultima_dir:
+		lineas.append(f"Ultimo domicilio: {ultima_dir}")
+
+	opciones = [
+		"1) Quiero pedir empanadas",
+		"2) Es para evento",
+		"3) Ver menu y precios",
+	]
+	if resumen_ultima:
+		opciones.append("4) Repetir ultima compra")
+	if ultima_dir:
+		opciones.append("5) Usar ultimo domicilio",
+		)
+
 	response = _armar_respuesta_comercial(
-		"Ey parce, bienvenido a Que Chimba. Elija una opcion para arrancar.",
-		"1) Quiero pedir empanadas\n2) Es para evento\n3) Ver menu y precios",
+		"\n".join(lineas),
+		"\n".join(opciones),
 		datos_temp,
 	)
 	out = _respuesta_to_handler_output(response, "bienvenida")
@@ -1947,8 +2432,21 @@ def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 def handle_seleccion_producto(sesion: dict, mensaje: str, cliente: dict) -> dict:
 	datos_temp = _as_dict(sesion.get("datos_temp"))
 	extraccion = _extraer_items_menu_oficial(mensaje)
+	_registrar_observabilidad_parser(cliente, mensaje, extraccion, estado_origen="seleccion_producto")
 	items = extraccion.get("items") or []
 	total = int(extraccion.get("total") or 0)
+	if extraccion.get("needs_clarification"):
+		if items:
+			datos_temp["items"] = items
+			datos_temp["total"] = total
+		response = _armar_respuesta_comercial(
+			str(extraccion.get("clarification_message") or "Aclarame el pedido, parce."),
+			"Responde por ejemplo: de carne\nde pollo",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "seleccion_producto")
+		out["datos_temp"] = datos_temp
+		return out
 	if not items:
 		response = _armar_respuesta_comercial(
 			"No le entendi el pedido completo, parce. Digamelo con cantidades.",
@@ -1972,9 +2470,14 @@ def handle_seleccion_producto(sesion: dict, mensaje: str, cliente: dict) -> dict
 
 	datos_temp["items"] = items
 	datos_temp["total"] = total
+	datos_temp["parser_confidence_score"] = float(extraccion.get("confidence_score") or 0)
+	datos_temp["parser_parse_mode"] = str(extraccion.get("parse_mode") or "unknown")
 	resumen = _formatear_carrito(items, total)
+	texto_confirmacion = f"Buena nota parce, confirme su carrito:\n{resumen}"
+	if extraccion.get("needs_confirmation"):
+		texto_confirmacion = f"Te entendi asi por ahora:\n{resumen}\n\nSi eso era lo que querias, me confirmas y seguimos."
 	response = _armar_respuesta_comercial(
-		f"Buena nota parce, confirme su carrito:\n{resumen}",
+		texto_confirmacion,
 		"1) Si, esta bien\n2) Quiero cambiar algo",
 		datos_temp,
 	)
@@ -2072,14 +2575,9 @@ def handle_confirmacion(sesion: dict, mensaje: str, cliente: dict) -> dict:
 		return out
 
 	if any(k in t for k in ["1", "si", "confirm", "acepto", "listo"]):
-		response = _armar_respuesta_comercial(
-			"Perfecto parce, voy a confirmar su pedido en sistema.",
-			"Aguanteme un segundo y le comparto folio y codigo de entrega.",
-			datos_temp,
-		)
-		out = _respuesta_to_handler_output(response, "completado")
-		out["datos_temp"] = datos_temp
-		return out
+		# Confirmacion inmediata: persistimos el pedido en este mismo turno.
+		sesion_confirmada = {"estado": "completado", "datos_temp": datos_temp}
+		return handle_completado(sesion_confirmada, mensaje, cliente)
 
 	items = datos_temp.get("items") or []
 	total = int(datos_temp.get("total") or 0)
@@ -2096,9 +2594,59 @@ def handle_confirmacion(sesion: dict, mensaje: str, cliente: dict) -> dict:
 
 def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 	datos_temp = _as_dict(sesion.get("datos_temp"))
+	if datos_temp.get("pedido_id") and bool(datos_temp.get("pedido_confirmado")):
+		pedido_id = int(datos_temp.get("pedido_id") or 0)
+		codigo = str(datos_temp.get("codigo_entrega") or "").strip().upper()
+		texto = f"Tu pedido #{pedido_id} ya esta confirmado y en proceso."
+		if codigo:
+			texto = f"{texto} Codigo de entrega: {codigo}"
+		response = _armar_respuesta_comercial(
+			texto,
+			"menu\nayuda",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "completado")
+		out["datos_temp"] = datos_temp
+		return out
+
 	try:
+		nombre_actual = datos_temp.get("cliente_nombre") or cliente.get("nombre")
+		if not _nombre_cliente_es_valido(nombre_actual):
+			posible_nombre = _extraer_nombre_cliente(mensaje)
+			if _nombre_cliente_es_valido(posible_nombre):
+				datos_temp["cliente_nombre"] = posible_nombre
+				partes = str(posible_nombre).split()
+				if len(partes) > 1 and not datos_temp.get("cliente_apellidos"):
+					datos_temp["cliente_apellidos"] = " ".join(partes[1:])
+			else:
+				response = _armar_respuesta_comercial(
+					"antes de confirmar necesito tu nombre para registrar la venta correctamente.",
+					"Escribe tu nombre completo. Ejemplo: Mariana Soto",
+					datos_temp,
+				)
+				out = _respuesta_to_handler_output(response, "bienvenida")
+				out["datos_temp"] = datos_temp
+				return out
+		elif not datos_temp.get("cliente_nombre"):
+			datos_temp["cliente_nombre"] = str(nombre_actual).strip()
+			partes = str(nombre_actual).strip().split()
+			if len(partes) > 1 and not datos_temp.get("cliente_apellidos"):
+				datos_temp["cliente_apellidos"] = " ".join(partes[1:])
+
+		_persistir_datos_cliente(cliente, datos_temp)
+
 		items = datos_temp.get("items") or []
 		if not items:
+			if datos_temp.get("pedido_id"):
+				pedido_id = int(datos_temp.get("pedido_id") or 0)
+				response = _armar_respuesta_comercial(
+					f"Tu pedido #{pedido_id} sigue en proceso.",
+					"menu\nayuda",
+					datos_temp,
+				)
+				out = _respuesta_to_handler_output(response, "completado")
+				out["datos_temp"] = datos_temp
+				return out
 			response = _armar_respuesta_comercial(
 				"No encuentro el carrito para cerrar la orden. Armemoslo otra vez rapidito.",
 				"Escriba productos y cantidades. Ejemplo: 3 de carne y 2 de pollo",
@@ -2114,7 +2662,11 @@ def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 
 		pedido_id = int(result.get("pedido_id") or 0)
 		codigo = str(result.get("codigo_entrega") or "").strip().upper()
-		nuevos_datos = {}
+		nuevos_datos = {
+			"pedido_id": pedido_id,
+			"codigo_entrega": codigo,
+			"pedido_confirmado": True,
+		}
 
 		if requests is not None and pedido_id > 0:
 			try:
@@ -2273,9 +2825,9 @@ def process_message(whatsapp_id, tipo, texto, audio_path=None, lat=None, lng=Non
 		if nuevo_estado not in ESTADOS:
 			nuevo_estado = estado
 
-		# Generar audio colombiano de bienvenida al nuevo estado cuando hay transicion.
+		# Generar audio colombiano de transicion solo si la respuesta principal no trae audio.
 		audio_colombiano = None
-		if voice and nuevo_estado != estado:
+		if voice and nuevo_estado != estado and not resultado.get("audio_path"):
 			try:
 				audio_colombiano = voice.generar_audio_colombiano(
 					nuevo_estado,
@@ -2561,7 +3113,7 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 		)
 
 
-def procesar_mensaje_whatsapp(whatsapp_id, mensaje, media_url=None, media_type=None, latitude=None, longitude=None):
+def procesar_mensaje_whatsapp(whatsapp_id, mensaje, media_url=None, media_type=None, media_kind=None, latitude=None, longitude=None):
 	"""
 	Puerta de entrada desde app.py. Enruta al nuevo dispatcher FSM (process_message)
 	y convierte la salida al formato legacy {"tipo", "contenido", "audio_filename"}
@@ -2569,8 +3121,40 @@ def procesar_mensaje_whatsapp(whatsapp_id, mensaje, media_url=None, media_type=N
 	"""
 	from_id = _numero_desde_from(whatsapp_id)
 
+	# ── Comando de administrador via WhatsApp: RESOLVER TKT-XXXXXXXX-NNN [notas] ──
+	clean_from = from_id.lstrip("+").replace(" ", "").replace("-", "")
+	if _TICKET_COMMANDS_ENABLED and _WHATSAPP_ADMINS and clean_from in _WHATSAPP_ADMINS:
+		m = _TICKET_RESOLVE_RE.match((mensaje or "").strip())
+		if m:
+			numero_ticket = m.group(1).upper()
+			notas = (m.group(2) or "").strip() or None
+			result = db.actualizar_estado_ticket(
+				numero_ticket=numero_ticket,
+				nuevo_estado="resuelto",
+				notas_resolucion=notas,
+				resuelto_por=from_id,
+			)
+			if isinstance(result, dict) and result.get("error"):
+				return {
+					"tipo": "texto",
+					"contenido": f"\u274c No se pudo resolver el ticket: {result['error']}",
+				}
+			contacto = result.get("nombre_contacto", "N/A")
+			categoria = result.get("categoria", "N/A")
+			linea_notas = f"\nNotas: {notas}" if notas else ""
+			return {
+				"tipo": "texto",
+				"contenido": (
+					f"\u2705 Ticket *{numero_ticket}* marcado como *resuelto*.\n"
+					f"Solicitante: {contacto}\n"
+					f"Categoria: {categoria}{linea_notas}"
+				),
+			}
+	# ─────────────────────────────────────────────────────────────────────────────
+
 	# Determinar tipo de entrada para process_message.
-	if media_url and (media_type or "").startswith("audio"):
+
+	if media_url and _es_media_audio(media_url, media_type=media_type, media_kind=media_kind):
 		tipo = "audio"
 		audio_path = media_url
 	else:

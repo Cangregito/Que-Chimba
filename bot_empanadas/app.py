@@ -73,13 +73,14 @@ else:
         return {"tipo": "texto", "contenido": texto}
 
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "templates"))
 _flask_secret = (os.getenv("FLASK_SECRET", "") or "").strip()
 if not _flask_secret:
     _flask_secret = secrets.token_hex(32)
 app.config["SECRET_KEY"] = _flask_secret
 app.config["JSON_SORT_KEYS"] = False
 app.config["AUDIO_DIR"] = os.path.join(os.path.dirname(__file__), "audios_temp")
+app.config["IMG_DIR"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Img"))
 app.config["PUBLIC_BASE_URL"] = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 app.config["N8N_PEDIDO_WEBHOOK_URL"] = os.getenv("N8N_PEDIDO_WEBHOOK_URL", "").strip()
 app.config["BAILEYS_BRIDGE_URL"] = (os.getenv("BAILEYS_BRIDGE_URL", "http://localhost:3001") or "http://localhost:3001").rstrip("/")
@@ -167,6 +168,19 @@ def _error(message, status=400, code=None, details=None, error_id=None):
     return response
 
 
+def _parse_json_field(value, fallback):
+    if value is None:
+        return fallback
+    if isinstance(value, (list, dict)):
+        return value
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return fallback
+        return json.loads(raw)
+    return fallback
+
+
 def _validar_requeridos(payload, required_fields):
     missing = []
     for field in required_fields:
@@ -184,6 +198,16 @@ def _normalizar_whatsapp_id(raw_value):
     if raw.startswith("whatsapp:"):
         raw = raw.replace("whatsapp:", "", 1)
     return raw
+
+
+def _normalizar_destino_ticket_whatsapp(raw_value):
+    raw = _normalizar_whatsapp_id(raw_value)
+    digits = "".join(ch for ch in str(raw) if ch.isdigit())
+    if not digits:
+        return ""
+    if len(digits) == 10:
+        return f"52{digits}"
+    return digits
 
 
 def _client_ip():
@@ -354,6 +378,24 @@ def health():
     return _ok({"status": "up"})
 
 
+@app.get("/img/<path:filename>")
+def serve_img(filename):
+    img_dir = app.config.get("IMG_DIR", "")
+    if not img_dir or not os.path.isdir(img_dir):
+        abort(404)
+    return send_from_directory(img_dir, filename)
+
+
+@app.get("/Img/<path:filename>")
+def serve_img_upper(filename):
+    return serve_img(filename)
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return serve_img("simbolo-cuadrado-amarillo.png")
+
+
 @app.get("/")
 def landing():
     raw_number = os.getenv("WHATSAPP_PUBLIC_NUMBER", "526567751166")
@@ -373,6 +415,17 @@ def landing():
 @app.get("/login")
 def login_page():
     return render_template("login.html")
+
+
+@app.get("/soporte")
+def soporte_page():
+    return render_template("soporte.html")
+
+
+@app.get("/admin/tickets")
+@login_required(roles=["admin"])
+def admin_tickets_page():
+    return render_template("tickets_admin.html", user=session.get("user"))
 
 
 @app.post("/login")
@@ -560,8 +613,33 @@ def api_pedidos():
         estados = [part.strip() for part in estado_raw.split(",") if part.strip()]
         estado = estados if len(estados) > 1 else estados[0]
     fecha = request.args.get("fecha")
+    fecha_desde = (request.args.get("fecha_desde") or "").strip() or None
+    fecha_hasta = (request.args.get("fecha_hasta") or "").strip() or None
+    busqueda = (request.args.get("q") or request.args.get("buscar") or "").strip() or None
 
-    data = db.obtener_pedidos(estado=estado, fecha=fecha)
+    limit_raw = request.args.get("limit")
+    offset_raw = request.args.get("offset", "0")
+    limit_int = None
+    offset_int = 0
+    if limit_raw not in (None, ""):
+        try:
+            limit_int = max(1, min(500, int(limit_raw)))
+        except ValueError:
+            return _error("Parametro limit invalido", 400)
+    try:
+        offset_int = max(0, int(offset_raw))
+    except ValueError:
+        return _error("Parametro offset invalido", 400)
+
+    data = db.obtener_pedidos(
+        estado=estado,
+        fecha=fecha,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        busqueda=busqueda,
+        limit=limit_int,
+        offset=offset_int,
+    )
     if isinstance(data, dict) and data.get("error"):
         return _error(data["error"], 500)
     return _ok(data)
@@ -945,6 +1023,144 @@ def api_ventas_anuales():
     return _ok(data)
 
 
+@app.get("/api/ventas/kpis-periodo")
+@login_required(roles=["admin"])
+def api_kpis_ventas_periodo():
+    data = db.obtener_kpis_ventas_periodo()
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/admin/reporte-ventas-profesional")
+@login_required(roles=["admin"])
+def api_reporte_ventas_profesional():
+    periodo = (request.args.get("periodo") or "dia").strip().lower()
+    fecha_base = (request.args.get("fecha") or "").strip() or None
+    busqueda = (request.args.get("q") or request.args.get("buscar") or "").strip() or None
+
+    limit_raw = request.args.get("limit", "300")
+    try:
+        limit_int = max(1, min(1000, int(limit_raw)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_reporte_ventas_profesional(
+        periodo=periodo,
+        fecha_base=fecha_base,
+        busqueda=busqueda,
+        limit=limit_int,
+    )
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.get("/api/admin/reporte-ventas-profesional.xlsx")
+@login_required(roles=["admin"])
+def api_reporte_ventas_profesional_xlsx():
+    periodo = (request.args.get("periodo") or "dia").strip().lower()
+    fecha_base = (request.args.get("fecha") or "").strip() or None
+    busqueda = (request.args.get("q") or request.args.get("buscar") or "").strip() or None
+
+    limit_raw = request.args.get("limit", "1000")
+    try:
+        limit_int = max(1, min(5000, int(limit_raw)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+
+    data = db.obtener_reporte_ventas_profesional(
+        periodo=periodo,
+        fecha_base=fecha_base,
+        busqueda=busqueda,
+        limit=limit_int,
+    )
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+
+    try:
+        from openpyxl import Workbook
+    except Exception:
+        return _error("Falta dependencia openpyxl. Ejecuta: pip install openpyxl", 500)
+
+    payload = _serialize(data if isinstance(data, dict) else {})
+    resumen = payload.get("resumen") or {}
+    rows = payload.get("rows") or []
+
+    wb = Workbook()
+    ws_res = wb.active
+    if ws_res is None:
+        ws_res = wb.create_sheet(title="Resumen")
+    else:
+        ws_res.title = "Resumen"
+    ws_res.append(["Metrica", "Valor"])
+    periodo_label = {"dia": "Día", "semana": "Semana", "mes": "Mes", "ano": "Año"}.get(
+        str(payload.get("periodo") or "dia").strip().lower(),
+        str(payload.get("periodo") or "dia"),
+    )
+    ws_res.append(["Periodo", periodo_label])
+    ws_res.append(["Fecha base", payload.get("fecha_base") or ""])
+    ws_res.append(["Ventas", resumen.get("ventas") or 0])
+    ws_res.append(["Pedidos", resumen.get("pedidos") or 0])
+    ws_res.append(["Ticket promedio", resumen.get("ticket_promedio") or 0])
+    ws_res.append(["Clientes unicos", resumen.get("clientes_unicos") or 0])
+    ws_res.append(["Costo estimado total", resumen.get("costo_estimado_total") or 0])
+    ws_res.append(["Utilidad estimada total", resumen.get("utilidad_estimada_total") or 0])
+    ws_res.append(["Margen estimado pct", resumen.get("margen_estimado_pct") or 0])
+    ws_res.append(["Rapidez preparacion promedio min", resumen.get("rapidez_preparacion_promedio_min") or 0])
+    ws_res.append(["Rapidez entrega promedio min", resumen.get("rapidez_entrega_promedio_min") or 0])
+
+    ws_det = wb.create_sheet(title="Detalle")
+    ws_det.append([
+        "pedido_id",
+        "creado_en",
+        "cliente",
+        "whatsapp_id",
+        "metodo_pago",
+        "metodo_entrega",
+        "estado",
+        "productos",
+        "piezas",
+        "total",
+        "costo_estimado",
+        "utilidad_estimada",
+        "margen_estimado_pct",
+        "rapidez_preparacion_min",
+        "rapidez_entrega_min",
+    ])
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        ws_det.append([
+            row.get("pedido_id"),
+            row.get("creado_en"),
+            row.get("cliente"),
+            row.get("whatsapp_id"),
+            row.get("metodo_pago"),
+            row.get("metodo_entrega"),
+            row.get("estado"),
+            row.get("productos"),
+            row.get("piezas"),
+            row.get("total"),
+            row.get("costo_estimado"),
+            row.get("utilidad_estimada"),
+            row.get("margen_estimado_pct"),
+            row.get("rapidez_preparacion_min"),
+            row.get("rapidez_entrega_min"),
+        ])
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"reporte_ventas_profesional_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    response = make_response(output.getvalue())
+    response.headers["Content-Type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
 @app.get("/api/inventario/alertas")
 @login_required(roles=["admin"])
 def api_alertas_inventario():
@@ -957,7 +1173,31 @@ def api_alertas_inventario():
 @app.get("/api/inventario")
 @login_required(roles=["admin"])
 def api_inventario():
-    data = db.obtener_inventario()
+    texto = (request.args.get("q") or request.args.get("texto") or "").strip() or None
+    estado_stock = (request.args.get("estado_stock") or "").strip().lower() or None
+    proveedor = (request.args.get("proveedor") or "").strip() or None
+
+    limit_raw = request.args.get("limit")
+    offset_raw = request.args.get("offset", "0")
+    limit_int = None
+    offset_int = 0
+    if limit_raw not in (None, ""):
+        try:
+            limit_int = max(1, min(500, int(limit_raw)))
+        except ValueError:
+            return _error("Parametro limit invalido", 400)
+    try:
+        offset_int = max(0, int(offset_raw))
+    except ValueError:
+        return _error("Parametro offset invalido", 400)
+
+    data = db.obtener_inventario(
+        texto=texto,
+        estado_stock=estado_stock,
+        proveedor=proveedor,
+        limit=limit_int,
+        offset=offset_int,
+    )
     if isinstance(data, dict) and data.get("error"):
         return _error(data["error"], 500)
     return _ok(data)
@@ -1147,6 +1387,28 @@ def api_admin_recetas_producto_guardar_componente():
 @login_required(roles=["admin"])
 def api_admin_recetas_producto_listar():
     producto_id = request.args.get("producto_id")
+    texto = (request.args.get("q") or request.args.get("texto") or "").strip() or None
+    activa_raw = (request.args.get("activa") or "").strip().lower()
+    activa = None
+    if activa_raw in {"1", "true", "yes", "on"}:
+        activa = True
+    elif activa_raw in {"0", "false", "no", "off"}:
+        activa = False
+
+    limit_raw = request.args.get("limit")
+    offset_raw = request.args.get("offset", "0")
+    limit_int = None
+    offset_int = 0
+    if limit_raw not in (None, ""):
+        try:
+            limit_int = max(1, min(500, int(limit_raw)))
+        except ValueError:
+            return _error("Parametro limit invalido", 400)
+    try:
+        offset_int = max(0, int(offset_raw))
+    except ValueError:
+        return _error("Parametro offset invalido", 400)
+
     pid = None
     if producto_id not in (None, ""):
         try:
@@ -1154,7 +1416,13 @@ def api_admin_recetas_producto_listar():
         except ValueError:
             return _error("Parametro producto_id invalido", 400)
 
-    data = db.obtener_recetas_producto(producto_id=pid)
+    data = db.obtener_recetas_producto(
+        producto_id=pid,
+        texto=texto,
+        activa=activa,
+        limit=limit_int,
+        offset=offset_int,
+    )
     if isinstance(data, dict) and data.get("error"):
         return _error(data["error"], 500)
     return _ok(data)
@@ -1280,11 +1548,13 @@ def api_admin_usuarios_actualizar(usuario_id):
 @login_required(roles=["admin"])
 def api_admin_auditoria_seguridad():
     limit = request.args.get("limit", "40")
+    offset = request.args.get("offset", "0")
     tipo_evento = (request.args.get("tipo_evento") or "").strip() or None
     severidad = (request.args.get("severidad") or "").strip().lower() or None
     actor = (request.args.get("actor") or "").strip() or None
     fecha_desde = (request.args.get("fecha_desde") or "").strip() or None
     fecha_hasta = (request.args.get("fecha_hasta") or "").strip() or None
+    rango_rapido = (request.args.get("rango") or request.args.get("rango_rapido") or "").strip().lower() or None
 
     severidades_validas = {"info", "warning", "critical"}
     if severidad and severidad not in severidades_validas:
@@ -1294,14 +1564,20 @@ def api_admin_auditoria_seguridad():
         limit_int = max(1, min(200, int(limit)))
     except ValueError:
         return _error("Parametro limit invalido", 400)
+    try:
+        offset_int = max(0, int(offset))
+    except ValueError:
+        return _error("Parametro offset invalido", 400)
 
     data = db.obtener_auditoria_seguridad(
         limit=limit_int,
+        offset=offset_int,
         tipo_evento=tipo_evento,
         severidad=severidad,
         actor_username=actor,
         fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta,
+        rango_rapido=rango_rapido,
     )
     if isinstance(data, dict) and data.get("error"):
         return _error(data["error"], 500)
@@ -1382,10 +1658,12 @@ def api_admin_auditoria_seguridad_csv():
 @login_required(roles=["admin"])
 def api_admin_auditoria_negocio():
     limit = request.args.get("limit", "40")
+    offset = request.args.get("offset", "0")
     tabla = (request.args.get("tabla") or "").strip().lower() or None
     actor = (request.args.get("actor") or "").strip() or None
     fecha_desde = (request.args.get("fecha_desde") or "").strip() or None
     fecha_hasta = (request.args.get("fecha_hasta") or "").strip() or None
+    rango_rapido = (request.args.get("rango") or request.args.get("rango_rapido") or "").strip().lower() or None
 
     tablas_validas = {"pedidos", "pagos", "insumos", "compras_insumos"}
     if tabla and tabla not in tablas_validas:
@@ -1395,13 +1673,19 @@ def api_admin_auditoria_negocio():
         limit_int = max(1, min(200, int(limit)))
     except ValueError:
         return _error("Parametro limit invalido", 400)
+    try:
+        offset_int = max(0, int(offset))
+    except ValueError:
+        return _error("Parametro offset invalido", 400)
 
     data = db.obtener_auditoria_negocio(
         limit=limit_int,
+        offset=offset_int,
         tabla_objetivo=tabla,
         actor_username=actor,
         fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta,
+        rango_rapido=rango_rapido,
     )
     if isinstance(data, dict) and data.get("error"):
         return _error(data["error"], 500)
@@ -1468,6 +1752,138 @@ def api_admin_auditoria_negocio_csv():
     response.headers["Content-Type"] = "text/csv; charset=utf-8"
     response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+
+@app.get("/api/admin/parser/observaciones")
+@login_required(roles=["admin"])
+def api_admin_parser_observaciones():
+    limit = request.args.get("limit", "80")
+    tipo_evento = (request.args.get("tipo_evento") or "").strip() or None
+    estado_revision = (request.args.get("estado_revision") or "").strip().lower() or None
+    try:
+        limit_int = max(1, min(300, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+    data = db.obtener_observaciones_parser(limit=limit_int, tipo_evento=tipo_evento, estado_revision=estado_revision)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.patch("/api/admin/parser/observaciones/<int:observacion_id>")
+@login_required(roles=["admin"])
+def api_admin_parser_observacion_actualizar(observacion_id):
+    payload = request.get_json(silent=True) or {}
+    try:
+        expected_items = _parse_json_field(payload.get("expected_items_json"), None)
+    except Exception:
+        return _error("expected_items_json debe ser JSON valido", 400)
+    updated = db.actualizar_observacion_parser(
+        observacion_id=observacion_id,
+        estado_revision=payload.get("estado_revision") if "estado_revision" in payload else None,
+        admin_notes=payload.get("admin_notes") if "admin_notes" in payload else None,
+        expected_items_json=expected_items,
+        regla_id=payload.get("regla_id") if "regla_id" in payload else None,
+    )
+    if isinstance(updated, dict) and updated.get("error"):
+        msg = updated["error"].lower()
+        status = 404 if "no encontrada" in msg or "no encontrado" in msg else 400
+        return _error(updated["error"], status)
+    return _ok(updated)
+
+
+@app.get("/api/admin/parser/frases")
+@login_required(roles=["admin"])
+def api_admin_parser_frases():
+    limit = request.args.get("limit", "200")
+    activa_raw = (request.args.get("activa") or "").strip().lower()
+    activa = None
+    if activa_raw in {"1", "true", "yes", "on"}:
+        activa = True
+    elif activa_raw in {"0", "false", "no", "off"}:
+        activa = False
+    try:
+        limit_int = max(1, min(500, int(limit)))
+    except ValueError:
+        return _error("Parametro limit invalido", 400)
+    data = db.obtener_frases_parser_curadas(limit=limit_int, activa=activa)
+    if isinstance(data, dict) and data.get("error"):
+        return _error(data["error"], 500)
+    return _ok(data)
+
+
+@app.post("/api/admin/parser/frases")
+@login_required(roles=["admin"])
+def api_admin_parser_frases_crear():
+    payload = request.get_json(silent=True) or {}
+    try:
+        items_json = _parse_json_field(payload.get("items_json"), [])
+    except Exception:
+        return _error("items_json debe ser JSON valido", 400)
+    created = db.crear_frase_parser_curada(
+        frase_original=payload.get("frase_original"),
+        tipo_match=payload.get("tipo_match", "exact"),
+        items_json=items_json,
+        needs_confirmation=payload.get("needs_confirmation", False),
+        needs_clarification=payload.get("needs_clarification", False),
+        clarification_message=payload.get("clarification_message"),
+        notas=payload.get("notas"),
+        prioridad=payload.get("prioridad", 100),
+        activa=payload.get("activa", True),
+    )
+    if isinstance(created, dict) and created.get("error"):
+        return _error(created["error"], 400)
+    return _ok(created, 201)
+
+
+@app.patch("/api/admin/parser/frases/<int:regla_id>")
+@login_required(roles=["admin"])
+def api_admin_parser_frases_actualizar(regla_id):
+    payload = request.get_json(silent=True) or {}
+    try:
+        items_json = _parse_json_field(payload.get("items_json"), None) if "items_json" in payload else None
+    except Exception:
+        return _error("items_json debe ser JSON valido", 400)
+    updated = db.actualizar_frase_parser_curada(
+        regla_id=regla_id,
+        frase_original=payload.get("frase_original") if "frase_original" in payload else None,
+        tipo_match=payload.get("tipo_match") if "tipo_match" in payload else None,
+        items_json=items_json,
+        needs_confirmation=payload.get("needs_confirmation") if "needs_confirmation" in payload else None,
+        needs_clarification=payload.get("needs_clarification") if "needs_clarification" in payload else None,
+        clarification_message=payload.get("clarification_message") if "clarification_message" in payload else None,
+        notas=payload.get("notas") if "notas" in payload else None,
+        prioridad=payload.get("prioridad") if "prioridad" in payload else None,
+        activa=payload.get("activa") if "activa" in payload else None,
+    )
+    if isinstance(updated, dict) and updated.get("error"):
+        msg = updated["error"].lower()
+        status = 404 if "no encontrada" in msg or "no encontrado" in msg else 400
+        return _error(updated["error"], status)
+    return _ok(updated)
+
+
+@app.post("/api/admin/parser/simular")
+@login_required(roles=["admin"])
+def api_admin_parser_simular():
+    payload = request.get_json(silent=True) or {}
+    texto = (payload.get("texto") or "").strip()
+    if not texto:
+        return _error("texto es obligatorio", 400)
+    extractor = getattr(_bot_module, "_extraer_items_menu_oficial", None) if _bot_module is not None else None
+    formatter = getattr(_bot_module, "_formatear_carrito", None) if _bot_module is not None else None
+    if not callable(extractor):
+        return _error("Extractor del bot no disponible", 500)
+    try:
+        extraccion = extractor(texto)
+        resumen = ""
+        if callable(formatter):
+            items = extraccion.get("items") or []
+            total = int(extraccion.get("total") or 0)
+            resumen = formatter(items, total) if items else ""
+        return _ok({"extraccion": extraccion, "resumen": resumen})
+    except Exception as exc:
+        return _error(f"No se pudo simular el parser: {exc}", 500)
 
 
 @app.post("/api/campanias")
@@ -1582,6 +1998,126 @@ def api_empleados():
     return _ok(data)
 
 
+# ===================== SOPORTE / TICKETS =====================
+
+@app.post("/api/soporte/tickets")
+def api_crear_ticket():
+    """Crea un ticket de soporte. Ruta publica, no requiere sesion."""
+    payload = request.get_json(silent=True) or {}
+    nombre = (payload.get("nombre_contacto") or "").strip()
+    descripcion = (payload.get("descripcion") or "").strip()
+    if not nombre:
+        return _error("nombre_contacto es obligatorio", 400, code="validation_error")
+    if not descripcion:
+        return _error("descripcion es obligatoria", 400, code="validation_error")
+    result = db.crear_ticket_soporte(
+        categoria=(payload.get("categoria") or "otro").strip().lower(),
+        prioridad=(payload.get("prioridad") or "media").strip().lower(),
+        nombre_contacto=nombre,
+        whatsapp_contacto=(payload.get("whatsapp_contacto") or "").strip() or None,
+        descripcion=descripcion,
+    )
+    if isinstance(result, dict) and result.get("error"):
+        return _error(result["error"], 500)
+    return _ok(result, status=201)
+
+
+@app.get("/api/soporte/tickets")
+@login_required(roles=["admin"])
+def api_listar_tickets():
+    estado = request.args.get("estado") or None
+    numero = (request.args.get("numero") or "").strip().upper()
+    result = db.obtener_tickets_soporte(estado=estado)
+    if isinstance(result, dict) and result.get("error"):
+        return _error(result["error"], 500)
+    if numero:
+        data = [t for t in result if isinstance(t, dict) and (t.get("numero_ticket") or "").strip().upper() == numero]
+        return _ok(data)
+    return _ok(result)
+
+
+@app.get("/api/soporte/tickets/public/<numero>")
+def api_consultar_ticket_publico(numero):
+    numero_norm = (numero or "").strip().upper()
+    if not numero_norm:
+        return _error("numero de ticket invalido", 400, code="validation_error")
+
+    result = db.obtener_tickets_soporte(estado=None)
+    if isinstance(result, dict) and result.get("error"):
+        return _error(result["error"], 500)
+
+    ticket = None
+    for item in result:
+        if isinstance(item, dict) and (item.get("numero_ticket") or "").strip().upper() == numero_norm:
+            ticket = item
+            break
+
+    if not ticket:
+        return _error(f"Ticket {numero_norm} no encontrado", 404, code="ticket_not_found")
+
+    publico = {
+        "numero_ticket": ticket.get("numero_ticket"),
+        "categoria": ticket.get("categoria"),
+        "prioridad": ticket.get("prioridad"),
+        "estado": ticket.get("estado"),
+        "descripcion": ticket.get("descripcion"),
+        "creado_en": ticket.get("creado_en"),
+        "actualizado_en": ticket.get("actualizado_en"),
+        "notas_resolucion": ticket.get("notas_resolucion"),
+    }
+    return _ok(publico)
+
+
+@app.patch("/api/soporte/tickets/<numero>")
+@login_required(roles=["admin"])
+def api_actualizar_ticket(numero):
+    payload = request.get_json(silent=True) or {}
+    nuevo_estado = (payload.get("estado") or "").strip()
+    if not nuevo_estado:
+        return _error("estado es obligatorio", 400, code="validation_error")
+    actor = cast(Any, session).get("user", {}).get("username")
+    result = db.actualizar_estado_ticket(
+        numero_ticket=numero,
+        nuevo_estado=nuevo_estado,
+        notas_resolucion=(payload.get("notas_resolucion") or "").strip() or None,
+        resuelto_por=actor,
+    )
+    if isinstance(result, dict) and result.get("error"):
+        return _error(result["error"], 400)
+
+    notificacion = {
+        "intentada": False,
+        "enviada": False,
+        "destino": None,
+        "motivo": "No aplica para este estado.",
+    }
+    estado_final = (result.get("estado") or "").strip().lower()
+    if estado_final in {"resuelto", "cerrado"}:
+        notificacion["intentada"] = True
+        destino = _normalizar_destino_ticket_whatsapp(result.get("whatsapp_contacto"))
+        notificacion["destino"] = destino or None
+        if destino:
+            notas = (result.get("notas_resolucion") or "").strip()
+            texto = (
+                f"Listo parce, tu ticket {result.get('numero_ticket')} ya quedo {estado_final}. "
+                "Gracias por reportarlo."
+            )
+            if notas:
+                texto = f"{texto} Nota de soporte: {notas}"
+            enviado = _enviar_texto_whatsapp(destino=destino, texto=texto)
+            if isinstance(enviado, dict) and enviado.get("error"):
+                notificacion["motivo"] = enviado["error"]
+            else:
+                notificacion["enviada"] = True
+                notificacion["motivo"] = "ok"
+        else:
+            notificacion["motivo"] = "Ticket sin whatsapp_contacto valido."
+
+    response_data = dict(result)
+    response_data["notificacion_whatsapp"] = notificacion
+    return _ok(response_data)
+
+
 @app.post("/webhook")
 def webhook_whatsapp():
     whatsapp_id = _normalizar_whatsapp_id(request.values.get("From", ""))
@@ -1623,9 +2159,11 @@ def webhook_baileys():
     payload = request.get_json(silent=True) or {}
 
     whatsapp_id = _normalizar_whatsapp_id(payload.get("whatsapp_id") or payload.get("from") or payload.get("jid"))
+    whatsapp_jid = (payload.get("whatsapp_jid") or payload.get("jid") or "").strip()
     mensaje = payload.get("mensaje") or payload.get("text") or ""
     media_url = payload.get("media_url") or payload.get("mediaUrl")
     media_type = payload.get("media_type") or payload.get("mediaType")
+    media_kind = payload.get("media_kind") or payload.get("mediaKind")
     latitude = payload.get("latitude")
     longitude = payload.get("longitude")
 
@@ -1645,6 +2183,7 @@ def webhook_baileys():
         mensaje=mensaje,
         media_url=media_url,
         media_type=media_type,
+        media_kind=media_kind,
         latitude=latitude,
         longitude=longitude,
     )
@@ -1658,11 +2197,13 @@ def webhook_baileys():
     # Si el dispatcher genero audio colombiano de transicion de estado, enviarlo
     # como nota de voz adicional en segundo plano (fire-and-forget).
     audio_colombiano = output.get("audio_colombiano_path")
-    if audio_colombiano and whatsapp_id:
+    should_send_transition_audio = bool(audio_colombiano) and bool(whatsapp_id) and output.get("tipo") != "audio"
+    if should_send_transition_audio:
         import threading
+        destino_audio = whatsapp_jid or whatsapp_id
         def _enviar_colombiano_bg():
             try:
-                _enviar_audio_whatsapp(whatsapp_id, audio_colombiano)
+                _enviar_audio_whatsapp(destino_audio, audio_colombiano)
             except Exception as _exc:
                 app.logger.debug("audio_colombiano bg error: %s", _exc)
         threading.Thread(target=_enviar_colombiano_bg, daemon=True).start()

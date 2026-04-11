@@ -124,7 +124,7 @@ FRASES_COLOMBIANAS = {
 }
 
 _WHISPER_MODEL = None
-_WHISPER_MODEL_NAME = (os.getenv("WHISPER_MODEL", "tiny") or "tiny").strip().lower()
+_WHISPER_MODEL_NAME = (os.getenv("WHISPER_MODEL", "large-v3") or "large-v3").strip().lower()
 _TTS_PROVIDER = (os.getenv("TTS_PROVIDER", "auto") or "auto").strip().lower()
 _TTS_GTTS_LANG = (os.getenv("TTS_LANG", "es") or "es").strip()
 _TTS_GTTS_TLD = (os.getenv("TTS_TLD", "com.co") or "com.co").strip().lower()
@@ -407,7 +407,16 @@ def transcribir_audio(url_twilio: str) -> str:
         _convert_to_wav(temp_input_path, temp_wav_path)
 
         model = _load_whisper_model()
-        result = model.transcribe(str(temp_wav_path), language="es", fp16=False)
+        result = model.transcribe(
+            str(temp_wav_path),
+            language="es",
+            task="transcribe",
+            fp16=False,
+            temperature=0,
+            condition_on_previous_text=False,
+            no_speech_threshold=0.45,
+            compression_ratio_threshold=2.4,
+        )
         text = (result.get("text") or "").strip().lower()
         return " ".join(text.split())
 

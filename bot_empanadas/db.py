@@ -1,7 +1,9 @@
 import json
 import os
 import random
+import re
 import string
+import unicodedata
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -11,11 +13,13 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 
 def _db_config():
+    db_timezone = (os.getenv("DB_TIMEZONE", "America/Chihuahua") or "America/Chihuahua").strip()
     cfg = {
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", "5432")),
         "dbname": os.getenv("DB_NAME", "que_chimba"),
         "user": os.getenv("DB_USER", "postgres"),
+        "options": f"-c timezone={db_timezone}",
     }
     db_password = os.getenv("DB_PASSWORD")
     if db_password is not None and db_password != "":
@@ -44,6 +48,16 @@ def _to_json_text(payload):
     if isinstance(payload, str):
         return payload
     return json.dumps(payload, default=_json_default)
+
+
+def _normalizar_texto_busqueda(value):
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
 
 def _tabla_tiene_columna(conn, tabla, columna):
@@ -448,13 +462,495 @@ def registrar_evento_seguridad(
             conn.close()
 
 
+def _asegurar_tabla_observabilidad_parser(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS observabilidad_parser_pedidos (
+                observacion_id BIGSERIAL PRIMARY KEY,
+                tipo_evento VARCHAR(50) NOT NULL,
+                cliente_id BIGINT,
+                whatsapp_id VARCHAR(40),
+                estado_origen VARCHAR(40),
+                texto_usuario TEXT NOT NULL,
+                confidence_score NUMERIC(5,4) NOT NULL DEFAULT 0,
+                parse_mode VARCHAR(40) NOT NULL DEFAULT 'unknown',
+                needs_clarification BOOLEAN NOT NULL DEFAULT FALSE,
+                needs_confirmation BOOLEAN NOT NULL DEFAULT FALSE,
+                items_detectados JSONB NOT NULL DEFAULT '[]'::jsonb,
+                signals JSONB NOT NULL DEFAULT '[]'::jsonb,
+                metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+                estado_revision VARCHAR(20) NOT NULL DEFAULT 'nuevo',
+                admin_notes TEXT,
+                expected_items_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                regla_id BIGINT,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cur.execute("ALTER TABLE observabilidad_parser_pedidos ADD COLUMN IF NOT EXISTS estado_revision VARCHAR(20) NOT NULL DEFAULT 'nuevo'")
+        cur.execute("ALTER TABLE observabilidad_parser_pedidos ADD COLUMN IF NOT EXISTS admin_notes TEXT")
+        cur.execute("ALTER TABLE observabilidad_parser_pedidos ADD COLUMN IF NOT EXISTS expected_items_json JSONB NOT NULL DEFAULT '[]'::jsonb")
+        cur.execute("ALTER TABLE observabilidad_parser_pedidos ADD COLUMN IF NOT EXISTS regla_id BIGINT")
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_observabilidad_parser_pedidos_created_at
+                ON observabilidad_parser_pedidos (created_at DESC)
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_observabilidad_parser_pedidos_tipo_evento
+                ON observabilidad_parser_pedidos (tipo_evento, created_at DESC)
+            """
+        )
+
+
+def _asegurar_tabla_frases_parser_curadas(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS parser_frases_curadas (
+                regla_id BIGSERIAL PRIMARY KEY,
+                frase_original TEXT NOT NULL,
+                frase_normalizada TEXT NOT NULL,
+                tipo_match VARCHAR(20) NOT NULL DEFAULT 'exact',
+                items_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                needs_confirmation BOOLEAN NOT NULL DEFAULT FALSE,
+                needs_clarification BOOLEAN NOT NULL DEFAULT FALSE,
+                clarification_message TEXT,
+                notas TEXT,
+                prioridad INT NOT NULL DEFAULT 100,
+                activa BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                CONSTRAINT chk_parser_frases_curadas_tipo_match CHECK (tipo_match IN ('exact', 'contains'))
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_parser_frases_curadas_normalizada
+                ON parser_frases_curadas (frase_normalizada, activa, prioridad DESC)
+            """
+        )
+
+
+def registrar_observacion_parser_pedido(
+    tipo_evento,
+    cliente_id=None,
+    whatsapp_id=None,
+    estado_origen=None,
+    texto_usuario=None,
+    confidence_score=0,
+    parse_mode="unknown",
+    needs_clarification=False,
+    needs_confirmation=False,
+    items_detectados=None,
+    signals=None,
+    metadata=None,
+):
+    conn = None
+    try:
+        texto = (texto_usuario or "").strip()
+        if not texto:
+            return {"ok": True, "skipped": True}
+        conn = get_connection()
+        _asegurar_tabla_observabilidad_parser(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO observabilidad_parser_pedidos (
+                    tipo_evento,
+                    cliente_id,
+                    whatsapp_id,
+                    estado_origen,
+                    texto_usuario,
+                    confidence_score,
+                    parse_mode,
+                    needs_clarification,
+                    needs_confirmation,
+                    items_detectados,
+                    signals,
+                    metadata,
+                    expected_items_json
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb)
+                """,
+                (
+                    tipo_evento,
+                    cliente_id,
+                    whatsapp_id,
+                    estado_origen,
+                    texto,
+                    float(confidence_score or 0),
+                    parse_mode or "unknown",
+                    bool(needs_clarification),
+                    bool(needs_confirmation),
+                    _to_json_text(items_detectados or []),
+                    _to_json_text(signals or []),
+                    _to_json_text(metadata or {}),
+                    _to_json_text([]),
+                ),
+            )
+            conn.commit()
+            return {"ok": True}
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_observaciones_parser(limit=80, tipo_evento=None, estado_revision=None):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_observabilidad_parser(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            where = []
+            params = []
+            if tipo_evento:
+                where.append("tipo_evento = %s")
+                params.append(str(tipo_evento).strip())
+            if estado_revision:
+                where.append("estado_revision = %s")
+                params.append(str(estado_revision).strip())
+            where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+            params.append(max(1, min(500, int(limit))))
+            cur.execute(
+                f"""
+                SELECT
+                    observacion_id,
+                    tipo_evento,
+                    cliente_id,
+                    whatsapp_id,
+                    estado_origen,
+                    texto_usuario,
+                    confidence_score,
+                    parse_mode,
+                    needs_clarification,
+                    needs_confirmation,
+                    items_detectados,
+                    signals,
+                    metadata,
+                    estado_revision,
+                    admin_notes,
+                    expected_items_json,
+                    regla_id,
+                    created_at
+                FROM observabilidad_parser_pedidos
+                {where_sql}
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                tuple(params),
+            )
+            return cur.fetchall()
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def actualizar_observacion_parser(observacion_id, estado_revision=None, admin_notes=None, expected_items_json=None, regla_id=None):
+    conn = None
+    try:
+        oid = int(observacion_id)
+        updates = []
+        params = []
+        if estado_revision is not None:
+            estado = str(estado_revision).strip().lower()
+            if estado not in {"nuevo", "en_revision", "resuelto", "descartado"}:
+                return {"error": "estado_revision invalido"}
+            updates.append("estado_revision = %s")
+            params.append(estado)
+        if admin_notes is not None:
+            updates.append("admin_notes = %s")
+            params.append(str(admin_notes or "").strip() or None)
+        if expected_items_json is not None:
+            updates.append("expected_items_json = %s::jsonb")
+            params.append(_to_json_text(expected_items_json or []))
+        if regla_id is not None:
+            rid = int(regla_id) if regla_id else None
+            updates.append("regla_id = %s")
+            params.append(rid)
+        if not updates:
+            return {"error": "No hay campos para actualizar"}
+        conn = get_connection()
+        _asegurar_tabla_observabilidad_parser(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            params.append(oid)
+            cur.execute(
+                f"""
+                UPDATE observabilidad_parser_pedidos
+                SET {', '.join(updates)}
+                WHERE observacion_id = %s
+                RETURNING observacion_id, estado_revision, admin_notes, expected_items_json, regla_id
+                """,
+                tuple(params),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": "Observacion no encontrada"}
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_frases_parser_curadas(limit=200, activa=None):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_frases_parser_curadas(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            params = []
+            where_sql = ""
+            if activa is not None:
+                where_sql = "WHERE activa = %s"
+                params.append(bool(activa))
+            params.append(max(1, min(500, int(limit))))
+            cur.execute(
+                f"""
+                SELECT
+                    regla_id,
+                    frase_original,
+                    frase_normalizada,
+                    tipo_match,
+                    items_json,
+                    needs_confirmation,
+                    needs_clarification,
+                    clarification_message,
+                    notas,
+                    prioridad,
+                    activa,
+                    created_at,
+                    updated_at
+                FROM parser_frases_curadas
+                {where_sql}
+                ORDER BY activa DESC, prioridad DESC, updated_at DESC
+                LIMIT %s
+                """,
+                tuple(params),
+            )
+            return cur.fetchall()
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def crear_frase_parser_curada(
+    frase_original,
+    tipo_match="exact",
+    items_json=None,
+    needs_confirmation=False,
+    needs_clarification=False,
+    clarification_message=None,
+    notas=None,
+    prioridad=100,
+    activa=True,
+):
+    conn = None
+    try:
+        frase = str(frase_original or "").strip()
+        if not frase:
+            return {"error": "frase_original es obligatoria"}
+        tipo = str(tipo_match or "exact").strip().lower()
+        if tipo not in {"exact", "contains"}:
+            return {"error": "tipo_match invalido"}
+        frase_norm = _normalizar_texto_busqueda(frase)
+        conn = get_connection()
+        _asegurar_tabla_frases_parser_curadas(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO parser_frases_curadas (
+                    frase_original,
+                    frase_normalizada,
+                    tipo_match,
+                    items_json,
+                    needs_confirmation,
+                    needs_clarification,
+                    clarification_message,
+                    notas,
+                    prioridad,
+                    activa
+                )
+                VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s)
+                RETURNING regla_id, frase_original, frase_normalizada, tipo_match, items_json,
+                          needs_confirmation, needs_clarification, clarification_message,
+                          notas, prioridad, activa, created_at, updated_at
+                """,
+                (
+                    frase,
+                    frase_norm,
+                    tipo,
+                    _to_json_text(items_json or []),
+                    bool(needs_confirmation),
+                    bool(needs_clarification),
+                    str(clarification_message or "").strip() or None,
+                    str(notas or "").strip() or None,
+                    int(prioridad or 100),
+                    bool(activa),
+                ),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def actualizar_frase_parser_curada(
+    regla_id,
+    frase_original=None,
+    tipo_match=None,
+    items_json=None,
+    needs_confirmation=None,
+    needs_clarification=None,
+    clarification_message=None,
+    notas=None,
+    prioridad=None,
+    activa=None,
+):
+    conn = None
+    try:
+        rid = int(regla_id)
+        updates = ["updated_at = NOW()"]
+        params = []
+        if frase_original is not None:
+            frase = str(frase_original or "").strip()
+            if not frase:
+                return {"error": "frase_original es obligatoria"}
+            updates.append("frase_original = %s")
+            params.append(frase)
+            updates.append("frase_normalizada = %s")
+            params.append(_normalizar_texto_busqueda(frase))
+        if tipo_match is not None:
+            tipo = str(tipo_match or "").strip().lower()
+            if tipo not in {"exact", "contains"}:
+                return {"error": "tipo_match invalido"}
+            updates.append("tipo_match = %s")
+            params.append(tipo)
+        if items_json is not None:
+            updates.append("items_json = %s::jsonb")
+            params.append(_to_json_text(items_json or []))
+        if needs_confirmation is not None:
+            updates.append("needs_confirmation = %s")
+            params.append(bool(needs_confirmation))
+        if needs_clarification is not None:
+            updates.append("needs_clarification = %s")
+            params.append(bool(needs_clarification))
+        if clarification_message is not None:
+            updates.append("clarification_message = %s")
+            params.append(str(clarification_message or "").strip() or None)
+        if notas is not None:
+            updates.append("notas = %s")
+            params.append(str(notas or "").strip() or None)
+        if prioridad is not None:
+            updates.append("prioridad = %s")
+            params.append(int(prioridad or 100))
+        if activa is not None:
+            updates.append("activa = %s")
+            params.append(bool(activa))
+        conn = get_connection()
+        _asegurar_tabla_frases_parser_curadas(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            params.append(rid)
+            cur.execute(
+                f"""
+                UPDATE parser_frases_curadas
+                SET {', '.join(updates)}
+                WHERE regla_id = %s
+                RETURNING regla_id, frase_original, frase_normalizada, tipo_match, items_json,
+                          needs_confirmation, needs_clarification, clarification_message,
+                          notas, prioridad, activa, created_at, updated_at
+                """,
+                tuple(params),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": "Regla no encontrada"}
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def buscar_regla_curada_parser(texto_usuario):
+    conn = None
+    try:
+        texto_norm = _normalizar_texto_busqueda(texto_usuario)
+        if not texto_norm:
+            return None
+        conn = get_connection()
+        _asegurar_tabla_frases_parser_curadas(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    regla_id,
+                    frase_original,
+                    frase_normalizada,
+                    tipo_match,
+                    items_json,
+                    needs_confirmation,
+                    needs_clarification,
+                    clarification_message,
+                    notas,
+                    prioridad,
+                    activa,
+                    created_at,
+                    updated_at
+                FROM parser_frases_curadas
+                WHERE activa = TRUE
+                  AND (
+                    (tipo_match = 'exact' AND frase_normalizada = %s)
+                    OR (tipo_match = 'contains' AND %s LIKE '%%' || frase_normalizada || '%%')
+                  )
+                ORDER BY prioridad DESC, updated_at DESC
+                LIMIT 1
+                """,
+                (texto_norm, texto_norm),
+            )
+            return cur.fetchone()
+    except Exception:
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
 def obtener_auditoria_seguridad(
     limit=50,
+    offset=0,
     tipo_evento=None,
     severidad=None,
     actor_username=None,
     fecha_desde=None,
     fecha_hasta=None,
+    rango_rapido=None,
 ):
     conn = None
     try:
@@ -484,11 +980,21 @@ def obtener_auditoria_seguridad(
                 filtros.append("creado_en < (%s::date + INTERVAL '1 day')")
                 params.append(str(fecha_hasta).strip())
 
+            rango = str(rango_rapido or "").strip().lower()
+            if rango == "hoy":
+                filtros.append("creado_en::date = CURRENT_DATE")
+            elif rango == "7d":
+                filtros.append("creado_en >= NOW() - INTERVAL '7 days'")
+            elif rango == "30d":
+                filtros.append("creado_en >= NOW() - INTERVAL '30 days'")
+
             where_sql = ""
             if filtros:
                 where_sql = "WHERE " + " AND ".join(filtros)
 
-            params.append(int(limit))
+            lim = max(1, min(500, int(limit)))
+            off = max(0, int(offset or 0))
+            params.extend([lim, off])
             cur.execute(
                 f"""
                 SELECT
@@ -506,7 +1012,7 @@ def obtener_auditoria_seguridad(
                 FROM auditoria_seguridad
                 {where_sql}
                 ORDER BY creado_en DESC
-                LIMIT %s
+                LIMIT %s OFFSET %s
                 """,
                 tuple(params),
             )
@@ -604,7 +1110,15 @@ def _set_audit_actor(cur, actor_username=None, actor_rol=None):
     cur.execute("SELECT set_config('app.current_role', %s, true)", (str(actor_rol or "sistema"),))
 
 
-def obtener_auditoria_negocio(limit=50, tabla_objetivo=None, actor_username=None, fecha_desde=None, fecha_hasta=None):
+def obtener_auditoria_negocio(
+    limit=50,
+    offset=0,
+    tabla_objetivo=None,
+    actor_username=None,
+    fecha_desde=None,
+    fecha_hasta=None,
+    rango_rapido=None,
+):
     conn = None
     try:
         conn = get_connection()
@@ -630,11 +1144,21 @@ def obtener_auditoria_negocio(limit=50, tabla_objetivo=None, actor_username=None
                 filtros.append("creado_en < (%s::date + INTERVAL '1 day')")
                 params.append(str(fecha_hasta).strip())
 
+            rango = str(rango_rapido or "").strip().lower()
+            if rango == "hoy":
+                filtros.append("creado_en::date = CURRENT_DATE")
+            elif rango == "7d":
+                filtros.append("creado_en >= NOW() - INTERVAL '7 days'")
+            elif rango == "30d":
+                filtros.append("creado_en >= NOW() - INTERVAL '30 days'")
+
             where_sql = ""
             if filtros:
                 where_sql = "WHERE " + " AND ".join(filtros)
 
-            params.append(int(limit))
+            lim = max(1, min(500, int(limit)))
+            off = max(0, int(offset or 0))
+            params.extend([lim, off])
             cur.execute(
                 f"""
                 SELECT
@@ -649,7 +1173,7 @@ def obtener_auditoria_negocio(limit=50, tabla_objetivo=None, actor_username=None
                 FROM auditoria_negocio
                 {where_sql}
                 ORDER BY creado_en DESC
-                LIMIT %s
+                LIMIT %s OFFSET %s
                 """,
                 tuple(params),
             )
@@ -1591,8 +2115,8 @@ def crear_pedido_completo(cliente_id, datos_temp):
                 placeholders.append("%s")
             if cols_pedidos["creado_en"]:
                 fields.append("creado_en")
-                values.append(datetime.utcnow())
-                placeholders.append("%s")
+                # Usar hora de BD evita desfase UTC/local en reportes por fecha.
+                placeholders.append("NOW()")
 
             # Paso 2: pedido principal.
             cur.execute(
@@ -1615,6 +2139,22 @@ def crear_pedido_completo(cliente_id, datos_temp):
                     """,
                     (pedido_id, producto_id, cantidad, precio_unitario),
                 )
+
+            # Paso 3b: registrar bitacora de consumo de inventario.
+            # Si existe trigger SQL de descuento, solo registramos movimientos.
+            actor_usuario = (str(datos.get("actor_usuario") or "") or "bot").strip() or "bot"
+            actor_rol = (str(datos.get("actor_rol") or "") or "bot").strip() or "bot"
+            trigger_descuenta = _detalle_pedido_tiene_trigger_descuento(cur)
+            consumo = _descontar_inventario_por_pedido(
+                cur,
+                pedido_id=pedido_id,
+                items=items,
+                actor_usuario=actor_usuario,
+                actor_rol=actor_rol,
+                actualizar_stock=not trigger_descuenta,
+            )
+            if isinstance(consumo, dict) and consumo.get("error"):
+                raise RuntimeError(consumo.get("error"))
 
             # Paso 4: vincular pago pendiente si fue tarjeta.
             if metodo_pago in {"tarjeta", "mercadopago"}:
@@ -1656,6 +2196,7 @@ def crear_pedido_completo(cliente_id, datos_temp):
             "pedido_id": pedido_id,
             "codigo_entrega": codigo_entrega,
             "total": round(float(total), 2),
+            "movimientos_inventario": (consumo or {}).get("movimientos", []),
         }
 
     except Exception:
@@ -1790,7 +2331,15 @@ def obtener_pedidos_por_estado(estado):
             conn.close()
 
 
-def obtener_pedidos(estado=None, fecha=None):
+def obtener_pedidos(
+    estado=None,
+    fecha=None,
+    fecha_desde=None,
+    fecha_hasta=None,
+    busqueda=None,
+    limit=None,
+    offset=0,
+):
     conn = None
     try:
         conn = get_connection()
@@ -1811,9 +2360,40 @@ def obtener_pedidos(estado=None, fecha=None):
         if fecha == "hoy":
             clauses.append("p.creado_en::date = CURRENT_DATE")
 
+        if fecha_desde:
+            clauses.append("p.creado_en >= %s::date")
+            params.append(str(fecha_desde).strip())
+
+        if fecha_hasta:
+            clauses.append("p.creado_en < (%s::date + INTERVAL '1 day')")
+            params.append(str(fecha_hasta).strip())
+
+        search = str(busqueda or "").strip()
+        if search:
+            clauses.append(
+                """
+                (
+                    CAST(p.pedido_id AS TEXT) ILIKE %s
+                    OR COALESCE(c.whatsapp_id, '') ILIKE %s
+                    OR COALESCE(c.nombre, '') ILIKE %s
+                    OR COALESCE(c.apellidos, '') ILIKE %s
+                    OR COALESCE(dc.direccion_texto, '') ILIKE %s
+                )
+                """
+            )
+            pattern = f"%{search}%"
+            params.extend([pattern, pattern, pattern, pattern, pattern])
+
         where_sql = ""
         if clauses:
             where_sql = "WHERE " + " AND ".join(clauses)
+
+        limit_sql = ""
+        if limit is not None:
+            lim = max(1, min(500, int(limit)))
+            off = max(0, int(offset or 0))
+            limit_sql = " LIMIT %s OFFSET %s"
+            params.extend([lim, off])
 
         query = f"""
             SELECT
@@ -1849,6 +2429,7 @@ def obtener_pedidos(estado=None, fecha=None):
             {where_sql}
             GROUP BY p.pedido_id, p.estado, p.total, p.creado_en, c.cliente_id, c.whatsapp_id, c.nombre, c.apellidos, dc.direccion_texto
             ORDER BY p.creado_en DESC
+            {limit_sql}
         """
 
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -2190,7 +2771,7 @@ def obtener_pedidos_repartidor(repartidor_usuario=None, area_entrega=None):
         conn = get_connection()
         _asegurar_tablas_operacion_pedidos(conn)
 
-        params = ["listo", "en_camino"]
+        params = ["listo", "en_camino"]  # type: list[object]
         area_expr = "COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000'))"
         where_assignment = ""
         area_filter = _normalizar_area_entrega(area_entrega)
@@ -2356,6 +2937,335 @@ def obtener_ventas_anuales():
             conn.close()
 
 
+def obtener_kpis_ventas_periodo():
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                WITH base AS (
+                    SELECT
+                        p.pedido_id,
+                        p.cliente_id,
+                        p.total,
+                        p.creado_en
+                    FROM pedidos p
+                    WHERE p.estado <> 'cancelado'
+                ),
+                day_current AS (
+                    SELECT
+                        COALESCE(SUM(total), 0)::NUMERIC(12,2) AS ventas,
+                        COUNT(*)::INT AS pedidos,
+                        COUNT(DISTINCT cliente_id)::INT AS clientes
+                    FROM base
+                    WHERE creado_en::date = CURRENT_DATE
+                ),
+                day_prev AS (
+                    SELECT
+                        COALESCE(SUM(total), 0)::NUMERIC(12,2) AS ventas
+                    FROM base
+                    WHERE creado_en::date = (CURRENT_DATE - INTERVAL '1 day')::date
+                ),
+                month_current AS (
+                    SELECT
+                        COALESCE(SUM(total), 0)::NUMERIC(12,2) AS ventas,
+                        COUNT(*)::INT AS pedidos,
+                        COUNT(DISTINCT cliente_id)::INT AS clientes
+                    FROM base
+                    WHERE DATE_TRUNC('month', creado_en) = DATE_TRUNC('month', CURRENT_DATE)
+                ),
+                month_prev AS (
+                    SELECT
+                        COALESCE(SUM(total), 0)::NUMERIC(12,2) AS ventas
+                    FROM base
+                    WHERE DATE_TRUNC('month', creado_en) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+                ),
+                year_current AS (
+                    SELECT
+                        COALESCE(SUM(total), 0)::NUMERIC(12,2) AS ventas,
+                        COUNT(*)::INT AS pedidos,
+                        COUNT(DISTINCT cliente_id)::INT AS clientes
+                    FROM base
+                    WHERE DATE_TRUNC('year', creado_en) = DATE_TRUNC('year', CURRENT_DATE)
+                ),
+                year_prev AS (
+                    SELECT
+                        COALESCE(SUM(total), 0)::NUMERIC(12,2) AS ventas
+                    FROM base
+                    WHERE DATE_TRUNC('year', creado_en) = DATE_TRUNC('year', CURRENT_DATE - INTERVAL '1 year')
+                )
+                SELECT
+                    dc.ventas AS dia_ventas,
+                    dc.pedidos AS dia_pedidos,
+                    dc.clientes AS dia_clientes,
+                    dp.ventas AS dia_prev_ventas,
+                    mc.ventas AS mes_ventas,
+                    mc.pedidos AS mes_pedidos,
+                    mc.clientes AS mes_clientes,
+                    mp.ventas AS mes_prev_ventas,
+                    yc.ventas AS ano_ventas,
+                    yc.pedidos AS ano_pedidos,
+                    yc.clientes AS ano_clientes,
+                    yp.ventas AS ano_prev_ventas
+                FROM day_current dc
+                CROSS JOIN day_prev dp
+                CROSS JOIN month_current mc
+                CROSS JOIN month_prev mp
+                CROSS JOIN year_current yc
+                CROSS JOIN year_prev yp
+                """
+            )
+            row = cur.fetchone() or {}
+
+            def _to_float(v):
+                return float(v or 0)
+
+            def _to_int(v):
+                return int(v or 0)
+
+            def _growth(current, previous):
+                if previous and previous > 0:
+                    return round(((current - previous) / previous) * 100, 2)
+                return 0.0
+
+            def _pack(prefix):
+                ventas = _to_float(row.get(f"{prefix}_ventas"))
+                pedidos = _to_int(row.get(f"{prefix}_pedidos"))
+                clientes = _to_int(row.get(f"{prefix}_clientes"))
+                prev_ventas = _to_float(row.get(f"{prefix}_prev_ventas"))
+                ticket = round((ventas / pedidos), 2) if pedidos > 0 else 0.0
+                return {
+                    "ventas": round(ventas, 2),
+                    "pedidos": pedidos,
+                    "clientes": clientes,
+                    "ticket_promedio": ticket,
+                    "crecimiento_pct": _growth(ventas, prev_ventas),
+                }
+
+            return {
+                "dia": _pack("dia"),
+                "mes": _pack("mes"),
+                "ano": _pack("ano"),
+            }
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_reporte_ventas_profesional(periodo="dia", fecha_base=None, busqueda=None, limit=300):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tablas_operacion_pedidos(conn)
+        _asegurar_tablas_inventario_real(conn)
+        _asegurar_tabla_compras_insumos(conn)
+        has_metodo_pago = _tabla_tiene_columna(conn, "pedidos", "metodo_pago")
+        has_metodo_entrega = _tabla_tiene_columna(conn, "pedidos", "metodo_entrega")
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            filtros = ["p.estado <> 'cancelado'"]
+            params = []
+
+            periodo_norm = str(periodo or "dia").strip().lower()
+            if periodo_norm not in {"dia", "semana", "mes", "ano"}:
+                periodo_norm = "dia"
+
+            fecha_ref = str(fecha_base or "").strip()
+            if fecha_ref:
+                params.append(fecha_ref)
+                if periodo_norm == "dia":
+                    filtros.append("p.creado_en::date = %s::date")
+                elif periodo_norm == "semana":
+                    filtros.append(
+                        """
+                        p.creado_en >= DATE_TRUNC('week', %s::date)
+                        AND p.creado_en < (DATE_TRUNC('week', %s::date) + INTERVAL '7 day')
+                        """
+                    )
+                    params.append(fecha_ref)
+                elif periodo_norm == "mes":
+                    filtros.append(
+                        """
+                        p.creado_en >= DATE_TRUNC('month', %s::date)
+                        AND p.creado_en < (DATE_TRUNC('month', %s::date) + INTERVAL '1 month')
+                        """
+                    )
+                    params.append(fecha_ref)
+                else:
+                    filtros.append(
+                        """
+                        p.creado_en >= DATE_TRUNC('year', %s::date)
+                        AND p.creado_en < (DATE_TRUNC('year', %s::date) + INTERVAL '1 year')
+                        """
+                    )
+                    params.append(fecha_ref)
+            else:
+                if periodo_norm == "dia":
+                    filtros.append("p.creado_en::date = CURRENT_DATE")
+                elif periodo_norm == "semana":
+                    filtros.append(
+                        """
+                        p.creado_en >= DATE_TRUNC('week', CURRENT_DATE)
+                        AND p.creado_en < (DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '7 day')
+                        """
+                    )
+                elif periodo_norm == "mes":
+                    filtros.append("DATE_TRUNC('month', p.creado_en) = DATE_TRUNC('month', CURRENT_DATE)")
+                else:
+                    filtros.append("DATE_TRUNC('year', p.creado_en) = DATE_TRUNC('year', CURRENT_DATE)")
+
+            q = str(busqueda or "").strip()
+            if q:
+                pattern = f"%{q}%"
+                filtros.append(
+                    """
+                    (
+                        CAST(p.pedido_id AS TEXT) ILIKE %s
+                        OR COALESCE(c.nombre, '') ILIKE %s
+                        OR COALESCE(c.apellidos, '') ILIKE %s
+                        OR COALESCE(c.whatsapp_id, '') ILIKE %s
+                    )
+                    """
+                )
+                params.extend([pattern, pattern, pattern, pattern])
+
+            where_sql = "WHERE " + " AND ".join(filtros)
+            metodo_pago_sql = "COALESCE(p.metodo_pago, '-')" if has_metodo_pago else "'-'"
+            metodo_entrega_sql = "COALESCE(p.metodo_entrega, '-')" if has_metodo_entrega else "'-'"
+            group_cols = [
+                "p.pedido_id",
+                "p.creado_en",
+                "p.estado",
+                "p.total",
+                "c.cliente_id",
+                "c.nombre",
+                "c.apellidos",
+                "c.whatsapp_id",
+            ]
+            if has_metodo_pago:
+                group_cols.append("COALESCE(p.metodo_pago, '-')")
+            if has_metodo_entrega:
+                group_cols.append("COALESCE(p.metodo_entrega, '-')")
+            group_cols.extend([
+                "et.ts_listo",
+                "et.ts_entregado",
+            ])
+            group_by_sql = ",\n                    ".join(group_cols)
+
+            lim = max(1, min(1000, int(limit or 300)))
+            params.append(lim)
+
+            cur.execute(
+                f"""
+                WITH estado_times AS (
+                    SELECT
+                        b.pedido_id,
+                        MIN(CASE WHEN b.estado_nuevo IN ('listo', 'en_camino', 'entregado') THEN b.creado_en END) AS ts_listo,
+                        MIN(CASE WHEN b.estado_nuevo = 'entregado' THEN b.creado_en END) AS ts_entregado
+                    FROM bitacora_estado_pedidos b
+                    GROUP BY b.pedido_id
+                ),
+                costo_insumo AS (
+                    SELECT DISTINCT ON (c.insumo_id)
+                        c.insumo_id,
+                        COALESCE(c.costo_total / NULLIF(c.cantidad, 0), 0)::NUMERIC(12,4) AS costo_unitario
+                    FROM compras_insumos c
+                    WHERE c.costo_total IS NOT NULL
+                      AND c.cantidad > 0
+                    ORDER BY c.insumo_id, c.creado_en DESC
+                ),
+                costo_producto AS (
+                    SELECT
+                        r.producto_id,
+                        COALESCE(SUM(r.cantidad_por_unidad * COALESCE(ci.costo_unitario, 0)), 0)::NUMERIC(12,4) AS costo_unitario_producto
+                    FROM recetas_producto_insumo r
+                    LEFT JOIN costo_insumo ci ON ci.insumo_id = r.insumo_id
+                    WHERE r.activo = TRUE
+                    GROUP BY r.producto_id
+                )
+                SELECT
+                    p.pedido_id,
+                    p.creado_en,
+                    p.estado,
+                    p.total::NUMERIC(12,2) AS total,
+                    c.cliente_id,
+                    COALESCE(NULLIF(TRIM(c.nombre || ' ' || COALESCE(c.apellidos, '')), ''), 'Cliente') AS cliente,
+                    COALESCE(c.whatsapp_id, '-') AS whatsapp_id,
+                    {metodo_pago_sql} AS metodo_pago,
+                    {metodo_entrega_sql} AS metodo_entrega,
+                    COALESCE(SUM(dp.cantidad), 0)::INT AS piezas,
+                    COALESCE(
+                        STRING_AGG(
+                            (COALESCE(pr.nombre, 'Producto') ||
+                             CASE WHEN COALESCE(pr.variante, '') <> '' THEN ' ' || pr.variante ELSE '' END ||
+                             ' x' || COALESCE(dp.cantidad, 0)::TEXT),
+                            ', ' ORDER BY dp.detalle_id
+                        ),
+                        '-'
+                    ) AS productos,
+                    COALESCE(SUM(dp.cantidad * COALESCE(cp.costo_unitario_producto, 0)), 0)::NUMERIC(12,2) AS costo_estimado,
+                    (p.total - COALESCE(SUM(dp.cantidad * COALESCE(cp.costo_unitario_producto, 0)), 0))::NUMERIC(12,2) AS utilidad_estimada,
+                    CASE
+                        WHEN p.total > 0 THEN ((p.total - COALESCE(SUM(dp.cantidad * COALESCE(cp.costo_unitario_producto, 0)), 0)) / p.total) * 100
+                        ELSE 0
+                    END::NUMERIC(12,2) AS margen_estimado_pct,
+                    ROUND(EXTRACT(EPOCH FROM (et.ts_listo - p.creado_en)) / 60.0, 2) AS rapidez_preparacion_min,
+                    ROUND(EXTRACT(EPOCH FROM (et.ts_entregado - p.creado_en)) / 60.0, 2) AS rapidez_entrega_min
+                FROM pedidos p
+                JOIN clientes c ON c.cliente_id = p.cliente_id
+                LEFT JOIN detalle_pedido dp ON dp.pedido_id = p.pedido_id
+                LEFT JOIN productos pr ON pr.producto_id = dp.producto_id
+                LEFT JOIN costo_producto cp ON cp.producto_id = dp.producto_id
+                LEFT JOIN estado_times et ON et.pedido_id = p.pedido_id
+                {where_sql}
+                GROUP BY
+                    {group_by_sql}
+                ORDER BY p.creado_en DESC
+                LIMIT %s
+                """,
+                tuple(params),
+            )
+            rows = cur.fetchall() or []
+
+            total_ventas = round(sum(float(r.get("total") or 0) for r in rows), 2)
+            total_pedidos = len(rows)
+            ticket_promedio = round((total_ventas / total_pedidos), 2) if total_pedidos > 0 else 0.0
+            clientes_unicos = len({int(r.get("cliente_id") or 0) for r in rows if int(r.get("cliente_id") or 0) > 0})
+            costo_estimado_total = round(sum(float(r.get("costo_estimado") or 0) for r in rows), 2)
+            utilidad_estimada_total = round(total_ventas - costo_estimado_total, 2)
+            margen_estimado_pct = round((utilidad_estimada_total / total_ventas) * 100, 2) if total_ventas > 0 else 0.0
+
+            prep_vals = [float(r.get("rapidez_preparacion_min")) for r in rows if r.get("rapidez_preparacion_min") is not None]
+            entrega_vals = [float(r.get("rapidez_entrega_min")) for r in rows if r.get("rapidez_entrega_min") is not None]
+            rapidez_prep_promedio = round(sum(prep_vals) / len(prep_vals), 2) if prep_vals else None
+            rapidez_entrega_promedio = round(sum(entrega_vals) / len(entrega_vals), 2) if entrega_vals else None
+
+            return {
+                "periodo": periodo_norm,
+                "fecha_base": fecha_ref or None,
+                "resumen": {
+                    "ventas": total_ventas,
+                    "pedidos": total_pedidos,
+                    "ticket_promedio": ticket_promedio,
+                    "clientes_unicos": clientes_unicos,
+                    "costo_estimado_total": costo_estimado_total,
+                    "utilidad_estimada_total": utilidad_estimada_total,
+                    "margen_estimado_pct": margen_estimado_pct,
+                    "rapidez_preparacion_promedio_min": rapidez_prep_promedio,
+                    "rapidez_entrega_promedio_min": rapidez_entrega_promedio,
+                },
+                "rows": rows,
+            }
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
 def obtener_rentabilidad_productos(limit=30):
     conn = None
     try:
@@ -2446,6 +3356,135 @@ def obtener_top_clientes(limit=20):
             conn.close()
 
 
+def obtener_contexto_cliente(cliente_id):
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            has_metodo_entrega = _tabla_tiene_columna(conn, "pedidos", "metodo_entrega")
+
+            cur.execute(
+                """
+                SELECT cliente_id, whatsapp_id, nombre, apellidos
+                FROM clientes
+                WHERE cliente_id = %s
+                LIMIT 1
+                """,
+                (int(cliente_id),),
+            )
+            cliente = cur.fetchone()
+            if not cliente:
+                return {"error": "Cliente no encontrado"}
+
+            if has_metodo_entrega:
+                cur.execute(
+                    """
+                    SELECT p.pedido_id, p.total, p.metodo_entrega, p.creado_en
+                    FROM pedidos p
+                    WHERE p.cliente_id = %s
+                      AND p.estado <> 'cancelado'
+                    ORDER BY p.creado_en DESC, p.pedido_id DESC
+                    LIMIT 1
+                    """,
+                    (int(cliente_id),),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT p.pedido_id, p.total, NULL::TEXT AS metodo_entrega, p.creado_en
+                    FROM pedidos p
+                    WHERE p.cliente_id = %s
+                      AND p.estado <> 'cancelado'
+                    ORDER BY p.creado_en DESC, p.pedido_id DESC
+                    LIMIT 1
+                    """,
+                    (int(cliente_id),),
+                )
+            ultimo_pedido = cur.fetchone()
+
+            ultimo_items = []
+            if ultimo_pedido:
+                cur.execute(
+                    """
+                    SELECT
+                        d.producto_id,
+                        d.cantidad,
+                        d.precio_unitario,
+                        p.nombre,
+                        p.variante
+                    FROM detalle_pedido d
+                    LEFT JOIN productos p ON p.producto_id = d.producto_id
+                    WHERE d.pedido_id = %s
+                    ORDER BY d.detalle_id ASC
+                    """,
+                    (int(ultimo_pedido["pedido_id"]),),
+                )
+                for row in cur.fetchall() or []:
+                    ultimo_items.append(
+                        {
+                            "producto_id": int(row.get("producto_id") or 0),
+                            "cantidad": int(row.get("cantidad") or 0),
+                            "precio_unit": float(row.get("precio_unitario") or 0),
+                            "nombre": row.get("nombre"),
+                            "variante": row.get("variante"),
+                        }
+                    )
+
+            if has_metodo_entrega:
+                cur.execute(
+                    """
+                    SELECT dc.direccion_id, dc.direccion_texto, dc.codigo_postal
+                    FROM pedidos p
+                    JOIN direcciones_cliente dc ON dc.direccion_id = p.direccion_id
+                    WHERE p.cliente_id = %s
+                      AND p.estado <> 'cancelado'
+                      AND p.direccion_id IS NOT NULL
+                      AND p.metodo_entrega = 'domicilio'
+                    ORDER BY p.creado_en DESC, p.pedido_id DESC
+                    LIMIT 1
+                    """,
+                    (int(cliente_id),),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT dc.direccion_id, dc.direccion_texto, dc.codigo_postal
+                    FROM pedidos p
+                    JOIN direcciones_cliente dc ON dc.direccion_id = p.direccion_id
+                    WHERE p.cliente_id = %s
+                      AND p.estado <> 'cancelado'
+                      AND p.direccion_id IS NOT NULL
+                    ORDER BY p.creado_en DESC, p.pedido_id DESC
+                    LIMIT 1
+                    """,
+                    (int(cliente_id),),
+                )
+            ultima_direccion = cur.fetchone()
+
+            return {
+                "cliente_id": int(cliente.get("cliente_id") or 0),
+                "whatsapp_id": cliente.get("whatsapp_id"),
+                "nombre": cliente.get("nombre"),
+                "apellidos": cliente.get("apellidos"),
+                "ultimo_pedido_id": int(ultimo_pedido.get("pedido_id") or 0) if ultimo_pedido else None,
+                "ultimo_total": float(ultimo_pedido.get("total") or 0) if ultimo_pedido else 0,
+                "ultimo_metodo_entrega": (ultimo_pedido.get("metodo_entrega") if ultimo_pedido else None),
+                "ultimo_items": [i for i in ultimo_items if int(i.get("cantidad") or 0) > 0],
+                "ultima_direccion": {
+                    "direccion_id": int(ultima_direccion.get("direccion_id") or 0),
+                    "direccion_texto": (ultima_direccion.get("direccion_texto") or "").strip(),
+                    "codigo_postal": (ultima_direccion.get("codigo_postal") or "").strip(),
+                }
+                if ultima_direccion
+                else None,
+            }
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
 def obtener_alertas_inventario():
     conn = None
     try:
@@ -2475,13 +3514,54 @@ def obtener_alertas_inventario():
             conn.close()
 
 
-def obtener_inventario():
+def obtener_inventario(texto=None, estado_stock=None, proveedor=None, limit=None, offset=0):
     conn = None
     try:
         conn = get_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            filtros = []
+            params = []
+
+            search = str(texto or "").strip()
+            if search:
+                pattern = f"%{search}%"
+                filtros.append(
+                    """
+                    (
+                        COALESCE(i.nombre, '') ILIKE %s
+                        OR COALESCE(i.unidad_medida, '') ILIKE %s
+                        OR COALESCE(pv.nombre, '') ILIKE %s
+                    )
+                    """
+                )
+                params.extend([pattern, pattern, pattern])
+
+            prov = str(proveedor or "").strip()
+            if prov:
+                filtros.append("COALESCE(pv.nombre, '') ILIKE %s")
+                params.append(f"%{prov}%")
+
+            estado = str(estado_stock or "").strip().lower()
+            if estado == "bajo":
+                filtros.append("i.stock_actual < i.stock_minimo")
+            elif estado == "normal":
+                filtros.append("i.stock_actual >= i.stock_minimo")
+            elif estado == "sobre":
+                filtros.append("i.stock_actual >= (i.stock_minimo * 1.5)")
+
+            where_sql = ""
+            if filtros:
+                where_sql = "WHERE " + " AND ".join(filtros)
+
+            limit_sql = ""
+            if limit is not None:
+                lim = max(1, min(500, int(limit)))
+                off = max(0, int(offset or 0))
+                limit_sql = " LIMIT %s OFFSET %s"
+                params.extend([lim, off])
+
             cur.execute(
-                """
+                f"""
                 SELECT
                     i.insumo_id,
                     i.nombre,
@@ -2492,8 +3572,11 @@ def obtener_inventario():
                     pv.nombre AS proveedor
                 FROM insumos i
                 LEFT JOIN proveedores pv ON pv.proveedor_id = i.proveedor_id
+                {where_sql}
                 ORDER BY i.nombre
-                """
+                {limit_sql}
+                """,
+                tuple(params),
             )
             return cur.fetchall()
     except Exception as exc:
@@ -2648,7 +3731,26 @@ def _registrar_movimiento_inventario_cur(
     )
 
 
-def _descontar_inventario_por_pedido(cur, pedido_id, items, actor_usuario=None, actor_rol=None):
+def _detalle_pedido_tiene_trigger_descuento(cur):
+    cur.execute(
+        """
+        SELECT 1
+        FROM pg_trigger t
+        JOIN pg_class c ON c.oid = t.tgrelid
+        WHERE c.relname = 'detalle_pedido'
+          AND NOT t.tgisinternal
+          AND (
+                t.tgname = 'trg_descontar_insumos_detalle_pedido'
+                OR t.tgname ILIKE '%descontar%insumo%'
+                OR t.tgname ILIKE '%consumo%inventario%'
+          )
+        LIMIT 1
+        """
+    )
+    return cur.fetchone() is not None
+
+
+def _descontar_inventario_por_pedido(cur, pedido_id, items, actor_usuario=None, actor_rol=None, actualizar_stock=True):
     requeridos = {}
     faltan_recetas = []
 
@@ -2711,7 +3813,7 @@ def _descontar_inventario_por_pedido(cur, pedido_id, items, actor_usuario=None, 
             continue
         disponible = float(row["stock_actual"])
         requerido = float(req["cantidad"])
-        if disponible < requerido:
+        if actualizar_stock and disponible < requerido:
             faltantes.append(
                 f"{row['nombre']}: disponible={disponible:.3f} {row['unidad_medida']} / requerido={requerido:.3f} {row['unidad_medida']}"
             )
@@ -2722,18 +3824,25 @@ def _descontar_inventario_por_pedido(cur, pedido_id, items, actor_usuario=None, 
     movimientos = []
     for insumo_id, req in requeridos.items():
         row = stocks[insumo_id]
-        stock_antes = float(row["stock_actual"])
         qty = float(req["cantidad"])
-        stock_despues = stock_antes - qty
+        stock_actual = float(row["stock_actual"])
 
-        cur.execute(
-            """
-            UPDATE insumos
-            SET stock_actual = %s
-            WHERE insumo_id = %s
-            """,
-            (stock_despues, insumo_id),
-        )
+        if actualizar_stock:
+            stock_antes = stock_actual
+            stock_despues = stock_antes - qty
+
+            cur.execute(
+                """
+                UPDATE insumos
+                SET stock_actual = %s
+                WHERE insumo_id = %s
+                """,
+                (stock_despues, insumo_id),
+            )
+        else:
+            # Modo bitacora: el trigger SQL ya desconto existencias.
+            stock_despues = stock_actual
+            stock_antes = stock_despues + qty
 
         _registrar_movimiento_inventario_cur(
             cur,
@@ -3394,17 +4503,38 @@ def guardar_componente_receta(producto_id, insumo_id, cantidad_por_unidad, activ
             conn.close()
 
 
-def obtener_recetas_producto(producto_id=None):
+def obtener_recetas_producto(producto_id=None, texto=None, activa=None, limit=None, offset=0):
     conn = None
     try:
         conn = get_connection()
         _asegurar_tablas_inventario_real(conn)
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             params = []
-            where_sql = ""
+            filtros = []
             if producto_id is not None:
-                where_sql = "WHERE r.producto_id = %s"
+                filtros.append("r.producto_id = %s")
                 params.append(int(producto_id))
+
+            search = str(texto or "").strip()
+            if search:
+                pattern = f"%{search}%"
+                filtros.append("(COALESCE(p.nombre, '') ILIKE %s OR COALESCE(p.variante, '') ILIKE %s OR COALESCE(i.nombre, '') ILIKE %s)")
+                params.extend([pattern, pattern, pattern])
+
+            if activa is not None:
+                filtros.append("r.activo = %s")
+                params.append(bool(activa))
+
+            where_sql = ""
+            if filtros:
+                where_sql = "WHERE " + " AND ".join(filtros)
+
+            limit_sql = ""
+            if limit is not None:
+                lim = max(1, min(500, int(limit)))
+                off = max(0, int(offset or 0))
+                limit_sql = " LIMIT %s OFFSET %s"
+                params.extend([lim, off])
 
             cur.execute(
                 f"""
@@ -3424,6 +4554,7 @@ def obtener_recetas_producto(producto_id=None):
                 JOIN insumos i ON i.insumo_id = r.insumo_id
                 {where_sql}
                 ORDER BY p.nombre, p.variante, i.nombre
+                {limit_sql}
                 """,
                 tuple(params),
             )
@@ -3952,6 +5083,212 @@ def _asegurar_tabla_log_notificaciones(conn):
                 ON log_notificaciones (pedido_id)
             """
         )
+
+
+def _asegurar_tabla_tickets_soporte(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tickets_soporte (
+                ticket_id          BIGSERIAL PRIMARY KEY,
+                numero_ticket      VARCHAR(30)  NOT NULL UNIQUE,
+                categoria          VARCHAR(40)  NOT NULL DEFAULT 'otro',
+                prioridad          VARCHAR(15)  NOT NULL DEFAULT 'media',
+                nombre_contacto    VARCHAR(120) NOT NULL,
+                whatsapp_contacto  VARCHAR(30),
+                descripcion        TEXT         NOT NULL,
+                estado             VARCHAR(20)  NOT NULL DEFAULT 'abierto',
+                notas_resolucion   TEXT,
+                resuelto_por       VARCHAR(80),
+                creado_en          TIMESTAMP    NOT NULL DEFAULT NOW(),
+                actualizado_en     TIMESTAMP    NOT NULL DEFAULT NOW(),
+                resuelto_en        TIMESTAMP,
+                CONSTRAINT chk_tickets_soporte_categoria CHECK (
+                    categoria IN ('acceso', 'facturacion', 'tecnico', 'pedido', 'otro')
+                ),
+                CONSTRAINT chk_tickets_soporte_prioridad CHECK (
+                    prioridad IN ('baja', 'media', 'alta', 'urgente')
+                ),
+                CONSTRAINT chk_tickets_soporte_estado CHECK (
+                    estado IN ('abierto', 'en_proceso', 'resuelto', 'cerrado')
+                )
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tickets_soporte_estado
+                ON tickets_soporte (estado, creado_en DESC)
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tickets_soporte_numero
+                ON tickets_soporte (numero_ticket)
+            """
+        )
+        conn.commit()
+
+
+def _generar_numero_ticket(cur):
+    """Genera un numero de ticket tipo TKT-YYYYMMDD-NNN."""
+    hoy = datetime.now().strftime("%Y%m%d")
+    cur.execute(
+        """
+        SELECT COUNT(*)::INT + 1 AS siguiente
+        FROM tickets_soporte
+        WHERE numero_ticket LIKE %s
+        """,
+        (f"TKT-{hoy}-%",),
+    )
+    row = cur.fetchone()
+    seq = int(row["siguiente"] if isinstance(row, dict) else row[0])
+    return f"TKT-{hoy}-{seq:03d}"
+
+
+def crear_ticket_soporte(categoria, prioridad, nombre_contacto, whatsapp_contacto, descripcion):
+    conn = None
+    try:
+        categoria = (categoria or "otro").strip().lower()
+        prioridad = (prioridad or "media").strip().lower()
+        nombre = (nombre_contacto or "").strip()
+        whatsapp = (whatsapp_contacto or "").strip() or None
+        desc = (descripcion or "").strip()
+
+        if not nombre:
+            return {"error": "El nombre de contacto es obligatorio."}
+        if not desc:
+            return {"error": "La descripcion del problema es obligatoria."}
+        if categoria not in {"acceso", "facturacion", "tecnico", "pedido", "otro"}:
+            categoria = "otro"
+        if prioridad not in {"baja", "media", "alta", "urgente"}:
+            prioridad = "media"
+
+        conn = get_connection()
+        _asegurar_tabla_tickets_soporte(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            numero = _generar_numero_ticket(cur)
+            cur.execute(
+                """
+                INSERT INTO tickets_soporte
+                    (numero_ticket, categoria, prioridad, nombre_contacto,
+                     whatsapp_contacto, descripcion, estado)
+                VALUES (%s, %s, %s, %s, %s, %s, 'abierto')
+                RETURNING ticket_id, numero_ticket, categoria, prioridad,
+                          nombre_contacto, whatsapp_contacto, descripcion,
+                          estado, creado_en
+                """,
+                (numero, categoria, prioridad, nombre, whatsapp, desc),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_tickets_soporte(estado=None, limit=200):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_tickets_soporte(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if estado:
+                cur.execute(
+                    """
+                    SELECT ticket_id, numero_ticket, categoria, prioridad, nombre_contacto,
+                           whatsapp_contacto, descripcion, estado, notas_resolucion,
+                           resuelto_por, creado_en, actualizado_en, resuelto_en
+                    FROM tickets_soporte
+                    WHERE estado = %s
+                    ORDER BY
+                        CASE prioridad
+                            WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2
+                            WHEN 'media'   THEN 3 WHEN 'baja' THEN 4
+                        END,
+                        creado_en DESC
+                    LIMIT %s
+                    """,
+                    (estado, int(limit)),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT ticket_id, numero_ticket, categoria, prioridad, nombre_contacto,
+                           whatsapp_contacto, descripcion, estado, notas_resolucion,
+                           resuelto_por, creado_en, actualizado_en, resuelto_en
+                    FROM tickets_soporte
+                    ORDER BY
+                        CASE estado
+                            WHEN 'abierto'    THEN 1 WHEN 'en_proceso' THEN 2
+                            WHEN 'resuelto'   THEN 3 WHEN 'cerrado'    THEN 4
+                        END,
+                        CASE prioridad
+                            WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2
+                            WHEN 'media'   THEN 3 WHEN 'baja' THEN 4
+                        END,
+                        creado_en DESC
+                    LIMIT %s
+                    """,
+                    (int(limit),),
+                )
+            return cur.fetchall()
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def actualizar_estado_ticket(numero_ticket, nuevo_estado, notas_resolucion=None, resuelto_por=None):
+    conn = None
+    try:
+        numero = (numero_ticket or "").strip().upper()
+        nuevo_estado = (nuevo_estado or "").strip().lower()
+        if not numero:
+            return {"error": "numero_ticket es obligatorio."}
+        if nuevo_estado not in {"abierto", "en_proceso", "resuelto", "cerrado"}:
+            return {"error": f"Estado invalido: {nuevo_estado}"}
+
+        conn = get_connection()
+        _asegurar_tabla_tickets_soporte(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                UPDATE tickets_soporte
+                SET
+                    estado           = %s,
+                    notas_resolucion = COALESCE(%s, notas_resolucion),
+                    resuelto_por     = COALESCE(%s, resuelto_por),
+                    actualizado_en   = NOW(),
+                    resuelto_en      = CASE
+                        WHEN %s IN ('resuelto', 'cerrado') THEN COALESCE(resuelto_en, NOW())
+                        ELSE resuelto_en
+                    END
+                WHERE UPPER(numero_ticket) = %s
+                RETURNING ticket_id, numero_ticket, categoria, prioridad, nombre_contacto,
+                          whatsapp_contacto, descripcion, estado, notas_resolucion,
+                          resuelto_por, creado_en, actualizado_en, resuelto_en
+                """,
+                (nuevo_estado, notas_resolucion or None, resuelto_por or None, nuevo_estado, numero),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": f"Ticket {numero} no encontrado."}
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
 
 
 def crear_log_notificacion(payload):

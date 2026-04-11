@@ -319,6 +319,84 @@ CREATE TRIGGER trg_auditoria_negocio_compras_insumos
 AFTER INSERT OR UPDATE OR DELETE ON compras_insumos
 FOR EACH ROW EXECUTE FUNCTION fn_auditoria_negocio_generic();
 
+-- Tickets de soporte (enviados desde login o WhatsApp)
+CREATE TABLE IF NOT EXISTS tickets_soporte (
+    ticket_id          BIGSERIAL PRIMARY KEY,
+    numero_ticket      VARCHAR(30)  NOT NULL UNIQUE,
+    categoria          VARCHAR(40)  NOT NULL DEFAULT 'otro',
+    prioridad          VARCHAR(15)  NOT NULL DEFAULT 'media',
+    nombre_contacto    VARCHAR(120) NOT NULL,
+    whatsapp_contacto  VARCHAR(30),
+    descripcion        TEXT         NOT NULL,
+    estado             VARCHAR(20)  NOT NULL DEFAULT 'abierto',
+    notas_resolucion   TEXT,
+    resuelto_por       VARCHAR(80),
+    creado_en          TIMESTAMP    NOT NULL DEFAULT NOW(),
+    actualizado_en     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    resuelto_en        TIMESTAMP,
+    CONSTRAINT chk_tickets_soporte_categoria CHECK (
+        categoria IN ('acceso', 'facturacion', 'tecnico', 'pedido', 'otro')
+    ),
+    CONSTRAINT chk_tickets_soporte_prioridad CHECK (
+        prioridad IN ('baja', 'media', 'alta', 'urgente')
+    ),
+    CONSTRAINT chk_tickets_soporte_estado CHECK (
+        estado IN ('abierto', 'en_proceso', 'resuelto', 'cerrado')
+    )
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_soporte_estado
+    ON tickets_soporte (estado, creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_tickets_soporte_numero
+    ON tickets_soporte (numero_ticket);
+
+CREATE TABLE IF NOT EXISTS observabilidad_parser_pedidos (
+    observacion_id BIGSERIAL PRIMARY KEY,
+    tipo_evento VARCHAR(50) NOT NULL,
+    cliente_id BIGINT,
+    whatsapp_id VARCHAR(40),
+    estado_origen VARCHAR(40),
+    texto_usuario TEXT NOT NULL,
+    confidence_score NUMERIC(5,4) NOT NULL DEFAULT 0,
+    parse_mode VARCHAR(40) NOT NULL DEFAULT 'unknown',
+    needs_clarification BOOLEAN NOT NULL DEFAULT FALSE,
+    needs_confirmation BOOLEAN NOT NULL DEFAULT FALSE,
+    items_detectados JSONB NOT NULL DEFAULT '[]'::jsonb,
+    signals JSONB NOT NULL DEFAULT '[]'::jsonb,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    estado_revision VARCHAR(30) NOT NULL DEFAULT 'nuevo',
+    admin_notes TEXT,
+    expected_items_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    regla_id BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_observabilidad_parser_pedidos_created_at
+    ON observabilidad_parser_pedidos (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_observabilidad_parser_pedidos_tipo_evento
+    ON observabilidad_parser_pedidos (tipo_evento, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_observabilidad_parser_pedidos_estado_revision
+    ON observabilidad_parser_pedidos (estado_revision, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS parser_frases_curadas (
+    regla_id BIGSERIAL PRIMARY KEY,
+    frase_original TEXT NOT NULL,
+    frase_normalizada TEXT NOT NULL,
+    tipo_match VARCHAR(20) NOT NULL DEFAULT 'exact',
+    items_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    needs_confirmation BOOLEAN NOT NULL DEFAULT FALSE,
+    needs_clarification BOOLEAN NOT NULL DEFAULT FALSE,
+    clarification_message TEXT,
+    notas TEXT,
+    prioridad INTEGER NOT NULL DEFAULT 100,
+    activa BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_parser_frases_curadas_tipo_match CHECK (tipo_match IN ('exact', 'contains'))
+);
+CREATE INDEX IF NOT EXISTS idx_parser_frases_curadas_frase_normalizada
+    ON parser_frases_curadas (frase_normalizada);
+CREATE INDEX IF NOT EXISTS idx_parser_frases_curadas_activa_prioridad
+    ON parser_frases_curadas (activa, prioridad DESC, updated_at DESC);
+
 -- ================================================================
 -- Seeds mínimos para poder crear un pedido de prueba
 -- ================================================================

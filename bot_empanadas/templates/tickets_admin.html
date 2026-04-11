@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Que Chimba | Admin Tickets</title>
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --surface: #F8F8F7;
+      --line: #E5E5E3;
+      --text: #1A1A1A;
+      --text-2: #6B6B6B;
+      --text-3: #9B9B9B;
+      --accent: #1F2328;
+      --blue-bg: #E6F1FB;
+      --blue-fg: #0C447C;
+      --green-bg: #EAF3DE;
+      --green-fg: #27500A;
+      --amber-bg: #FAEEDA;
+      --amber-fg: #633806;
+      --red-bg: #FCEBEB;
+      --red-fg: #791F1F;
+      --r-sm: 8px;
+      --r-lg: 12px;
+      --t: 120ms ease;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 400;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .topbar {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--surface);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--bg);
+      padding: 12px;
+    }
+
+    .card.flat {
+      border: none;
+      background: var(--surface);
+      border-radius: var(--r-sm);
+      padding: 16px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .controls input,
+    .controls select,
+    textarea,
+    button {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 8px 10px;
+      background: var(--bg);
+      color: var(--text);
+      transition: border-color var(--t);
+    }
+
+    .controls input:focus,
+    .controls select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      color: #FFFFFF;
+      border-color: var(--accent);
+      font-weight: 500;
+      transition: opacity var(--t);
+    }
+
+    button:hover {
+      opacity: 0.85;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--line);
+      font-weight: 400;
+    }
+
+    button.secondary:hover {
+      background: var(--surface);
+      opacity: 1;
+    }
+
+    button.xs {
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border-bottom: 0.5px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--text-2);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    tbody tr:hover {
+      background: var(--surface);
+    }
+
+    .status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+
+    .status.abierto {
+      background: var(--blue-bg);
+      color: var(--blue-fg);
+    }
+
+    .status.en_proceso {
+      background: var(--amber-bg);
+      color: var(--amber-fg);
+    }
+
+    .status.resuelto {
+      background: var(--green-bg);
+      color: var(--green-fg);
+    }
+
+    .status.cerrado {
+      background: var(--red-bg);
+      color: var(--red-fg);
+    }
+
+    .subtle {
+      color: var(--text-2);
+      font-size: 12px;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .notes {
+      width: 100%;
+      min-height: 60px;
+      resize: vertical;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: inherit;
+    }
+
+    .notes:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .meta-item {
+      display: flex;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .meta-label {
+      color: var(--text-2);
+      min-width: 70px;
+    }
+
+    .meta-value {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    #status {
+      color: var(--text-2);
+      font-size: 12px;
+      margin-left: auto;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <h1>Gestión de Tickets de Soporte</h1>
+      <div class="topbar-actions">
+        <span id="status" class="subtle"></span>
+        <a href="/admin" class="secondary" style="text-decoration: none; display: inline-block;">
+          <button class="secondary xs">← Volver</button>
+        </a>
+      </div>
+    </div>
+
+    <div class="card flat">
+      <div class="controls">
+        <select id="f-estado">
+          <option value="">— Estado —</option>
+          <option value="abierto">Abierto</option>
+          <option value="en_proceso">En proceso</option>
+          <option value="resuelto">Resuelto</option>
+          <option value="cerrado">Cerrado</option>
+        </select>
+        <input id="f-numero" placeholder="TKT-YYYYMMDD-001" />
+        <button id="btn-filtrar">Filtrar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Contacto</th>
+              <th>Detalle</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div style="padding-top: 8px; color: var(--text-2); font-size: 12px;" id="count"></div>
+    </div>
+  </div>
+
+  <script>
+    const tbody = document.getElementById("tbody");
+    const statusEl = document.getElementById("status");
+    const countEl = document.getElementById("count");
+
+    function fmtDate(v) {
+      if (!v) return "-";
+      try { 
+        const d = new Date(v);
+        return d.toLocaleDateString("es-MX") + " " + d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      } catch { 
+        return String(v); 
+      }
+    }
+
+    function statusBadge(estado) {
+      const estados = {
+        "abierto": "Abierto",
+        "en_proceso": "En proceso",
+        "resuelto": "Resuelto",
+        "cerrado": "Cerrado"
+      };
+      return '<span class="status ' + (estado || "") + '">' + (estados[estado] || estado || "-") + '</span>';
+    }
+
+    async function cargarTickets() {
+      const estado = document.getElementById("f-estado").value;
+      const numero = document.getElementById("f-numero").value.trim();
+      let url = "/api/soporte/tickets";
+      const params = new URLSearchParams();
+      if (estado) params.set("estado", estado);
+      if (numero) params.set("numero", numero);
+      if (params.toString()) url += "?" + params.toString();
+
+      statusEl.textContent = "Cargando...";
+      tbody.innerHTML = "";
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar tickets");
+        const rows = Array.isArray(data.data) ? data.data : [];
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-2); padding: 20px;">Sin tickets para mostrar.</td></tr>';
+          countEl.textContent = "0 tickets";
+          statusEl.textContent = "";
+          return;
+        }
+
+        tbody.innerHTML = rows.map((t) => {
+          const numeroTicket = t.numero_ticket || "-";
+          return `
+            <tr>
+              <td>
+                <div style="font-weight: 600;">${numeroTicket}</div>
+                <div class="subtle">${fmtDate(t.creado_en)}</div>
+              </td>
+              <td>
+                <div style="font-weight: 500;">${t.nombre_contacto || "-"}</div>
+                <div class="subtle">${t.whatsapp_contacto || "Sin WhatsApp"}</div>
+              </td>
+              <td>
+                <div class="meta">
+                  <div class="meta-item">
+                    <span class="meta-label">Cat:</span>
+                    <span class="meta-value">${t.categoria || "-"}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Prio:</span>
+                    <span class="meta-value">${t.prioridad || "-"}</span>
+                  </div>
+                  <div class="subtle" style="margin-top: 4px;">${t.descripcion || "-"}</div>
+                  ${t.notas_resolucion ? '<div class="subtle" style="margin-top: 4px; border-top: 0.5px solid var(--line); padding-top: 4px;"><strong>Notas:</strong> ' + t.notas_resolucion + '</div>' : ''}
+                </div>
+              </td>
+              <td>
+                ${statusBadge(t.estado)}
+              </td>
+              <td>
+                <div class="row-actions">
+                  <button class="xs" onclick="actualizarEstado('${numeroTicket}','en_proceso')">En curso</button>
+                  <button class="xs" onclick="actualizarEstado('${numeroTicket}','resuelto')">Resolver</button>
+                  <button class="xs" onclick="actualizarEstado('${numeroTicket}','cerrado')">Cerrar</button>
+                  <button class="secondary xs" onclick="actualizarEstado('${numeroTicket}','abierto')">Reabrir</button>
+                </div>
+                <textarea class="notes" id="notas-${numeroTicket}" placeholder="Notas de resolucion (opcional)"></textarea>
+                <div id="res-${numeroTicket}" style="margin-top: 4px; font-size: 11px; color: var(--text-2);"></div>
+              </td>
+            </tr>
+          `;
+        }).join("");
+        countEl.textContent = rows.length + " ticket" + (rows.length !== 1 ? "s" : "");
+        statusEl.textContent = "";
+      } catch (err) {
+        statusEl.textContent = "Error: " + err.message;
+        countEl.textContent = "";
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--red-fg); padding: 20px;">Error cargando tickets.</td></tr>';
+      }
+    }
+
+    async function actualizarEstado(numero, estado) {
+      const notasEl = document.getElementById("notas-" + numero);
+      const resEl = document.getElementById("res-" + numero);
+      const notas = notasEl ? notasEl.value.trim() : "";
+      statusEl.textContent = "Actualizando...";
+      try {
+        const res = await fetch("/api/soporte/tickets/" + encodeURIComponent(numero), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ estado, notas_resolucion: notas || null }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo actualizar");
+
+        const notif = data.data && data.data.notificacion_whatsapp;
+        if (notif && notif.intentada) {
+          if (notif.enviada) {
+            statusEl.textContent = "✓ " + numero + " actualizado y notificación enviada a " + (notif.destino || "cliente");
+            if (resEl) resEl.innerHTML = '<span style="color: var(--green-fg);">✓ Notificación enviada a ' + notif.destino + '</span>';
+          } else {
+            statusEl.textContent = numero + " actualizado (notificación no enviada)";
+            if (resEl) resEl.innerHTML = '<span style="color: var(--amber-fg);">⚠ ' + (notif.motivo || "Sin detalle") + '</span>';
+          }
+        } else {
+          statusEl.textContent = "✓ " + numero + " actualizado";
+        }
+        await cargarTickets();
+      } catch (err) {
+        statusEl.textContent = "Error: " + err.message;
+      }
+    }
+
+    document.getElementById("btn-filtrar").addEventListener("click", cargarTickets);
+    cargarTickets();
+  </script>
+</body>
+</html>

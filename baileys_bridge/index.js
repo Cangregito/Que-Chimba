@@ -59,6 +59,14 @@ function toJid(numberOrJid) {
     return raw;
   }
   const digits = raw.replace(/[^0-9]/g, "");
+  if (!digits) {
+    return "";
+  }
+  // Heuristica: IDs largos suelen venir como LID (no MSISDN telefonico).
+  // MX normal: 52 + 10 digitos (12). LID suele ser bastante mas largo.
+  if (digits.length >= 15) {
+    return `${digits}@lid`;
+  }
   return `${digits}@s.whatsapp.net`;
 }
 
@@ -173,7 +181,7 @@ async function saveIncomingMedia(msg) {
   const hasDocument = Boolean(message?.documentMessage);
 
   if (!hasAudio && !hasImage && !hasVideo && !hasDocument) {
-    return { mediaUrl: null, mediaType: null };
+    return { mediaUrl: null, mediaType: null, mediaKind: null };
   }
 
   const mediaType = hasAudio
@@ -215,7 +223,8 @@ async function saveIncomingMedia(msg) {
 
   return {
     mediaUrl: `${PUBLIC_BASE_URL}/media/${filename}`,
-    mediaType: contentType || mediaType,
+    mediaType: contentType || null,
+    mediaKind: mediaType,
   };
 }
 
@@ -228,6 +237,29 @@ async function sendText(to, text) {
     throw new Error("Numero destino invalido.");
   }
   await sock.sendMessage(jid, { text: String(text || "") });
+}
+
+async function sendTextWithFallback(primaryTo, secondaryTo, text, context = "") {
+  try {
+    await sendText(primaryTo, text);
+    return;
+  } catch (errorPrimary) {
+    logger.error(
+      {
+        err: errorPrimary?.message,
+        primaryTo: String(primaryTo || ""),
+        secondaryTo: String(secondaryTo || ""),
+        context,
+      },
+      "Fallo envio de texto al destino primario"
+    );
+  }
+
+  if (!secondaryTo || String(secondaryTo).trim() === String(primaryTo || "").trim()) {
+    throw new Error("No hay destino alterno para envio de texto.");
+  }
+
+  await sendText(secondaryTo, text);
 }
 
 async function sendQuickReplies(to, text, options) {
@@ -309,16 +341,22 @@ async function processIncomingMessage(msg) {
     return;
   }
 
+  // Siempre responder al JID original recibido para evitar desvíos
+  // cuando WhatsApp use identificadores LID en vez de numero telefonico.
+  const replyTarget = remoteJid;
+
   const bodyText = extractText(msg.message);
   const replyId = extractReplyId(msg.message);
   const { latitude, longitude } = extractLocation(msg.message);
-  const { mediaUrl, mediaType } = await saveIncomingMedia(msg);
+  const { mediaUrl, mediaType, mediaKind } = await saveIncomingMedia(msg);
 
   const payload = {
     whatsapp_id: toPlainNumber(remoteJid),
+    whatsapp_jid: remoteJid,
     mensaje: bodyText,
     media_url: mediaUrl,
     media_type: mediaType,
+    media_kind: mediaKind,
     latitude,
     longitude,
     message_id: key.id || "",
@@ -340,7 +378,16 @@ async function processIncomingMessage(msg) {
     flaskData = flaskResp?.data?.data || flaskResp?.data;
   } catch (error) {
     logger.error({ err: error?.message, payload }, "Error llamando webhook Flask");
-    await sendText(payload.whatsapp_id, "Listo parce, tengo una falla temporal del sistema. Intenta de nuevo en un minuto.");
+    try {
+      await sendTextWithFallback(
+        replyTarget,
+        payload.whatsapp_id,
+        "Listo parce, tengo una falla temporal del sistema. Intenta de nuevo en un minuto.",
+        "webhook_error"
+      );
+    } catch (sendErr) {
+      logger.error({ err: sendErr?.message, payload }, "No se pudo enviar mensaje de fallback tras error de webhook");
+    }
     return;
   }
 
@@ -350,24 +397,22 @@ async function processIncomingMessage(msg) {
 
   if (tipo === "audio" && flaskData?.audio_url) {
     try {
-      await sendAudioFromUrl(payload.whatsapp_id, flaskData.audio_url, contenido);
+      await sendAudioFromUrl(replyTarget, flaskData.audio_url, contenido);
       return;
     } catch (error) {
       logger.error({ err: error?.message }, "No se pudo enviar audio de respuesta");
     }
   }
 
-  if (parsed.quickReplies.length >= 2) {
-    try {
-      await sendQuickReplies(payload.whatsapp_id, parsed.bodyText, parsed.quickReplies);
-      return;
-    } catch (error) {
-      logger.error({ err: error?.message }, "No se pudo enviar botones rapidos; se usa fallback texto");
-    }
-  }
-
   if (parsed.fallbackText) {
-    await sendText(payload.whatsapp_id, parsed.fallbackText);
+    try {
+      await sendTextWithFallback(replyTarget, payload.whatsapp_id, parsed.fallbackText, "final_text");
+    } catch (sendErr) {
+      logger.error(
+        { err: sendErr?.message, tipo, hasContenido: Boolean(parsed.fallbackText), payload },
+        "No se pudo enviar respuesta final al usuario"
+      );
+    }
   }
 }
 

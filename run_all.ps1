@@ -8,10 +8,11 @@ param(
     [string]$TtsProvider = "elevenlabs",
     [string]$TtsLang = "es",
     [string]$TtsTld = "com.co",
-    [string]$WhisperModel = "tiny",
+    [string]$WhisperModel = "large-v3",
     [string]$ElevenLabsApiKey = "",
     [string]$ElevenLabsVoiceId = "",
     [string]$ElevenLabsModelId = "eleven_multilingual_v2",
+    [switch]$SkipRegressionTests,
     [switch]$SkipDocker,
     [switch]$ShowDemoCreds
 )
@@ -70,6 +71,105 @@ function Convert-SecureStringToPlain([System.Security.SecureString]$SecureValue)
     }
 }
 
+function Test-TcpPort([string]$HostName, [int]$Port, [int]$TimeoutMs = 1200) {
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $async = $client.BeginConnect($HostName, $Port, $null, $null)
+        if (-not $async.AsyncWaitHandle.WaitOne($TimeoutMs, $false)) {
+            return $false
+        }
+        $client.EndConnect($async)
+        return $true
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Close()
+    }
+}
+
+function Ensure-OllamaReady([string]$BaseUrl, [string]$Model, [string]$EnabledRaw) {
+    $enabledText = if ($null -eq $EnabledRaw) { "" } else { [string]$EnabledRaw }
+    $isEnabled = $enabledText.Trim().ToLower() -in @("1", "true", "yes", "on")
+    if (-not $isEnabled) {
+        Write-Warn "LLM_LOCAL_ENABLED esta en false. Se omite verificacion de Ollama."
+        return
+    }
+
+    $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+    if (-not $ollamaCmd) {
+        Write-Warn "Ollama no esta instalado o no esta en PATH. Instala Ollama para usar LLM local."
+        return
+    }
+
+    try {
+        $uri = [Uri]$BaseUrl
+    }
+    catch {
+        Write-Warn "LLM_LOCAL_BASE_URL invalida: '$BaseUrl'. No se pudo validar Ollama."
+        return
+    }
+
+    $targetHost = if ([string]::IsNullOrWhiteSpace($uri.Host)) { "localhost" } else { $uri.Host }
+    $port = if ($uri.Port -gt 0) { $uri.Port } else { 11434 }
+    $isLocalHost = $targetHost -in @("localhost", "127.0.0.1", "::1")
+
+    if ($isLocalHost -and -not (Test-TcpPort -HostName $targetHost -Port $port)) {
+        Write-Warn "Ollama no responde en ${targetHost}:$port. Iniciando 'ollama serve' en una ventana nueva..."
+        Start-Process -FilePath "powershell.exe" -ArgumentList @(
+            "-NoExit",
+            "-ExecutionPolicy", "Bypass",
+            "-Command", "ollama serve"
+        ) | Out-Null
+
+        $ready = $false
+        for ($i = 0; $i -lt 12; $i++) {
+            Start-Sleep -Seconds 1
+            if (Test-TcpPort -HostName $targetHost -Port $port) {
+                $ready = $true
+                break
+            }
+        }
+
+        if ($ready) {
+            Write-Ok "Ollama levantado en ${targetHost}:$port"
+        }
+        else {
+            Write-Warn "Ollama sigue sin responder en ${targetHost}:$port. El bot usara fallback sin LLM local."
+            return
+        }
+    }
+    else {
+        Write-Ok "Ollama responde en ${targetHost}:$port"
+    }
+
+    try {
+        $modelsRaw = (& ollama list 2>$null | Out-String)
+        if ($modelsRaw -notmatch "(?m)^\s*$([regex]::Escape($Model))\s+") {
+            Write-Warn "El modelo '$Model' no aparece en 'ollama list'. Ejecuta: ollama pull $Model"
+        }
+        else {
+            Write-Ok "Modelo Ollama detectado: $Model"
+        }
+    }
+    catch {
+        Write-Warn "No se pudo validar la lista de modelos de Ollama: $($_.Exception.Message)"
+    }
+}
+
+function Resolve-WhisperModel([string]$RequestedModel) {
+    $normalized = ([string]$RequestedModel).Trim().ToLower()
+    if ([string]::IsNullOrWhiteSpace($normalized)) {
+        return "large-v3"
+    }
+
+    if ($normalized -ne "large-v3") {
+        Write-Warn "WHISPER_MODEL '$normalized' fue reemplazado por 'large-v3' para maxima calidad."
+    }
+    return "large-v3"
+}
+
 if (-not (Test-Path -LiteralPath $bridgeDir)) {
     throw "No encontre la carpeta 'baileys_bridge'. Ejecuta este script desde la raiz del proyecto."
 }
@@ -112,7 +212,8 @@ $env:N8N_PEDIDO_WEBHOOK_URL = $N8nWebhookUrl
 $env:TTS_PROVIDER = if (-not [string]::IsNullOrWhiteSpace($TtsProvider)) { $TtsProvider } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_PROVIDER"))) { "auto" } else { [Environment]::GetEnvironmentVariable("TTS_PROVIDER") }
 $env:TTS_LANG = if (-not [string]::IsNullOrWhiteSpace($TtsLang)) { $TtsLang } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_LANG"))) { "es" } else { [Environment]::GetEnvironmentVariable("TTS_LANG") }
 $env:TTS_TLD = if (-not [string]::IsNullOrWhiteSpace($TtsTld)) { $TtsTld } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_TLD"))) { "com.co" } else { [Environment]::GetEnvironmentVariable("TTS_TLD") }
-$env:WHISPER_MODEL = if (-not [string]::IsNullOrWhiteSpace($WhisperModel)) { $WhisperModel } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("WHISPER_MODEL"))) { "tiny" } else { [Environment]::GetEnvironmentVariable("WHISPER_MODEL") }
+$requestedWhisperModel = if (-not [string]::IsNullOrWhiteSpace($WhisperModel)) { $WhisperModel } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("WHISPER_MODEL"))) { "large-v3" } else { [Environment]::GetEnvironmentVariable("WHISPER_MODEL") }
+$env:WHISPER_MODEL = Resolve-WhisperModel -RequestedModel $requestedWhisperModel
 $env:ELEVENLABS_API_KEY = if (-not [string]::IsNullOrWhiteSpace($ElevenLabsApiKey)) { $ElevenLabsApiKey } else { [Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY") }
 $env:ELEVENLABS_VOICE_ID = if (-not [string]::IsNullOrWhiteSpace($ElevenLabsVoiceId)) { $ElevenLabsVoiceId } else { [Environment]::GetEnvironmentVariable("ELEVENLABS_VOICE_ID") }
 $env:ELEVENLABS_MODEL_ID = if (-not [string]::IsNullOrWhiteSpace($ElevenLabsModelId)) { $ElevenLabsModelId } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("ELEVENLABS_MODEL_ID"))) { "eleven_multilingual_v2" } else { [Environment]::GetEnvironmentVariable("ELEVENLABS_MODEL_ID") }
@@ -138,6 +239,8 @@ Write-Info "LLM_LOCAL_ENABLED efectivo: $($env:LLM_LOCAL_ENABLED)"
 Write-Info "LLM_LOCAL_BASE_URL efectivo: $($env:LLM_LOCAL_BASE_URL)"
 Write-Info "LLM_LOCAL_MODEL efectivo: $($env:LLM_LOCAL_MODEL)"
 Write-Info "LLM_LOCAL_TIMEOUT_SEC efectivo: $($env:LLM_LOCAL_TIMEOUT_SEC)"
+
+Ensure-OllamaReady -BaseUrl $env:LLM_LOCAL_BASE_URL -Model $env:LLM_LOCAL_MODEL -EnabledRaw $env:LLM_LOCAL_ENABLED
 
 if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("FLASK_SECRET"))) {
     $env:FLASK_SECRET = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
@@ -172,6 +275,24 @@ finally {
 }
 
 Write-Ok "Conexion a PostgreSQL validada."
+
+if (-not $SkipRegressionTests) {
+    Write-Info "Ejecutando regresion rapida del parser de pedidos..."
+    Push-Location $root
+    try {
+        & $venvPython -m unittest bot_empanadas/test_order_parser_regression.py | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "La regresion del parser fallo. Corrige esos casos antes de levantar servicios."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    Write-Ok "Regresion del parser OK."
+}
+else {
+    Write-Warn "Se omiten pruebas de regresion por parametro -SkipRegressionTests"
+}
 
 if (-not (Test-Path -LiteralPath $bridgeEnv) -and (Test-Path -LiteralPath $bridgeEnvExample)) {
     Copy-Item -LiteralPath $bridgeEnvExample -Destination $bridgeEnv

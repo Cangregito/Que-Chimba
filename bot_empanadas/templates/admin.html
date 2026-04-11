@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -300,6 +300,22 @@
       background: var(--accent);
     }
 
+    .btn.xs {
+      padding: 6px 8px;
+      font-size: 12px;
+      min-height: auto;
+    }
+
+    .btn.secondary {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--line);
+    }
+
+    .btn.secondary:hover {
+      background: var(--surface);
+    }
+
     .btn:focus-visible,
     .nav-item:focus-visible,
     input:focus-visible,
@@ -367,6 +383,82 @@
 
     .muted {
       color: var(--text-3);
+    }
+
+    .status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+
+    .status.abierto {
+      background: var(--blue-bg);
+      color: var(--blue-fg);
+    }
+
+    .status.en_proceso {
+      background: var(--amber-bg);
+      color: var(--amber-fg);
+    }
+
+    .status.resuelto {
+      background: var(--green-bg);
+      color: var(--green-fg);
+    }
+
+    .status.cerrado {
+      background: var(--red-bg);
+      color: var(--red-fg);
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .meta-item {
+      display: flex;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .meta-label {
+      color: var(--text-2);
+      min-width: 70px;
+    }
+
+    .meta-value {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .notes {
+      width: 100%;
+      min-height: 60px;
+      resize: vertical;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .notes:focus {
+      outline: none;
+      border-color: var(--accent);
     }
 
     .chart-box {
@@ -557,6 +649,27 @@
       color: var(--text-2);
     }
 
+    .mono {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .parser-output {
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      padding: 10px;
+      min-height: 180px;
+    }
+
     .toast {
       position: fixed;
       right: 12px;
@@ -646,6 +759,8 @@
         <button class="nav-item" data-section="seguridad" type="button"><span class="dot red"></span>Seguridad</button>
         <button class="nav-item" data-section="campanas" type="button"><span class="dot amber"></span>Campañas</button>
         <button class="nav-item" data-section="inventario" type="button"><span class="dot darkgreen"></span>Inventario</button>
+        <button class="nav-item" data-section="parser" type="button"><span class="dot blue"></span>Parser IA</button>
+        <button class="nav-item" data-section="soporte" type="button"><span class="dot red"></span>Soporte</button>
       </nav>
 
       <div class="session">
@@ -701,17 +816,125 @@
 
           <div class="row grid-2">
             <article class="card">
-              <div class="card-head"><h3>Ventas por dia (mes actual)</h3></div>
+              <div class="card-head"><h3>Ventas por día (mes actual)</h3></div>
               <div id="ventas-mes-slot" class="chart-box"><canvas id="chart-ventas-mes"></canvas></div>
             </article>
             <article class="card">
-              <div class="card-head"><h3>Ventas por mes (ano actual)</h3></div>
+              <div class="card-head"><h3>Ventas por mes (año actual)</h3></div>
               <div id="ventas-ano-slot" class="chart-box"><canvas id="chart-ventas-ano"></canvas></div>
             </article>
           </div>
 
           <article class="card">
+            <div class="card-head"><h3>Reporte profesional de ventas</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field">
+                <label for="f-rep-ventas-periodo">Periodo</label>
+                <select id="f-rep-ventas-periodo">
+                  <option value="dia">Día</option>
+                  <option value="semana">Semana</option>
+                  <option value="mes">Mes</option>
+                  <option value="ano">Año</option>
+                </select>
+              </div>
+              <div class="field"><label for="f-rep-ventas-fecha">Fecha base</label><input id="f-rep-ventas-fecha" type="date" /></div>
+              <div class="field"><label for="f-rep-ventas-q">Buscar</label><input id="f-rep-ventas-q" placeholder="cliente, whatsapp o #pedido" /></div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-rep-ventas-filtrar" type="button">Generar</button>
+                <button class="btn" id="btn-rep-ventas-limpiar" type="button">Limpiar</button>
+                <button class="btn" id="btn-rep-ventas-export" type="button">Exportar CSV</button>
+                <button class="btn" id="btn-rep-ventas-export-xlsx" type="button">Exportar XLSX</button>
+              </div>
+            </div>
+
+            <div class="row kpi-4" style="margin-bottom:10px;">
+              <article class="flat card">
+                <p class="kpi-label">Ventas periodo</p>
+                <div class="kpi-number" id="kpi-rep-ventas">$0.00</div>
+              </article>
+              <article class="flat card">
+                <p class="kpi-label">Pedidos</p>
+                <div class="kpi-number" id="kpi-rep-pedidos">0</div>
+              </article>
+              <article class="flat card">
+                <p class="kpi-label">Ticket promedio</p>
+                <div class="kpi-number" id="kpi-rep-ticket">$0.00</div>
+              </article>
+              <article class="flat card">
+                <p class="kpi-label">Rapidez promedio</p>
+                <div class="kpi-number" id="kpi-rep-rapidez">-</div>
+              </article>
+              <article class="flat card">
+                <p class="kpi-label">Utilidad estimada</p>
+                <div class="kpi-number" id="kpi-rep-utilidad">$0.00</div>
+                <div class="kpi-trend" id="kpi-rep-margen">0.00% margen</div>
+              </article>
+            </div>
+
+            <div class="row grid-2" style="margin-bottom:10px;">
+              <article class="flat card">
+                <div class="field">
+                  <label for="f-rep-ticket-id">Tickets del período (menú desplegable)</label>
+                  <select id="f-rep-ticket-id">
+                    <option value="">Selecciona un ticket...</option>
+                  </select>
+                </div>
+                <div class="small" id="lbl-rep-ticket-count" style="margin-top:8px;">0 tickets encontrados</div>
+              </article>
+              <article class="flat card">
+                <div class="small" style="margin-bottom:6px;">Información importante de la venta seleccionada</div>
+                <div id="rep-ticket-detalle" class="small">Selecciona un ticket para ver el detalle profesional.</div>
+              </article>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Pedido</th>
+                    <th>Cliente</th>
+                    <th>Productos</th>
+                    <th>Monto</th>
+                    <th>Estado</th>
+                    <th>Rapidez</th>
+                    <th>SLA</th>
+                    <th>Rentabilidad</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-reporte-ventas-profesional"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><h3>Reporte profesional de KPIs (Día / Mes / Año)</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Periodo</th>
+                    <th>Ventas</th>
+                    <th>Pedidos</th>
+                    <th>Ticket promedio</th>
+                    <th>Clientes</th>
+                    <th>Crecimiento</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-kpis-periodo-profesional"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
             <div class="card-head"><h3>Top 20 clientes</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-top-clientes-q">Buscar</label><input id="f-top-clientes-q" placeholder="nombre o whatsapp" /></div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-top-clientes-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-top-clientes-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -751,6 +974,22 @@
 
           <article class="card">
             <div class="card-head"><h3>Rentabilidad por producto</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-rent-q">Buscar</label><input id="f-rent-q" placeholder="producto o variante" /></div>
+              <div class="field">
+                <label for="f-rent-calidad">Calidad receta</label>
+                <select id="f-rent-calidad">
+                  <option value="">Todas</option>
+                  <option value="completo">Completa</option>
+                  <option value="incompleto">Incompleta</option>
+                  <option value="sin_receta">Sin receta</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-rent-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-rent-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -770,6 +1009,23 @@
 
           <article class="card">
             <div class="card-head"><h3>Pedidos recientes (activos)</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-ped-buscar">Buscar</label><input id="f-ped-buscar" placeholder="#pedido, cliente, whatsapp" /></div>
+              <div class="field"><label for="f-ped-desde">Desde</label><input id="f-ped-desde" type="date" /></div>
+              <div class="field"><label for="f-ped-hasta">Hasta</label><input id="f-ped-hasta" type="date" /></div>
+              <div class="field">
+                <label for="f-ped-limit">Filas por página</label>
+                <select id="f-ped-limit">
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-ped-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-ped-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -779,16 +1035,28 @@
                     <th>Productos</th>
                     <th>Total</th>
                     <th>Estado</th>
-                    <th>Accion</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-pedidos-activos"></tbody>
               </table>
             </div>
+            <div class="row-actions" style="margin-top:10px;">
+              <button class="btn" id="btn-ped-prev" type="button">Anterior</button>
+              <button class="btn" id="btn-ped-next" type="button">Siguiente</button>
+              <span class="small" id="lbl-ped-page">Página 1</span>
+            </div>
           </article>
 
           <article class="card">
             <div class="card-head"><h3>Ultimas compras de inventario</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-compras-q">Buscar</label><input id="f-compras-q" placeholder="insumo o registrado por" /></div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-compras-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-compras-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -835,8 +1103,8 @@
                 <input id="usuario-password" name="password" type="password" minlength="8" required />
               </div>
               <div class="field" id="field-area-entrega" style="display:none;">
-                <label for="usuario-area-entrega">Area de entrega (repartidor)</label>
-                <input id="usuario-area-entrega" name="area_entrega" placeholder="ej. juarez-centro o 32600" />
+                <label for="usuario-area-entrega">Área de entrega (repartidor)</label>
+                <input id="usuario-area-entrega" name="area_entrega" placeholder="ej. juárez-centro o 32600" />
               </div>
               <div class="field" style="align-self:end;">
                 <button class="btn primary full" type="submit">Guardar usuario</button>
@@ -857,8 +1125,8 @@
                 </select>
               </div>
               <div class="field">
-                <label for="f-usr-area">Filtrar por area</label>
-                <input id="f-usr-area" placeholder="juarez-centro o 32600" />
+                <label for="f-usr-area">Filtrar por área</label>
+                <input id="f-usr-area" placeholder="juárez-centro o 32600" />
               </div>
               <div class="field" style="align-self:end; display:flex; gap:8px;">
                 <button class="btn" id="btn-usr-filtrar" type="button">Aplicar</button>
@@ -871,9 +1139,9 @@
                   <tr>
                     <th>Nombre</th>
                     <th>Rol</th>
-                    <th>Area</th>
+                    <th>Área</th>
                     <th>Estado</th>
-                    <th>Ultima sesion</th>
+                    <th>Última sesión</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -896,6 +1164,23 @@
                 </select>
               </div>
               <div class="field"><label for="f-seg-actor">Actor</label><input id="f-seg-actor" placeholder="admin" /></div>
+              <div class="field">
+                <label for="f-seg-rango">Rango rapido</label>
+                <select id="f-seg-rango">
+                  <option value="">Todos</option>
+                  <option value="hoy">Hoy</option>
+                  <option value="7d">Ultimos 7 dias</option>
+                  <option value="30d">Ultimos 30 dias</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-seg-limit">Filas por página</label>
+                <select id="f-seg-limit">
+                  <option value="40">40</option>
+                  <option value="80">80</option>
+                  <option value="120">120</option>
+                </select>
+              </div>
               <div class="field"><label for="f-seg-desde">Desde</label><input id="f-seg-desde" type="date" /></div>
               <div class="field"><label for="f-seg-hasta">Hasta</label><input id="f-seg-hasta" type="date" /></div>
               <div class="field" style="align-self:end; display:flex; gap:8px;">
@@ -917,6 +1202,11 @@
                 <tbody id="tbody-bitacora-seguridad"></tbody>
               </table>
             </div>
+            <div class="row-actions" style="margin-top:10px;">
+              <button class="btn" id="btn-seg-prev" type="button">Anterior</button>
+              <button class="btn" id="btn-seg-next" type="button">Siguiente</button>
+              <span class="small" id="lbl-seg-page">Página 1</span>
+            </div>
           </article>
 
           <article class="card">
@@ -933,6 +1223,23 @@
                 </select>
               </div>
               <div class="field"><label for="f-neg-actor">Actor</label><input id="f-neg-actor" placeholder="admin" /></div>
+              <div class="field">
+                <label for="f-neg-rango">Rango rapido</label>
+                <select id="f-neg-rango">
+                  <option value="">Todos</option>
+                  <option value="hoy">Hoy</option>
+                  <option value="7d">Ultimos 7 dias</option>
+                  <option value="30d">Ultimos 30 dias</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-neg-limit">Filas por página</label>
+                <select id="f-neg-limit">
+                  <option value="40">40</option>
+                  <option value="80">80</option>
+                  <option value="120">120</option>
+                </select>
+              </div>
               <div class="field"><label for="f-neg-desde">Desde</label><input id="f-neg-desde" type="date" /></div>
               <div class="field"><label for="f-neg-hasta">Hasta</label><input id="f-neg-hasta" type="date" /></div>
               <div class="field" style="align-self:end; display:flex; gap:8px;">
@@ -953,6 +1260,11 @@
                 </thead>
                 <tbody id="tbody-bitacora-negocio"></tbody>
               </table>
+            </div>
+            <div class="row-actions" style="margin-top:10px;">
+              <button class="btn" id="btn-neg-prev" type="button">Anterior</button>
+              <button class="btn" id="btn-neg-next" type="button">Siguiente</button>
+              <span class="small" id="lbl-neg-page">Página 1</span>
             </div>
           </article>
         </section>
@@ -989,6 +1301,13 @@
 
           <article class="card">
             <div class="card-head"><h3>Historial de campañas</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-camp-q">Buscar</label><input id="f-camp-q" placeholder="nombre, segmento o usuario" /></div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-camp-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-camp-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -1043,6 +1362,22 @@
 
           <article class="card">
             <div class="card-head"><h3>Catalogo de productos</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-prod-q">Buscar</label><input id="f-prod-q" placeholder="producto o variante" /></div>
+              <div class="field">
+                <label for="f-prod-estado">Estado</label>
+                <select id="f-prod-estado">
+                  <option value="">Todos</option>
+                  <option value="activo">Activos</option>
+                  <option value="inactivo">Inactivos</option>
+                  <option value="sin_receta">Sin receta</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-prod-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-prod-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -1062,13 +1397,34 @@
 
           <article class="card">
             <div class="card-head"><h3>Gestion de recetas</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-rec-texto">Buscar</label><input id="f-rec-texto" placeholder="producto o insumo" /></div>
+              <div class="field"><label for="f-rec-activa">Estado</label>
+                <select id="f-rec-activa">
+                  <option value="">Todos</option>
+                  <option value="1">Activas</option>
+                  <option value="0">Inactivas</option>
+                </select>
+              </div>
+              <div class="field"><label for="f-rec-limit">Filas por página</label>
+                <select id="f-rec-limit">
+                  <option value="30">30</option>
+                  <option value="60">60</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-rec-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-rec-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <form id="form-receta" class="form-grid cols-3" style="margin-bottom:10px;">
               <div class="field"><label for="receta-producto">Producto</label><select id="receta-producto" required></select></div>
               <div class="field"><label for="receta-insumo">Insumo</label><select id="receta-insumo" required></select></div>
               <div class="field"><label for="receta-cantidad">Cantidad por unidad</label><input id="receta-cantidad" type="number" min="0" step="0.001" required /></div>
               <div class="field full" id="receta-componentes-extra"></div>
               <div class="field"><button id="btn-receta-add-comp" class="btn" type="button">Agregar ingrediente</button></div>
-              <div class="field"><button id="btn-receta-template" class="btn" type="button">Plantilla rapida</button></div>
+              <div class="field"><button id="btn-receta-template" class="btn" type="button">Plantilla rápida</button></div>
               <div class="field"><label for="receta-activo">Estado</label><select id="receta-activo"><option value="1">activo</option><option value="0">inactivo</option></select></div>
               <div class="field" style="align-self:end;"><button class="btn primary full" type="submit">Guardar receta</button></div>
             </form>
@@ -1086,6 +1442,11 @@
                 <tbody id="tbody-recetas"></tbody>
               </table>
             </div>
+            <div class="row-actions" style="margin-top:10px;">
+              <button class="btn" id="btn-rec-prev" type="button">Anterior</button>
+              <button class="btn" id="btn-rec-next" type="button">Siguiente</button>
+              <span class="small" id="lbl-rec-page">Página 1</span>
+            </div>
           </article>
 
           <article class="card">
@@ -1093,7 +1454,35 @@
               <h3>Stock actual</h3>
               <button id="btn-abrir-compra" class="btn" type="button">Registrar compra</button>
             </div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-inv-texto">Buscar</label><input id="f-inv-texto" placeholder="insumo, unidad o proveedor" /></div>
+              <div class="field"><label for="f-inv-estado">Estado stock</label>
+                <select id="f-inv-estado">
+                  <option value="">Todos</option>
+                  <option value="bajo">Bajo minimo</option>
+                  <option value="normal">Normal o arriba</option>
+                  <option value="sobre">Sobre stock</option>
+                </select>
+              </div>
+              <div class="field"><label for="f-inv-prov">Proveedor</label><input id="f-inv-prov" placeholder="Nombre proveedor" /></div>
+              <div class="field"><label for="f-inv-limit">Filas por página</label>
+                <select id="f-inv-limit">
+                  <option value="24">24</option>
+                  <option value="48">48</option>
+                  <option value="96">96</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-inv-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-inv-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <div class="grid-stock" id="grid-stock"></div>
+            <div class="row-actions" style="margin-top:10px;">
+              <button class="btn" id="btn-inv-prev" type="button">Anterior</button>
+              <button class="btn" id="btn-inv-next" type="button">Siguiente</button>
+              <span class="small" id="lbl-inv-page">Página 1</span>
+            </div>
           </article>
 
           <article class="card">
@@ -1118,6 +1507,24 @@
 
           <article class="card">
             <div class="card-head"><h3>Movimientos de inventario</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-mov-q">Buscar</label><input id="f-mov-q" placeholder="insumo, actor o referencia" /></div>
+              <div class="field">
+                <label for="f-mov-tipo">Tipo</label>
+                <select id="f-mov-tipo">
+                  <option value="">Todos</option>
+                  <option value="entrada">entrada</option>
+                  <option value="salida">salida</option>
+                  <option value="ajuste">ajuste</option>
+                  <option value="compra">compra</option>
+                  <option value="consumo">consumo</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-mov-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-mov-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -1134,6 +1541,209 @@
                 <tbody id="tbody-movimientos"></tbody>
               </table>
             </div>
+          </article>
+        </section>
+
+        <section class="section" id="section-parser">
+          <div class="row grid-2">
+            <article class="card">
+              <div class="card-head">
+                <h3>Simulacion en tiempo real</h3>
+                <button class="btn" id="btn-parser-simular" type="button">Simular</button>
+              </div>
+              <div class="stack">
+                <div class="field">
+                  <label for="parser-sim-texto">Frase del cliente</label>
+                  <textarea id="parser-sim-texto" placeholder="Ej. una empanada de carne y un agua"></textarea>
+                </div>
+                <div class="small" id="parser-sim-status">Escribe una frase y ejecuta la simulacion para ver como interpreta el pedido.</div>
+                <div class="parser-output mono" id="parser-sim-output">Esperando simulacion...</div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-head"><h3>Nueva regla curada</h3></div>
+              <form id="form-parser-regla" class="form-grid">
+                <div class="field full">
+                  <label for="parser-regla-frase">Frase problema</label>
+                  <input id="parser-regla-frase" placeholder="Ej. una de carne y agua" required />
+                </div>
+                <div class="field">
+                  <label for="parser-regla-tipo">Tipo de match</label>
+                  <select id="parser-regla-tipo">
+                    <option value="exact">exact</option>
+                    <option value="contains">contains</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="parser-regla-prioridad">Prioridad</label>
+                  <input id="parser-regla-prioridad" type="number" value="100" min="1" step="1" />
+                </div>
+                <div class="field">
+                  <label for="parser-regla-activa">Activa</label>
+                  <select id="parser-regla-activa">
+                    <option value="1">si</option>
+                    <option value="0">no</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="parser-regla-confirmacion">Pedir confirmacion</label>
+                  <select id="parser-regla-confirmacion">
+                    <option value="0">no</option>
+                    <option value="1">si</option>
+                  </select>
+                </div>
+                <div class="field full">
+                  <label for="parser-regla-clarifica">Pedir aclaracion</label>
+                  <select id="parser-regla-clarifica">
+                    <option value="0">no</option>
+                    <option value="1">si</option>
+                  </select>
+                </div>
+                <div class="field full">
+                  <label for="parser-regla-items">Items JSON</label>
+                  <textarea id="parser-regla-items" class="mono" placeholder='[{"product_id": 1, "quantity": 1}]' required></textarea>
+                </div>
+                <div class="field full">
+                  <label for="parser-regla-msg">Mensaje de aclaracion</label>
+                  <input id="parser-regla-msg" placeholder="Solo si la regla pide aclaracion" />
+                </div>
+                <div class="field full">
+                  <label for="parser-regla-notas">Notas internas</label>
+                  <textarea id="parser-regla-notas" placeholder="Por qué se creó esta regla"></textarea>
+                </div>
+                <div class="field full"><button class="btn primary" type="submit">Guardar regla</button></div>
+              </form>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card-head"><h3>Observaciones del parser</h3></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field">
+                <label for="parser-filtro-tipo">Tipo de evento</label>
+                <select id="parser-filtro-tipo">
+                  <option value="">Todos</option>
+                  <option value="clarification_required">clarification_required</option>
+                  <option value="confirmation_required">confirmation_required</option>
+                  <option value="low_confidence">low_confidence</option>
+                  <option value="not_understood">not_understood</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="parser-filtro-estado">Estado revision</label>
+                <select id="parser-filtro-estado">
+                  <option value="">Todos</option>
+                  <option value="nuevo">nuevo</option>
+                  <option value="en_revision">en_revision</option>
+                  <option value="resuelto">resuelto</option>
+                  <option value="descartado">descartado</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-parser-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-parser-refresh" type="button">Refrescar</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Entrada</th>
+                    <th>Lectura actual</th>
+                    <th>Revision admin</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-parser-observaciones"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <h3>Reglas curadas existentes</h3>
+              <button class="btn" id="btn-parser-reglas-refresh" type="button">Recargar reglas</button>
+            </div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-parser-reglas-q">Buscar</label><input id="f-parser-reglas-q" placeholder="frase, notas o tipo" /></div>
+              <div class="field">
+                <label for="f-parser-reglas-activa">Estado</label>
+                <select id="f-parser-reglas-activa">
+                  <option value="">Todas</option>
+                  <option value="1">Activas</option>
+                  <option value="0">Inactivas</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-parser-reglas-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-parser-reglas-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Frase</th>
+                    <th>Match</th>
+                    <th>Comportamiento</th>
+                    <th>JSON</th>
+                    <th>Notas</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-parser-reglas"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="section" id="section-soporte">
+          <header class="topbar" style="margin-bottom: 12px;">
+            <div>
+              <h2>Gestión de Tickets</h2>
+              <div class="subtle">Administra tickets de soporte técnico y envía notificaciones.</div>
+            </div>
+            <div class="topbar-actions" id="status-tickets" style="color: var(--text-2); font-size: 12px;"></div>
+          </header>
+
+          <article class="card flat">
+            <div class="form-grid cols-3">
+              <div class="field">
+                <label for="f-estado">Estado</label>
+                <select id="f-estado">
+                  <option value="">— Todos —</option>
+                  <option value="abierto">Abierto</option>
+                  <option value="en_proceso">En proceso</option>
+                  <option value="resuelto">Resuelto</option>
+                  <option value="cerrado">Cerrado</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-numero">Número de ticket</label>
+                <input id="f-numero" placeholder="TKT-YYYYMMDD-001" />
+              </div>
+              <div class="field" style="align-self: end; display: flex; gap: 8px;">
+                <button class="btn" id="btn-filtrar" type="button">Filtrar</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ticket</th>
+                    <th>Contacto</th>
+                    <th>Detalle</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-tickets"></tbody>
+              </table>
+            </div>
+            <div style="padding-top: 8px; color: var(--text-2); font-size: 12px;" id="count-tickets"></div>
           </article>
         </section>
       </div>
@@ -1165,7 +1775,8 @@
           operacion: false,
           seguridad: false,
           campanas: false,
-          inventario: false
+          inventario: false,
+          parser: false
         },
         current: "ventas",
         timers: {
@@ -1180,7 +1791,24 @@
         campanaSegmento: "todos",
         campanaProgressTimer: null,
         inventoryCache: [],
-        productCache: []
+        productCache: [],
+        parserRulesCache: [],
+        tableCache: {
+          topClientes: [],
+          rentabilidad: [],
+          comprasRecientes: [],
+          campanas: [],
+          productosAdmin: [],
+          movimientos: [],
+          reporteVentas: []
+        },
+        pages: {
+          pedidos: { page: 1, hasMore: false },
+          seg: { page: 1, hasMore: false },
+          neg: { page: 1, hasMore: false },
+          inv: { page: 1, hasMore: false },
+          rec: { page: 1, hasMore: false }
+        }
       };
 
       const sectionMeta = {
@@ -1203,6 +1831,14 @@
         inventario: {
           title: "Inventario",
           subtitle: "Productos, insumos, recetas y compras."
+        },
+        parser: {
+          title: "Parser IA",
+          subtitle: "Observa frases problematicas, crea reglas curadas y simula pedidos en tiempo real."
+        },
+        soporte: {
+          title: "Soporte",
+          subtitle: "Gestión de tickets técnicos y notificaciones a clientes."
         }
       };
 
@@ -1259,6 +1895,58 @@
           .trim();
       }
 
+      function parseJsonText(value, fallback) {
+        const text = String(value || "").trim();
+        if (!text) return fallback;
+        return JSON.parse(text);
+      }
+
+      function prettyJson(value) {
+        try {
+          return JSON.stringify(value == null ? null : value, null, 2);
+        } catch (_e) {
+          return String(value == null ? "" : value);
+        }
+      }
+
+      function parserModeBadge(value) {
+        const mode = String(value || "unknown").toLowerCase();
+        const cls = mode === "explicit" || mode === "curated_rule" ? "green" : (mode === "inferred" ? "amber" : "red");
+        return "<span class='badge " + cls + "'>" + html(mode) + "</span>";
+      }
+
+      function parserReviewOptions(selected) {
+        const current = String(selected || "nuevo").toLowerCase();
+        return ["nuevo", "en_revision", "resuelto", "descartado"].map((value) => (
+          "<option value='" + value + "'" + (value === current ? " selected" : "") + ">" + value + "</option>"
+        )).join("");
+      }
+
+      function parserRuleOptions(selected) {
+        const current = String(selected || "");
+        const rules = Array.isArray(state.parserRulesCache) ? state.parserRulesCache : [];
+        const base = ["<option value=''>Sin ligar</option>"];
+        return base.concat(rules.map((rule) => (
+          "<option value='" + Number(rule.regla_id) + "'" + (String(Number(rule.regla_id)) === current ? " selected" : "") + ">#" + Number(rule.regla_id) + " · " + html(rule.frase_original || "") + "</option>"
+        ))).join("");
+      }
+
+      function summarizeParserItems(items) {
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) return "Sin items";
+        return list.map((item) => {
+          const qty = Number(item.quantity || item.cantidad || 0);
+          const name = item.product_name || item.nombre || item.producto || (item.product_id ? "#" + item.product_id : "item");
+          return num(qty || 0) + "x " + name;
+        }).join(", ");
+      }
+
+      function summarizeSignals(signals) {
+        const list = Array.isArray(signals) ? signals : [];
+        if (!list.length) return "-";
+        return list.join(", ");
+      }
+
       async function api(path, options) {
         const cfg = Object.assign({ credentials: "same-origin" }, options || {});
         if (cfg.body && typeof cfg.body !== "string") {
@@ -1269,7 +1957,7 @@
         const res = await fetch(path, cfg);
         if (res.redirected && res.url) {
           window.location.href = res.url;
-          throw new Error("Sesion requerida");
+          throw new Error("Sesión requerida");
         }
 
         const contentType = (res.headers.get("content-type") || "").toLowerCase();
@@ -1343,7 +2031,7 @@
         const card = document.createElement("div");
         card.className = "error-card";
         const text = document.createElement("span");
-        text.textContent = msg || "No se pudo cargar esta seccion.";
+        text.textContent = msg || "No se pudo cargar esta sección.";
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn";
@@ -1420,6 +2108,41 @@
         chart.update();
       }
 
+      function renderKpisPeriodoProfesional(payload) {
+        const tb = qs("tbody-kpis-periodo-profesional");
+        if (!tb) return;
+
+        const src = payload && typeof payload === "object" ? payload : {};
+        const rows = [
+          { key: "dia", label: "Día" },
+          { key: "mes", label: "Mes" },
+          { key: "ano", label: "Año" }
+        ].map((item) => {
+          const d = src[item.key] || {};
+          return {
+            periodo: item.label,
+            ventas: Number(d.ventas || 0),
+            pedidos: Number(d.pedidos || 0),
+            ticket: Number(d.ticket_promedio || 0),
+            clientes: Number(d.clientes || 0),
+            crecimiento: Number(d.crecimiento_pct || 0)
+          };
+        });
+
+        tb.innerHTML = rows.map((r) => {
+          return (
+            "<tr>" +
+              "<td><strong>" + html(r.periodo) + "</strong></td>" +
+              "<td>" + mxn(r.ventas) + "</td>" +
+              "<td>" + num(r.pedidos) + "</td>" +
+              "<td>" + mxn(r.ticket) + "</td>" +
+              "<td>" + num(r.clientes) + "</td>" +
+              "<td>" + pct(r.crecimiento) + "</td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
       async function loadVentasKpisAndCharts(forceDailyOnly = false) {
         if (!forceDailyOnly) {
           showChartLoading("ventas-mes-slot");
@@ -1430,8 +2153,11 @@
         let diaria = [];
         let mensual = [];
         let anual = [];
+        let kpisPeriodo = null;
         try {
           diaria = await api("/api/ventas/diarias");
+          kpisPeriodo = await api("/api/ventas/kpis-periodo");
+          renderKpisPeriodoProfesional(kpisPeriodo);
           restoreChartCanvas("ventas-dia-slot", "chart-ventas-dia");
           state.charts.dia = createChart("chart-ventas-dia", "Ventas por hora");
           hydrateChart(state.charts.dia, Array.isArray(diaria) ? diaria : []);
@@ -1501,29 +2227,275 @@
         }
       }
 
+      function renderTopClientes() {
+        const tb = qs("tbody-top-clientes");
+        const q = normalizeText((qs("f-top-clientes-q") && qs("f-top-clientes-q").value) || "");
+        const source = Array.isArray(state.tableCache.topClientes) ? state.tableCache.topClientes : [];
+        const list = source.filter((row) => {
+          if (!q) return true;
+          const blob = normalizeText([
+            row && row.nombre,
+            row && row.apellidos,
+            row && row.whatsapp_id
+          ].filter(Boolean).join(" "));
+          return blob.includes(q);
+        });
+
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin registros para el filtro actual.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((row, i) => {
+          const name = [row.nombre, row.apellidos].filter(Boolean).join(" ").trim() || "Sin nombre";
+          const wa = row.whatsapp_id || "Sin whatsapp";
+          return (
+            "<tr>" +
+              "<td>" + (i + 1) + "</td>" +
+              "<td><strong>" + html(name) + "</strong><br><span class='muted'>" + html(wa) + "</span></td>" +
+              "<td>" + num(row.total_pedidos) + "</td>" +
+              "<td>" + mxn(row.monto_total_comprado) + "</td>" +
+              "<td>" + html(dateTime(row.ultima_compra)) + "</td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
+      function formatMin(value) {
+        if (value === null || value === undefined || value === "") return "-";
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return "-";
+        return n.toFixed(1) + " min";
+      }
+
+      function slaMeta(row) {
+        const entrega = Number(row && row.rapidez_entrega_min);
+        if (!Number.isFinite(entrega) || entrega <= 0) {
+          return { text: "Pendiente", cls: "blue" };
+        }
+        if (entrega <= 30) return { text: "SLA OK", cls: "green" };
+        if (entrega <= 50) return { text: "SLA Riesgo", cls: "amber" };
+        return { text: "SLA Tarde", cls: "red" };
+      }
+
+      function renderTicketDetalleProfesional(row) {
+        const panel = qs("rep-ticket-detalle");
+        if (!panel) return;
+        if (!row || typeof row !== "object") {
+          panel.innerHTML = "Selecciona un ticket para ver el detalle profesional.";
+          return;
+        }
+
+        const total = Number(row.total || 0);
+        const piezas = Number(row.piezas || 0);
+        const prep = row.rapidez_preparacion_min;
+        const entrega = row.rapidez_entrega_min;
+        const costo = Number(row.costo_estimado || 0);
+        const utilidad = Number(row.utilidad_estimada || 0);
+        const margen = Number(row.margen_estimado_pct || 0);
+        const sla = slaMeta(row);
+        const fechaTxt = dateTime(row.creado_en);
+        const clienteTxt = (row.cliente || "Cliente") + " (" + (row.whatsapp_id || "-") + ")";
+        const metodoTxt = (row.metodo_pago || "-") + " / " + (row.metodo_entrega || "-");
+
+        panel.innerHTML = [
+          "<div><strong>Ticket #" + Number(row.pedido_id || 0) + "</strong> · " + html(fechaTxt) + "</div>",
+          "<div><strong>Cliente:</strong> " + html(clienteTxt) + "</div>",
+          "<div><strong>Estado:</strong> <span class='badge " + estadoBadge(row.estado || "recibido") + "'>" + html(row.estado || "-") + "</span></div>",
+          "<div><strong>Monto:</strong> " + mxn(total) + " · <strong>Piezas:</strong> " + num(piezas) + "</div>",
+          "<div><strong>Costo estimado:</strong> " + mxn(costo) + " · <strong>Utilidad:</strong> " + mxn(utilidad) + " (" + Number(margen).toFixed(2) + "%)</div>",
+          "<div><strong>Ticket promedio unitario:</strong> " + (piezas > 0 ? mxn(total / piezas) : "-") + "</div>",
+          "<div><strong>Metodo:</strong> " + html(metodoTxt) + "</div>",
+          "<div><strong>Rapidez preparacion:</strong> " + html(formatMin(prep)) + "</div>",
+          "<div><strong>Rapidez entrega total:</strong> " + html(formatMin(entrega)) + "</div>",
+          "<div><strong>SLA:</strong> <span class='badge " + sla.cls + "'>" + sla.text + "</span></div>",
+          "<div><strong>Productos:</strong> " + html(row.productos || "-") + "</div>"
+        ].join("");
+      }
+
+      function hydrateTicketDropdownProfesional(rows) {
+        const sel = qs("f-rep-ticket-id");
+        const lbl = qs("lbl-rep-ticket-count");
+        if (!sel || !lbl) return;
+
+        const list = Array.isArray(rows) ? rows : [];
+        const previous = sel.value;
+        sel.innerHTML = "<option value=''>Selecciona un ticket...</option>" + list.map((r) => {
+          const pid = Number(r.pedido_id || 0);
+          const cliente = (r.cliente || "Cliente");
+          const total = mxn(r.total || 0);
+          const fecha = dateTime(r.creado_en);
+          return "<option value='" + pid + "'>#" + pid + " · " + html(cliente) + " · " + total + " · " + html(fecha) + "</option>";
+        }).join("");
+
+        lbl.textContent = num(list.length) + " tickets encontrados";
+        if (previous && list.some((r) => String(Number(r.pedido_id || 0)) === String(previous))) {
+          sel.value = previous;
+        }
+        const selectedId = sel.value;
+        const selectedRow = list.find((r) => String(Number(r.pedido_id || 0)) === String(selectedId));
+        renderTicketDetalleProfesional(selectedRow || list[0] || null);
+      }
+
+      function exportReporteVentasCsv() {
+        const rows = Array.isArray(state.tableCache.reporteVentas) ? state.tableCache.reporteVentas : [];
+        if (!rows.length) {
+          toast("No hay datos para exportar. Genera el reporte primero.", "warn");
+          return;
+        }
+
+        const csvEsc = (v) => {
+          const text = String(v === null || v === undefined ? "" : v);
+          return '"' + text.replace(/"/g, '""') + '"';
+        };
+
+        const header = [
+          "pedido_id",
+          "creado_en",
+          "cliente",
+          "whatsapp_id",
+          "metodo_pago",
+          "metodo_entrega",
+          "estado",
+          "productos",
+          "piezas",
+          "total",
+          "costo_estimado",
+          "utilidad_estimada",
+          "margen_estimado_pct",
+          "rapidez_preparacion_min",
+          "rapidez_entrega_min",
+          "sla"
+        ];
+
+        const lines = [header.map(csvEsc).join(",")];
+        rows.forEach((r) => {
+          const sla = slaMeta(r).text;
+          lines.push([
+            Number(r.pedido_id || 0),
+            dateTime(r.creado_en),
+            r.cliente || "",
+            r.whatsapp_id || "",
+            r.metodo_pago || "",
+            r.metodo_entrega || "",
+            r.estado || "",
+            r.productos || "",
+            Number(r.piezas || 0),
+            Number(r.total || 0),
+            Number(r.costo_estimado || 0),
+            Number(r.utilidad_estimada || 0),
+            Number(r.margen_estimado_pct || 0),
+            Number(r.rapidez_preparacion_min || 0),
+            Number(r.rapidez_entrega_min || 0),
+            sla
+          ].map(csvEsc).join(","));
+        });
+
+        const content = lines.join("\r\n");
+        const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const now = new Date();
+        const stamp = [
+          now.getFullYear(),
+          String(now.getMonth() + 1).padStart(2, "0"),
+          String(now.getDate()).padStart(2, "0"),
+          "_",
+          String(now.getHours()).padStart(2, "0"),
+          String(now.getMinutes()).padStart(2, "0")
+        ].join("");
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "reporte_ventas_profesional_" + stamp + ".csv";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function exportReporteVentasXlsx() {
+        const params = new URLSearchParams();
+        const periodo = (qs("f-rep-ventas-periodo") && qs("f-rep-ventas-periodo").value) || "dia";
+        const fecha = (qs("f-rep-ventas-fecha") && qs("f-rep-ventas-fecha").value) || "";
+        const q = (qs("f-rep-ventas-q") && qs("f-rep-ventas-q").value || "").trim();
+        params.set("periodo", periodo);
+        if (fecha) params.set("fecha", fecha);
+        if (q) params.set("q", q);
+        params.set("limit", "4000");
+        window.location.href = "/api/admin/reporte-ventas-profesional.xlsx?" + params.toString();
+      }
+
+      async function loadReporteVentasProfesional() {
+        const tb = qs("tbody-reporte-ventas-profesional");
+        if (!tb) return;
+        showTableLoading("tbody-reporte-ventas-profesional", 9);
+
+        const params = new URLSearchParams();
+        const periodo = (qs("f-rep-ventas-periodo") && qs("f-rep-ventas-periodo").value) || "dia";
+        const fecha = (qs("f-rep-ventas-fecha") && qs("f-rep-ventas-fecha").value) || "";
+        const q = (qs("f-rep-ventas-q") && qs("f-rep-ventas-q").value || "").trim();
+        params.set("periodo", periodo);
+        if (fecha) params.set("fecha", fecha);
+        if (q) params.set("q", q);
+        params.set("limit", "400");
+
+        try {
+          const payload = await api("/api/admin/reporte-ventas-profesional?" + params.toString());
+          const resumen = (payload && payload.resumen) || {};
+          const rows = (payload && payload.rows) || [];
+          state.tableCache.reporteVentas = Array.isArray(rows) ? rows : [];
+
+          qs("kpi-rep-ventas").textContent = mxn(Number(resumen.ventas || 0));
+          qs("kpi-rep-pedidos").textContent = num(Number(resumen.pedidos || 0));
+          qs("kpi-rep-ticket").textContent = mxn(Number(resumen.ticket_promedio || 0));
+          qs("kpi-rep-utilidad").textContent = mxn(Number(resumen.utilidad_estimada_total || 0));
+          qs("kpi-rep-margen").textContent = Number(resumen.margen_estimado_pct || 0).toFixed(2) + "% margen";
+
+          const prepProm = resumen.rapidez_preparacion_promedio_min;
+          const entProm = resumen.rapidez_entrega_promedio_min;
+          const rapidezTxt = "Prep " + formatMin(prepProm) + " / Entrega " + formatMin(entProm);
+          qs("kpi-rep-rapidez").textContent = rapidezTxt;
+
+          const list = Array.isArray(rows) ? rows : [];
+          hydrateTicketDropdownProfesional(list);
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='9' class='muted'>Sin ventas para el filtro seleccionado.</td></tr>";
+            renderTicketDetalleProfesional(null);
+            return;
+          }
+
+          tb.innerHTML = list.map((r) => {
+            const cliente = (r.cliente || "Cliente") + "\n" + (r.whatsapp_id || "-");
+            const rapidez = "Prep: " + formatMin(r.rapidez_preparacion_min) + "\nEntrega: " + formatMin(r.rapidez_entrega_min);
+            const sla = slaMeta(r);
+            const rent = mxn(r.utilidad_estimada || 0) + "\n" + Number(r.margen_estimado_pct || 0).toFixed(2) + "%";
+            const pedidoMeta = "#" + Number(r.pedido_id || 0) + "\n" + html((r.metodo_pago || "-") + " / " + (r.metodo_entrega || "-"));
+            return (
+              "<tr>" +
+                "<td>" + html(dateTime(r.creado_en)) + "</td>" +
+                "<td><strong>" + pedidoMeta.replace(/\n/g, "<br>") + "</strong></td>" +
+                "<td>" + html(cliente).replace(/\n/g, "<br>") + "</td>" +
+                "<td>" + html(r.productos || "-") + "</td>" +
+                "<td>" + mxn(r.total || 0) + "</td>" +
+                "<td><span class='badge " + estadoBadge(r.estado || "recibido") + "'>" + html(r.estado || "-") + "</span></td>" +
+                "<td>" + html(rapidez).replace(/\n/g, "<br>") + "</td>" +
+                "<td><span class='badge " + sla.cls + "'>" + sla.text + "</span></td>" +
+                "<td>" + html(rent).replace(/\n/g, "<br>") + "</td>" +
+              "</tr>"
+            );
+          }).join("");
+        } catch (_e) {
+          tb.innerHTML = "<tr><td colspan='9' class='muted'>No se pudo cargar el reporte profesional.</td></tr>";
+          renderTicketDetalleProfesional(null);
+        }
+      }
+
       async function loadTopClientes() {
         showTableLoading("tbody-top-clientes", 5);
         try {
           const rows = await api("/api/clientes/top20");
-          const tb = qs("tbody-top-clientes");
-          const list = Array.isArray(rows) ? rows : [];
-          if (!list.length) {
-            tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin registros.</td></tr>";
-            return;
-          }
-          tb.innerHTML = list.map((row, i) => {
-            const name = [row.nombre, row.apellidos].filter(Boolean).join(" ").trim() || "Sin nombre";
-            const wa = row.whatsapp_id || "Sin whatsapp";
-            return (
-              "<tr>" +
-                "<td>" + (i + 1) + "</td>" +
-                "<td><strong>" + html(name) + "</strong><br><span class='muted'>" + html(wa) + "</span></td>" +
-                "<td>" + num(row.total_pedidos) + "</td>" +
-                "<td>" + mxn(row.monto_total_comprado) + "</td>" +
-                "<td>" + html(dateTime(row.ultima_compra)) + "</td>" +
-              "</tr>"
-            );
-          }).join("");
+          state.tableCache.topClientes = Array.isArray(rows) ? rows : [];
+          renderTopClientes();
         } catch (_e) {
           const tb = qs("tbody-top-clientes");
           tb.innerHTML = "<tr><td colspan='5' class='muted'>No se pudieron cargar clientes. Reintenta.</td></tr>";
@@ -1542,28 +2514,43 @@
         }
       }
 
+      function renderRentabilidad() {
+        const tb = qs("tbody-rentabilidad");
+        const q = normalizeText((qs("f-rent-q") && qs("f-rent-q").value) || "");
+        const calidad = String((qs("f-rent-calidad") && qs("f-rent-calidad").value) || "").trim().toLowerCase();
+        const source = Array.isArray(state.tableCache.rentabilidad) ? state.tableCache.rentabilidad : [];
+        const list = source.filter((r) => {
+          if (calidad && String(r.calidad_costo || "").toLowerCase() !== calidad) return false;
+          if (!q) return true;
+          const blob = normalizeText([r && r.nombre, r && r.variante].filter(Boolean).join(" "));
+          return blob.includes(q);
+        });
+
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin datos para el filtro actual.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((r) => {
+          return (
+            "<tr>" +
+              "<td>" + html(r.nombre || "-") + "</td>" +
+              "<td>" + html(r.variante || "-") + "</td>" +
+              "<td>" + mxn(r.precio_venta) + "</td>" +
+              "<td>" + mxn(r.costo_estimado_unitario) + "</td>" +
+              "<td>" + Number(r.margen_pct || 0).toFixed(2) + "%</td>" +
+              "<td>" + qualityBadge(r.calidad_costo) + "</td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
       async function loadRentabilidad() {
         showTableLoading("tbody-rentabilidad", 6);
         try {
           const rows = await api("/api/admin/rentabilidad-productos?limit=50");
-          const tb = qs("tbody-rentabilidad");
-          const list = Array.isArray(rows) ? rows : [];
-          if (!list.length) {
-            tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin datos.</td></tr>";
-            return;
-          }
-          tb.innerHTML = list.map((r) => {
-            return (
-              "<tr>" +
-                "<td>" + html(r.nombre || "-") + "</td>" +
-                "<td>" + html(r.variante || "-") + "</td>" +
-                "<td>" + mxn(r.precio_venta) + "</td>" +
-                "<td>" + mxn(r.costo_estimado_unitario) + "</td>" +
-                "<td>" + Number(r.margen_pct || 0).toFixed(2) + "%</td>" +
-                "<td>" + qualityBadge(r.calidad_costo) + "</td>" +
-              "</tr>"
-            );
-          }).join("");
+          state.tableCache.rentabilidad = Array.isArray(rows) ? rows : [];
+          renderRentabilidad();
         } catch (_e) {
           const tb = qs("tbody-rentabilidad");
           tb.innerHTML = "<tr><td colspan='6' class='muted'>No se pudo cargar rentabilidad.</td></tr>";
@@ -1582,11 +2569,34 @@
       async function loadPedidosActivos() {
         showTableLoading("tbody-pedidos-activos", 6);
         try {
-          const rows = await api("/api/pedidos?estado=en_preparacion,listo");
-          const list = Array.isArray(rows) ? rows : [];
+          const pageSize = Number((qs("f-ped-limit") && qs("f-ped-limit").value) || 20);
+          const page = Math.max(1, Number(state.pages.pedidos.page || 1));
+          const params = new URLSearchParams();
+          params.set("estado", "en_preparacion,listo");
+          params.set("limit", String(pageSize + 1));
+          params.set("offset", String((page - 1) * pageSize));
+
+          const buscar = (qs("f-ped-buscar") && qs("f-ped-buscar").value || "").trim();
+          const desde = (qs("f-ped-desde") && qs("f-ped-desde").value || "").trim();
+          const hasta = (qs("f-ped-hasta") && qs("f-ped-hasta").value || "").trim();
+          if (buscar) params.set("q", buscar);
+          if (desde) params.set("fecha_desde", desde);
+          if (hasta) params.set("fecha_hasta", hasta);
+
+          const rows = await api("/api/pedidos?" + params.toString());
+          const listRaw = Array.isArray(rows) ? rows : [];
+          const hasMore = listRaw.length > pageSize;
+          const list = hasMore ? listRaw.slice(0, pageSize) : listRaw;
+          state.pages.pedidos.hasMore = hasMore;
+
           const tb = qs("tbody-pedidos-activos");
           if (!list.length) {
+            if (page > 1) {
+              state.pages.pedidos.page = page - 1;
+              return loadPedidosActivos();
+            }
             tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin pedidos activos.</td></tr>";
+            qs("lbl-ped-page").textContent = "Página " + page;
             return;
           }
           tb.innerHTML = list.map((r) => {
@@ -1612,6 +2622,8 @@
             );
           }).join("");
 
+          qs("lbl-ped-page").textContent = "Página " + page;
+
           tb.querySelectorAll(".pedido-estado-select").forEach((sel) => {
             sel.addEventListener("change", async (event) => {
               const pedidoId = Number(event.target.getAttribute("data-id"));
@@ -1627,6 +2639,7 @@
                   cell.innerHTML = "<span class='badge " + estadoBadge(estado) + "'>" + html(estado) + "</span>";
                 }
                 toast("Estado actualizado.", "success");
+                await loadPedidosActivos();
               } catch (_e) {
                 toast("No se pudo actualizar el estado.", "error");
               }
@@ -1635,28 +2648,42 @@
         } catch (_e) {
           const tb = qs("tbody-pedidos-activos");
           tb.innerHTML = "<tr><td colspan='6' class='muted'>Error al cargar pedidos activos.</td></tr>";
+          qs("lbl-ped-page").textContent = "Página " + (state.pages.pedidos.page || 1);
         }
+      }
+
+      function renderComprasRecientes() {
+        const tb = qs("tbody-compras-recientes");
+        const q = normalizeText((qs("f-compras-q") && qs("f-compras-q").value) || "");
+        const source = Array.isArray(state.tableCache.comprasRecientes) ? state.tableCache.comprasRecientes : [];
+        const list = source.filter((r) => {
+          if (!q) return true;
+          const blob = normalizeText([r && r.insumo, r && r.creado_por].filter(Boolean).join(" "));
+          return blob.includes(q);
+        });
+
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin compras para el filtro actual.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((r) => (
+          "<tr>" +
+            "<td>" + html(dateTime(r.creado_en)) + "</td>" +
+            "<td>" + html(r.insumo || "-") + "</td>" +
+            "<td>" + num(r.cantidad) + "</td>" +
+            "<td>" + mxn(r.costo_total) + "</td>" +
+            "<td>" + html(r.creado_por || "-") + "</td>" +
+          "</tr>"
+        )).join("");
       }
 
       async function loadComprasRecientes() {
         showTableLoading("tbody-compras-recientes", 5);
         try {
-          const rows = await api("/api/inventario/compras?limit=20");
-          const list = Array.isArray(rows) ? rows : [];
-          const tb = qs("tbody-compras-recientes");
-          if (!list.length) {
-            tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin compras registradas.</td></tr>";
-            return;
-          }
-          tb.innerHTML = list.map((r) => (
-            "<tr>" +
-              "<td>" + html(dateTime(r.creado_en)) + "</td>" +
-              "<td>" + html(r.insumo || "-") + "</td>" +
-              "<td>" + num(r.cantidad) + "</td>" +
-              "<td>" + mxn(r.costo_total) + "</td>" +
-              "<td>" + html(r.creado_por || "-") + "</td>" +
-            "</tr>"
-          )).join("");
+          const rows = await api("/api/inventario/compras?limit=100");
+          state.tableCache.comprasRecientes = Array.isArray(rows) ? rows : [];
+          renderComprasRecientes();
         } catch (_e) {
           const tb = qs("tbody-compras-recientes");
           tb.innerHTML = "<tr><td colspan='5' class='muted'>Error al cargar compras.</td></tr>";
@@ -1682,7 +2709,7 @@
           tb.innerHTML = list.map((u) => {
             const rolClass = u.rol === "admin" ? "blue" : (u.rol === "cocina" ? "amber" : "green");
             const stateClass = u.activo ? "green" : "red";
-            const area = u.rol === "repartidor" ? (u.area_entrega || "Sin area") : "N/A";
+            const area = u.rol === "repartidor" ? (u.area_entrega || "Sin área") : "N/A";
             return (
               "<tr>" +
                 "<td><strong>" + html(u.nombre_mostrar || u.username || "-") + "</strong><br><span class='muted'>" + html(u.username || "-") + "</span></td>" +
@@ -1759,24 +2786,37 @@
       async function loadBitacoraSeguridad() {
         showTableLoading("tbody-bitacora-seguridad", 5);
         const params = new URLSearchParams();
+        const pageSize = Number((qs("f-seg-limit") && qs("f-seg-limit").value) || 40);
+        const page = Math.max(1, Number(state.pages.seg.page || 1));
         const evento = qs("f-seg-evento").value.trim();
         const sev = qs("f-seg-sev").value;
         const actor = qs("f-seg-actor").value.trim();
+        const rango = (qs("f-seg-rango") && qs("f-seg-rango").value) || "";
         const desde = qs("f-seg-desde").value;
         const hasta = qs("f-seg-hasta").value;
         if (evento) params.set("tipo_evento", evento);
         if (sev) params.set("severidad", sev);
         if (actor) params.set("actor", actor);
+        if (rango) params.set("rango", rango);
         if (desde) params.set("fecha_desde", desde);
         if (hasta) params.set("fecha_hasta", hasta);
-        params.set("limit", "80");
+        params.set("limit", String(pageSize + 1));
+        params.set("offset", String((page - 1) * pageSize));
 
         try {
           const rows = await api("/api/admin/auditoria-seguridad?" + params.toString());
           const tb = qs("tbody-bitacora-seguridad");
-          const list = Array.isArray(rows) ? rows : [];
+          const listRaw = Array.isArray(rows) ? rows : [];
+          const hasMore = listRaw.length > pageSize;
+          const list = hasMore ? listRaw.slice(0, pageSize) : listRaw;
+          state.pages.seg.hasMore = hasMore;
           if (!list.length) {
+            if (page > 1) {
+              state.pages.seg.page = page - 1;
+              return loadBitacoraSeguridad();
+            }
             tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin registros.</td></tr>";
+            qs("lbl-seg-page").textContent = "Página " + page;
             return;
           }
           tb.innerHTML = list.map((r) => {
@@ -1791,31 +2831,46 @@
               "</tr>"
             );
           }).join("");
+          qs("lbl-seg-page").textContent = "Página " + page;
         } catch (_e) {
           const tb = qs("tbody-bitacora-seguridad");
           tb.innerHTML = "<tr><td colspan='5' class='muted'>No se pudo cargar bitacora de seguridad.</td></tr>";
+          qs("lbl-seg-page").textContent = "Página " + (state.pages.seg.page || 1);
         }
       }
 
       async function loadBitacoraNegocio() {
         showTableLoading("tbody-bitacora-negocio", 5);
         const params = new URLSearchParams();
+        const pageSize = Number((qs("f-neg-limit") && qs("f-neg-limit").value) || 40);
+        const page = Math.max(1, Number(state.pages.neg.page || 1));
         const tabla = qs("f-neg-tabla").value;
         const actor = qs("f-neg-actor").value.trim();
+        const rango = (qs("f-neg-rango") && qs("f-neg-rango").value) || "";
         const desde = qs("f-neg-desde").value;
         const hasta = qs("f-neg-hasta").value;
         if (tabla) params.set("tabla", tabla);
         if (actor) params.set("actor", actor);
+        if (rango) params.set("rango", rango);
         if (desde) params.set("fecha_desde", desde);
         if (hasta) params.set("fecha_hasta", hasta);
-        params.set("limit", "80");
+        params.set("limit", String(pageSize + 1));
+        params.set("offset", String((page - 1) * pageSize));
 
         try {
           const rows = await api("/api/admin/auditoria-negocio?" + params.toString());
           const tb = qs("tbody-bitacora-negocio");
-          const list = Array.isArray(rows) ? rows : [];
+          const listRaw = Array.isArray(rows) ? rows : [];
+          const hasMore = listRaw.length > pageSize;
+          const list = hasMore ? listRaw.slice(0, pageSize) : listRaw;
+          state.pages.neg.hasMore = hasMore;
           if (!list.length) {
+            if (page > 1) {
+              state.pages.neg.page = page - 1;
+              return loadBitacoraNegocio();
+            }
             tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin registros.</td></tr>";
+            qs("lbl-neg-page").textContent = "Página " + page;
             return;
           }
           tb.innerHTML = list.map((r) => (
@@ -1827,10 +2882,42 @@
               "<td>" + html(dateTime(r.creado_en)) + "</td>" +
             "</tr>"
           )).join("");
+          qs("lbl-neg-page").textContent = "Página " + page;
         } catch (_e) {
           const tb = qs("tbody-bitacora-negocio");
           tb.innerHTML = "<tr><td colspan='5' class='muted'>No se pudo cargar bitacora de negocio.</td></tr>";
+          qs("lbl-neg-page").textContent = "Página " + (state.pages.neg.page || 1);
         }
+      }
+
+      function renderCampanas() {
+        const tb = qs("tbody-campanas");
+        const q = normalizeText((qs("f-camp-q") && qs("f-camp-q").value) || "");
+        const source = Array.isArray(state.tableCache.campanas) ? state.tableCache.campanas : [];
+        const list = source.filter((r) => {
+          if (!q) return true;
+          const blob = normalizeText([
+            r && r.nombre,
+            r && r.segmento,
+            r && r.creado_por
+          ].filter(Boolean).join(" "));
+          return blob.includes(q);
+        });
+
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin campañas para el filtro actual.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((r) => (
+          "<tr>" +
+            "<td>" + html(r.nombre || "Campaña") + "</td>" +
+            "<td>" + html(r.segmento || "-") + "</td>" +
+            "<td>" + num(r.mensajes_enviados || r.total_enviados || 0) + "</td>" +
+            "<td>" + html(dateTime(r.creado_en || r.fecha)) + "</td>" +
+            "<td>" + html(r.creado_por || "-") + "</td>" +
+          "</tr>"
+        )).join("");
       }
 
       async function loadCampanas() {
@@ -1840,20 +2927,8 @@
         for (const endpoint of endpoints) {
           try {
             const rows = await api(endpoint);
-            const list = Array.isArray(rows) ? rows : [];
-            if (!list.length) {
-              tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin campañas registradas.</td></tr>";
-              return;
-            }
-            tb.innerHTML = list.map((r) => (
-              "<tr>" +
-                "<td>" + html(r.nombre || "Campaña") + "</td>" +
-                "<td>" + html(r.segmento || "-") + "</td>" +
-                "<td>" + num(r.mensajes_enviados || r.total_enviados || 0) + "</td>" +
-                "<td>" + html(dateTime(r.creado_en || r.fecha)) + "</td>" +
-                "<td>" + html(r.creado_por || "-") + "</td>" +
-              "</tr>"
-            )).join("");
+            state.tableCache.campanas = Array.isArray(rows) ? rows : [];
+            renderCampanas();
             return;
           } catch (_e) {
           }
@@ -1997,7 +3072,7 @@
         });
 
         if (!encontrados.length) {
-          toast("No se encontraron insumos para la plantilla rapida.", "error");
+          toast("No se encontraron insumos para la plantilla rápida.", "error");
           return;
         }
 
@@ -2018,21 +3093,30 @@
           toast("Plantilla aplicada parcialmente. Faltan insumos: " + faltantes.join(", ") + ".", "warn");
           return;
         }
-        toast("Plantilla rapida aplicada.", "success");
+        toast("Plantilla rápida aplicada.", "success");
       }
 
-      async function loadProductosAdmin() {
-        showTableLoading("tbody-productos-admin", 6);
-        try {
-          const rows = await api("/api/admin/productos?limit=300");
-          const list = Array.isArray(rows) ? rows : [];
-          state.productCache = list;
-          const tb = qs("tbody-productos-admin");
-          if (!list.length) {
-            tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin productos.</td></tr>";
-            return;
-          }
-          tb.innerHTML = list.map((p) => (
+      function renderProductosAdmin() {
+        const tb = qs("tbody-productos-admin");
+        const q = normalizeText((qs("f-prod-q") && qs("f-prod-q").value) || "");
+        const estado = String((qs("f-prod-estado") && qs("f-prod-estado").value) || "").trim().toLowerCase();
+        const source = Array.isArray(state.tableCache.productosAdmin) ? state.tableCache.productosAdmin : [];
+
+        const list = source.filter((p) => {
+          if (estado === "activo" && !p.activo) return false;
+          if (estado === "inactivo" && p.activo) return false;
+          if (estado === "sin_receta" && p.tiene_receta_activa) return false;
+          if (!q) return true;
+          const blob = normalizeText([p && p.nombre, p && p.variante].filter(Boolean).join(" "));
+          return blob.includes(q);
+        });
+
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin productos para el filtro actual.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((p) => (
             "<tr>" +
               "<td><input class='prod-nombre' data-id='" + Number(p.producto_id) + "' value='" + html(p.nombre || "") + "' /></td>" +
               "<td><input class='prod-variante' data-id='" + Number(p.producto_id) + "' value='" + html(p.variante || "") + "' /></td>" +
@@ -2043,26 +3127,36 @@
             "</tr>"
           )).join("");
 
-          tb.querySelectorAll(".btn-prod-save").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-              const id = Number(btn.getAttribute("data-id"));
-              try {
-                await api("/api/admin/productos/" + id, {
-                  method: "PATCH",
-                  body: {
-                    nombre: tb.querySelector(".prod-nombre[data-id='" + id + "']").value.trim(),
-                    variante: tb.querySelector(".prod-variante[data-id='" + id + "']").value.trim(),
-                    precio: Number(tb.querySelector(".prod-precio[data-id='" + id + "']").value || 0),
-                    activo: tb.querySelector(".prod-activo[data-id='" + id + "']").value === "1"
-                  }
-                });
-                await Promise.allSettled([loadProductosAdmin(), loadCatalogosInventario(), loadProductosSinReceta(), loadRentabilidad()]);
-                toast("Producto actualizado.", "success");
-              } catch (_e) {
-                toast("No se pudo actualizar producto.", "error");
-              }
-            });
+        tb.querySelectorAll(".btn-prod-save").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = Number(btn.getAttribute("data-id"));
+            try {
+              await api("/api/admin/productos/" + id, {
+                method: "PATCH",
+                body: {
+                  nombre: tb.querySelector(".prod-nombre[data-id='" + id + "']").value.trim(),
+                  variante: tb.querySelector(".prod-variante[data-id='" + id + "']").value.trim(),
+                  precio: Number(tb.querySelector(".prod-precio[data-id='" + id + "']").value || 0),
+                  activo: tb.querySelector(".prod-activo[data-id='" + id + "']").value === "1"
+                }
+              });
+              await Promise.allSettled([loadProductosAdmin(), loadCatalogosInventario(), loadProductosSinReceta(), loadRentabilidad()]);
+              toast("Producto actualizado.", "success");
+            } catch (_e) {
+              toast("No se pudo actualizar producto.", "error");
+            }
           });
+        });
+      }
+
+      async function loadProductosAdmin() {
+        showTableLoading("tbody-productos-admin", 6);
+        try {
+          const rows = await api("/api/admin/productos?limit=300");
+          const list = Array.isArray(rows) ? rows : [];
+          state.productCache = list;
+          state.tableCache.productosAdmin = list;
+          renderProductosAdmin();
         } catch (_e) {
           qs("tbody-productos-admin").innerHTML = "<tr><td colspan='6' class='muted'>Error al cargar productos.</td></tr>";
         }
@@ -2136,13 +3230,33 @@
         grid.innerHTML = "";
         grid.appendChild(skeleton(6));
         try {
-          const rows = await api("/api/inventario");
-          const list = Array.isArray(rows) ? rows : [];
-          state.inventoryCache = list;
-          fillInsumoSelects(list);
+          const pageSize = Number((qs("f-inv-limit") && qs("f-inv-limit").value) || 24);
+          const page = Math.max(1, Number(state.pages.inv.page || 1));
+          const params = new URLSearchParams();
+          params.set("limit", String(pageSize + 1));
+          params.set("offset", String((page - 1) * pageSize));
+
+          const texto = (qs("f-inv-texto") && qs("f-inv-texto").value || "").trim();
+          const estadoStock = (qs("f-inv-estado") && qs("f-inv-estado").value || "").trim();
+          const proveedor = (qs("f-inv-prov") && qs("f-inv-prov").value || "").trim();
+          if (texto) params.set("q", texto);
+          if (estadoStock) params.set("estado_stock", estadoStock);
+          if (proveedor) params.set("proveedor", proveedor);
+
+          const rows = await api("/api/inventario?" + params.toString());
+          const listRaw = Array.isArray(rows) ? rows : [];
+          const hasMore = listRaw.length > pageSize;
+          const list = hasMore ? listRaw.slice(0, pageSize) : listRaw;
+          state.pages.inv.hasMore = hasMore;
+
           renderInsumosAdmin(list);
           if (!list.length) {
+            if (page > 1) {
+              state.pages.inv.page = page - 1;
+              return loadInventarioStock();
+            }
             grid.innerHTML = "<div class='muted'>Sin insumos.</div>";
+            qs("lbl-inv-page").textContent = "Página " + page;
             return;
           }
           grid.innerHTML = list.map((r) => {
@@ -2155,21 +3269,27 @@
               "</article>"
             );
           }).join("");
+          qs("lbl-inv-page").textContent = "Página " + page;
         } catch (_e) {
           grid.innerHTML = "<div class='muted'>No se pudo cargar stock.</div>";
           qs("tbody-insumos-admin").innerHTML = "<tr><td colspan='7' class='muted'>No se pudo cargar control de insumos.</td></tr>";
+          qs("lbl-inv-page").textContent = "Página " + (state.pages.inv.page || 1);
         }
       }
 
       async function loadCatalogosInventario() {
         try {
-          const [productos] = await Promise.all([
-            api("/api/productos?solo_pedibles=0")
+          const [productos, insumos] = await Promise.all([
+            api("/api/productos?solo_pedibles=0"),
+            api("/api/inventario?limit=500&offset=0")
           ]);
           const pList = Array.isArray(productos) ? productos : [];
           qs("receta-producto").innerHTML = pList.map((p) => (
             "<option value='" + Number(p.producto_id) + "'>" + html(p.nombre + (p.variante ? " (" + p.variante + ")" : "")) + "</option>"
           )).join("");
+          const insList = Array.isArray(insumos) ? insumos : [];
+          state.inventoryCache = insList;
+          fillInsumoSelects(insList);
         } catch (_e) {
           qs("receta-producto").innerHTML = "";
         }
@@ -2178,11 +3298,30 @@
       async function loadRecetas() {
         showTableLoading("tbody-recetas", 5);
         try {
-          const rows = await api("/api/admin/recetas-producto");
-          const list = Array.isArray(rows) ? rows : [];
+          const pageSize = Number((qs("f-rec-limit") && qs("f-rec-limit").value) || 30);
+          const page = Math.max(1, Number(state.pages.rec.page || 1));
+          const params = new URLSearchParams();
+          params.set("limit", String(pageSize + 1));
+          params.set("offset", String((page - 1) * pageSize));
+
+          const texto = (qs("f-rec-texto") && qs("f-rec-texto").value || "").trim();
+          const activa = (qs("f-rec-activa") && qs("f-rec-activa").value || "").trim();
+          if (texto) params.set("q", texto);
+          if (activa) params.set("activa", activa);
+
+          const rows = await api("/api/admin/recetas-producto?" + params.toString());
+          const listRaw = Array.isArray(rows) ? rows : [];
+          const hasMore = listRaw.length > pageSize;
+          const list = hasMore ? listRaw.slice(0, pageSize) : listRaw;
+          state.pages.rec.hasMore = hasMore;
           const tb = qs("tbody-recetas");
           if (!list.length) {
+            if (page > 1) {
+              state.pages.rec.page = page - 1;
+              return loadRecetas();
+            }
             tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin recetas registradas.</td></tr>";
+            qs("lbl-rec-page").textContent = "Página " + page;
             return;
           }
           tb.innerHTML = list.map((r) => {
@@ -2200,6 +3339,7 @@
               "</tr>"
             );
           }).join("");
+          qs("lbl-rec-page").textContent = "Página " + page;
 
           tb.querySelectorAll(".btn-receta-save").forEach((btn) => {
             btn.addEventListener("click", async () => {
@@ -2245,32 +3385,380 @@
           });
         } catch (_e) {
           qs("tbody-recetas").innerHTML = "<tr><td colspan='5' class='muted'>Error al cargar recetas.</td></tr>";
+          qs("lbl-rec-page").textContent = "Página " + (state.pages.rec.page || 1);
         }
+      }
+
+      function renderMovimientos() {
+        const tb = qs("tbody-movimientos");
+        const q = normalizeText((qs("f-mov-q") && qs("f-mov-q").value) || "");
+        const tipo = normalizeText((qs("f-mov-tipo") && qs("f-mov-tipo").value) || "");
+        const source = Array.isArray(state.tableCache.movimientos) ? state.tableCache.movimientos : [];
+        const list = source.filter((m) => {
+          if (tipo && normalizeText(m.tipo) !== tipo) return false;
+          if (!q) return true;
+          const blob = normalizeText([
+            m && m.insumo,
+            m && m.actor_username,
+            m && m.referencia_tipo,
+            m && m.referencia_id
+          ].filter((x) => x !== null && x !== undefined).join(" "));
+          return blob.includes(q);
+        });
+
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='7' class='muted'>Sin movimientos para el filtro actual.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((m) => (
+          "<tr>" +
+            "<td>" + html(dateTime(m.creado_en)) + "</td>" +
+            "<td>" + html(m.insumo || "-") + "</td>" +
+            "<td>" + html(m.tipo || "-") + "</td>" +
+            "<td>" + num(m.stock_antes) + "</td>" +
+            "<td>" + num(m.stock_despues) + "</td>" +
+            "<td>" + html((m.referencia_tipo || "-") + (m.referencia_id ? " #" + m.referencia_id : "")) + "</td>" +
+            "<td>" + html(m.actor_username || "-") + "</td>" +
+          "</tr>"
+        )).join("");
       }
 
       async function loadMovimientos() {
         showTableLoading("tbody-movimientos", 7);
         try {
-          const rows = await api("/api/admin/inventario/movimientos?limit=60");
-          const list = Array.isArray(rows) ? rows : [];
-          const tb = qs("tbody-movimientos");
-          if (!list.length) {
-            tb.innerHTML = "<tr><td colspan='7' class='muted'>Sin movimientos.</td></tr>";
-            return;
-          }
-          tb.innerHTML = list.map((m) => (
-            "<tr>" +
-              "<td>" + html(dateTime(m.creado_en)) + "</td>" +
-              "<td>" + html(m.insumo || "-") + "</td>" +
-              "<td>" + html(m.tipo || "-") + "</td>" +
-              "<td>" + num(m.stock_antes) + "</td>" +
-              "<td>" + num(m.stock_despues) + "</td>" +
-              "<td>" + html((m.referencia_tipo || "-") + (m.referencia_id ? " #" + m.referencia_id : "")) + "</td>" +
-              "<td>" + html(m.actor_username || "-") + "</td>" +
-            "</tr>"
-          )).join("");
+          const rows = await api("/api/admin/inventario/movimientos?limit=200");
+          state.tableCache.movimientos = Array.isArray(rows) ? rows : [];
+          renderMovimientos();
         } catch (_e) {
           qs("tbody-movimientos").innerHTML = "<tr><td colspan='7' class='muted'>Error al cargar movimientos.</td></tr>";
+        }
+      }
+
+      function renderParserFrases() {
+        const tb = qs("tbody-parser-reglas");
+        const q = normalizeText((qs("f-parser-reglas-q") && qs("f-parser-reglas-q").value) || "");
+        const activaRaw = String((qs("f-parser-reglas-activa") && qs("f-parser-reglas-activa").value) || "").trim();
+        const source = Array.isArray(state.parserRulesCache) ? state.parserRulesCache : [];
+        const list = source.filter((rule) => {
+          if (activaRaw === "1" && !rule.activa) return false;
+          if (activaRaw === "0" && rule.activa) return false;
+          if (!q) return true;
+          const blob = normalizeText([
+            rule && rule.frase_original,
+            rule && rule.tipo_match,
+            rule && rule.notas
+          ].filter(Boolean).join(" "));
+          return blob.includes(q);
+        });
+
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='5' class='muted'>Sin reglas para el filtro actual.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((rule) => {
+            const behavior = [];
+            if (rule.needs_confirmation) behavior.push("confirmacion");
+            if (rule.needs_clarification) behavior.push("aclaracion");
+            if (!behavior.length) behavior.push("directa");
+            return (
+              "<tr data-regla-id='" + Number(rule.regla_id) + "'>" +
+                "<td>" +
+                  "<input class='parser-rule-frase' data-id='" + Number(rule.regla_id) + "' value='" + html(rule.frase_original || "") + "' />" +
+                  "<div class='small'>Actualizado: " + html(dateTime(rule.updated_at)) + "</div>" +
+                "</td>" +
+                "<td>" +
+                  "<select class='parser-rule-tipo' data-id='" + Number(rule.regla_id) + "'>" +
+                    "<option value='exact'" + (rule.tipo_match === "exact" ? " selected" : "") + ">exact</option>" +
+                    "<option value='contains'" + (rule.tipo_match === "contains" ? " selected" : "") + ">contains</option>" +
+                  "</select>" +
+                  "<div class='small'>Prioridad <input class='parser-rule-prioridad' data-id='" + Number(rule.regla_id) + "' type='number' min='1' step='1' value='" + Number(rule.prioridad || 100) + "' style='width:90px; margin-top:6px;' /></div>" +
+                "</td>" +
+                "<td>" +
+                  "<label class='small'>Activa <select class='parser-rule-activa' data-id='" + Number(rule.regla_id) + "'><option value='1'" + (rule.activa ? " selected" : "") + ">si</option><option value='0'" + (!rule.activa ? " selected" : "") + ">no</option></select></label><br>" +
+                  "<label class='small'>Confirma <select class='parser-rule-confirm' data-id='" + Number(rule.regla_id) + "'><option value='1'" + (rule.needs_confirmation ? " selected" : "") + ">si</option><option value='0'" + (!rule.needs_confirmation ? " selected" : "") + ">no</option></select></label><br>" +
+                  "<label class='small'>Aclara <select class='parser-rule-clarify' data-id='" + Number(rule.regla_id) + "'><option value='1'" + (rule.needs_clarification ? " selected" : "") + ">si</option><option value='0'" + (!rule.needs_clarification ? " selected" : "") + ">no</option></select></label><br>" +
+                  "<span class='badge blue'>" + html(behavior.join(" / ")) + "</span>" +
+                "</td>" +
+                "<td><textarea class='parser-rule-items mono' data-id='" + Number(rule.regla_id) + "'>" + html(prettyJson(rule.items_json || [])) + "</textarea><div class='small'>" + html(rule.clarification_message || "") + "</div></td>" +
+                "<td><textarea class='parser-rule-notas' data-id='" + Number(rule.regla_id) + "'>" + html(rule.notas || "") + "</textarea><div style='margin-top:8px;'><button class='btn btn-parser-rule-save' data-id='" + Number(rule.regla_id) + "' type='button'>Guardar</button></div></td>" +
+              "</tr>"
+            );
+          }).join("");
+
+        tb.querySelectorAll(".btn-parser-rule-save").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = Number(btn.getAttribute("data-id"));
+            try {
+              const body = {
+                frase_original: tb.querySelector(".parser-rule-frase[data-id='" + id + "']").value.trim(),
+                tipo_match: tb.querySelector(".parser-rule-tipo[data-id='" + id + "']").value,
+                prioridad: Number(tb.querySelector(".parser-rule-prioridad[data-id='" + id + "']").value || 100),
+                activa: tb.querySelector(".parser-rule-activa[data-id='" + id + "']").value === "1",
+                needs_confirmation: tb.querySelector(".parser-rule-confirm[data-id='" + id + "']").value === "1",
+                needs_clarification: tb.querySelector(".parser-rule-clarify[data-id='" + id + "']").value === "1",
+                items_json: parseJsonText(tb.querySelector(".parser-rule-items[data-id='" + id + "']").value, []),
+                notas: tb.querySelector(".parser-rule-notas[data-id='" + id + "']").value.trim()
+              };
+              await api("/api/admin/parser/frases/" + id, { method: "PATCH", body });
+              await Promise.allSettled([loadParserFrases(), loadParserObservaciones()]);
+              toast("Regla curada actualizada.", "success");
+            } catch (_e) {
+              toast("No se pudo guardar la regla. Revisa el JSON.", "error");
+            }
+          });
+        });
+      }
+
+      async function loadParserFrases() {
+        showTableLoading("tbody-parser-reglas", 5);
+        try {
+          const rows = await api("/api/admin/parser/frases?limit=200");
+          const list = Array.isArray(rows) ? rows : [];
+          state.parserRulesCache = list;
+          renderParserFrases();
+        } catch (_e) {
+          qs("tbody-parser-reglas").innerHTML = "<tr><td colspan='5' class='muted'>No se pudieron cargar reglas.</td></tr>";
+        }
+      }
+
+      async function loadParserObservaciones() {
+        showTableLoading("tbody-parser-observaciones", 4);
+        try {
+          const params = new URLSearchParams();
+          const tipo = qs("parser-filtro-tipo") ? qs("parser-filtro-tipo").value : "";
+          const estado = qs("parser-filtro-estado") ? qs("parser-filtro-estado").value : "";
+          if (tipo) params.set("tipo_evento", tipo);
+          if (estado) params.set("estado_revision", estado);
+          params.set("limit", "80");
+          const rows = await api("/api/admin/parser/observaciones?" + params.toString());
+          const list = Array.isArray(rows) ? rows : [];
+          const tb = qs("tbody-parser-observaciones");
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='4' class='muted'>Sin observaciones.</td></tr>";
+            return;
+          }
+          tb.innerHTML = list.map((row) => {
+            const meta = row.metadata || {};
+            return (
+              "<tr data-observacion-id='" + Number(row.observacion_id) + "'>" +
+                "<td>" + html(dateTime(row.created_at)) + "<br><span class='badge " + estadoBadge(row.tipo_evento) + "'>" + html(row.tipo_evento || "-") + "</span></td>" +
+                "<td>" +
+                  "<div><strong>" + html(row.texto_usuario || "") + "</strong></div>" +
+                  "<div class='small'>Cliente: " + html(row.whatsapp_id || "-") + "</div>" +
+                  "<div class='small'>Origen: " + html(row.estado_origen || "-") + "</div>" +
+                "</td>" +
+                "<td>" +
+                  parserModeBadge(row.parse_mode) +
+                  "<div class='small'>Confianza: " + Number(row.confidence_score || 0).toFixed(2) + "</div>" +
+                  "<div class='small'>Items: " + html(summarizeParserItems(row.items_detectados)) + "</div>" +
+                  "<div class='small'>Signals: " + html(summarizeSignals(row.signals)) + "</div>" +
+                  "<div class='small'>Regla match: " + html(meta.matched_rule_phrase || "-") + "</div>" +
+                "</td>" +
+                "<td>" +
+                  "<div class='field'><label>Estado</label><select class='parser-obs-estado' data-id='" + Number(row.observacion_id) + "'>" + parserReviewOptions(row.estado_revision) + "</select></div>" +
+                  "<div class='field'><label>Regla ligada</label><select class='parser-obs-regla' data-id='" + Number(row.observacion_id) + "'>" + parserRuleOptions(row.regla_id) + "</select></div>" +
+                  "<div class='field'><label>Expected items JSON</label><textarea class='parser-obs-expected mono' data-id='" + Number(row.observacion_id) + "'>" + html(prettyJson(row.expected_items_json || [])) + "</textarea></div>" +
+                  "<div class='field'><label>Notas admin</label><textarea class='parser-obs-notes' data-id='" + Number(row.observacion_id) + "'>" + html(row.admin_notes || "") + "</textarea></div>" +
+                  "<button class='btn btn-parser-obs-save' data-id='" + Number(row.observacion_id) + "' type='button'>Guardar revision</button>" +
+                "</td>" +
+              "</tr>"
+            );
+          }).join("");
+
+          tb.querySelectorAll(".btn-parser-obs-save").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = Number(btn.getAttribute("data-id"));
+              try {
+                const body = {
+                  estado_revision: tb.querySelector(".parser-obs-estado[data-id='" + id + "']").value,
+                  regla_id: tb.querySelector(".parser-obs-regla[data-id='" + id + "']").value || null,
+                  expected_items_json: parseJsonText(tb.querySelector(".parser-obs-expected[data-id='" + id + "']").value, []),
+                  admin_notes: tb.querySelector(".parser-obs-notes[data-id='" + id + "']").value.trim()
+                };
+                await api("/api/admin/parser/observaciones/" + id, { method: "PATCH", body });
+                toast("Observacion actualizada.", "success");
+              } catch (_e) {
+                toast("No se pudo guardar la observacion. Revisa el JSON.", "error");
+              }
+            });
+          });
+        } catch (_e) {
+          qs("tbody-parser-observaciones").innerHTML = "<tr><td colspan='4' class='muted'>No se pudieron cargar observaciones.</td></tr>";
+        }
+      }
+
+      async function runParserSimulation() {
+        const text = qs("parser-sim-texto").value.trim();
+        const status = qs("parser-sim-status");
+        const output = qs("parser-sim-output");
+        if (!text) {
+          toast("Captura una frase para simular.", "error");
+          return;
+        }
+        status.textContent = "Simulando...";
+        output.textContent = "Procesando...";
+        try {
+          const data = await api("/api/admin/parser/simular", {
+            method: "POST",
+            body: { texto: text }
+          });
+          const extraccion = data.extraccion || {};
+          const resumen = data.resumen || "";
+          status.textContent = "Modo: " + String(extraccion.parse_mode || "unknown") + " | Confianza: " + Number(extraccion.confidence_score || 0).toFixed(2);
+          output.textContent = prettyJson({
+            resumen,
+            parse_mode: extraccion.parse_mode,
+            confidence_score: extraccion.confidence_score,
+            needs_confirmation: extraccion.needs_confirmation,
+            needs_clarification: extraccion.needs_clarification,
+            clarification_message: extraccion.clarification_message,
+            matched_rule_id: extraccion.matched_rule_id,
+            matched_rule_phrase: extraccion.matched_rule_phrase,
+            signals: extraccion.signals,
+            items: extraccion.items,
+            total: extraccion.total
+          });
+        } catch (_e) {
+          status.textContent = "Fallo la simulacion.";
+          output.textContent = "No se pudo simular el parser.";
+          toast("No se pudo simular el parser.", "error");
+        }
+      }
+
+      async function loadTickets() {
+        const estado = qs("f-estado").value;
+        const numero = qs("f-numero").value.trim();
+        let url = "/api/soporte/tickets";
+        const params = new URLSearchParams();
+        if (estado) params.set("estado", estado);
+        if (numero) params.set("numero", numero);
+        if (params.toString()) url += "?" + params.toString();
+
+        const statusEl = qs("status-tickets");
+        const tbody = qs("tbody-tickets");
+        const countEl = qs("count-tickets");
+
+        statusEl.textContent = "Cargando...";
+        tbody.innerHTML = "";
+
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar tickets");
+          
+          const rows = Array.isArray(data.data) ? data.data : [];
+          if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-2); padding: 20px;">Sin tickets para mostrar.</td></tr>';
+            countEl.textContent = "0 tickets";
+            statusEl.textContent = "";
+            return;
+          }
+
+          function fmtDate(v) {
+            if (!v) return "-";
+            try { 
+              const d = new Date(v);
+              return d.toLocaleDateString("es-MX") + " " + d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+            } catch { 
+              return String(v); 
+            }
+          }
+
+          function statusBadge(estado) {
+            const estados = {
+              "abierto": "Abierto",
+              "en_proceso": "En proceso",
+              "resuelto": "Resuelto",
+              "cerrado": "Cerrado"
+            };
+            return '<span class="status ' + (estado || "") + '">' + (estados[estado] || estado || "-") + '</span>';
+          }
+
+          tbody.innerHTML = rows.map((t) => {
+            const numeroTicket = t.numero_ticket || "-";
+            return `
+              <tr>
+                <td>
+                  <div style="font-weight: 600;">${numeroTicket}</div>
+                  <div class="subtle">${fmtDate(t.creado_en)}</div>
+                </td>
+                <td>
+                  <div style="font-weight: 500;">${t.nombre_contacto || "-"}</div>
+                  <div class="subtle">${t.whatsapp_contacto || "Sin WhatsApp"}</div>
+                </td>
+                <td>
+                  <div class="meta">
+                    <div class="meta-item">
+                      <span class="meta-label">Cat:</span>
+                      <span class="meta-value">${t.categoria || "-"}</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">Prio:</span>
+                      <span class="meta-value">${t.prioridad || "-"}</span>
+                    </div>
+                    <div class="subtle" style="margin-top: 4px;">${t.descripcion || "-"}</div>
+                    ${t.notas_resolucion ? '<div class="subtle" style="margin-top: 4px; border-top: 0.5px solid var(--line); padding-top: 4px;"><strong>Notas:</strong> ' + t.notas_resolucion + '</div>' : ''}
+                  </div>
+                </td>
+                <td>
+                  ${statusBadge(t.estado)}
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button class="btn xs" onclick="updateTicketStatus('${numeroTicket}','en_proceso')">En curso</button>
+                    <button class="btn xs" onclick="updateTicketStatus('${numeroTicket}','resuelto')">Resolver</button>
+                    <button class="btn xs" onclick="updateTicketStatus('${numeroTicket}','cerrado')">Cerrar</button>
+                    <button class="btn secondary xs" onclick="updateTicketStatus('${numeroTicket}','abierto')">Reabrir</button>
+                  </div>
+                  <textarea class="notes" id="notas-${numeroTicket}" placeholder="Notas de resolución (opcional)"></textarea>
+                  <div id="res-${numeroTicket}" style="margin-top: 4px; font-size: 11px; color: var(--text-2);"></div>
+                </td>
+              </tr>
+            `;
+          }).join("");
+          countEl.textContent = rows.length + " ticket" + (rows.length !== 1 ? "s" : "");
+          statusEl.textContent = "";
+        } catch (err) {
+          statusEl.textContent = "Error: " + err.message;
+          countEl.textContent = "";
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--red-fg); padding: 20px;">Error cargando tickets.</td></tr>';
+        }
+      }
+
+      async function updateTicketStatus(numero, estado) {
+        const notasEl = qs("notas-" + numero);
+        const resEl = qs("res-" + numero);
+        const notas = notasEl ? notasEl.value.trim() : "";
+        
+        const statusEl = qs("status-tickets");
+        statusEl.textContent = "Actualizando...";
+        
+        try {
+          const res = await fetch("/api/soporte/tickets/" + encodeURIComponent(numero), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ estado, notas_resolucion: notas || null }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo actualizar");
+
+          const notif = data.data && data.data.notificacion_whatsapp;
+          if (notif && notif.intentada) {
+            if (notif.enviada) {
+              statusEl.textContent = "✓ " + numero + " actualizado y notificación enviada a " + (notif.destino || "cliente");
+              if (resEl) resEl.innerHTML = '<span style="color: var(--green-fg);">✓ Notificación enviada a ' + notif.destino + '</span>';
+            } else {
+              statusEl.textContent = numero + " actualizado (notificación no enviada)";
+              if (resEl) resEl.innerHTML = '<span style="color: var(--amber-fg);">⚠ ' + (notif.motivo || "Sin detalle") + '</span>';
+            }
+          } else {
+            statusEl.textContent = "✓ " + numero + " actualizado";
+          }
+          await loadTickets();
+        } catch (err) {
+          statusEl.textContent = "Error: " + err.message;
         }
       }
 
@@ -2309,7 +3797,8 @@
         if (sectionName === "ventas") {
           await Promise.allSettled([
             loadVentasKpisAndCharts(false),
-            loadTopClientes()
+            loadTopClientes(),
+            loadReporteVentasProfesional()
           ]);
           return;
         }
@@ -2350,6 +3839,19 @@
             loadMovimientos(),
             loadProductosSinReceta()
           ]);
+          return;
+        }
+
+        if (sectionName === "parser") {
+          await Promise.allSettled([
+            loadParserFrases(),
+            loadParserObservaciones()
+          ]);
+        }
+
+        if (sectionName === "soporte") {
+          loadTickets();
+          document.getElementById("btn-filtrar").addEventListener("click", loadTickets);
         }
       }
 
@@ -2404,6 +3906,63 @@
           loadVentasKpisAndCharts(true);
         });
 
+        qs("btn-top-clientes-filtrar").addEventListener("click", renderTopClientes);
+        qs("btn-top-clientes-limpiar").addEventListener("click", () => {
+          qs("f-top-clientes-q").value = "";
+          renderTopClientes();
+        });
+
+        qs("btn-rep-ventas-filtrar").addEventListener("click", loadReporteVentasProfesional);
+        qs("btn-rep-ventas-export").addEventListener("click", exportReporteVentasCsv);
+        qs("btn-rep-ventas-export-xlsx").addEventListener("click", exportReporteVentasXlsx);
+        qs("btn-rep-ventas-limpiar").addEventListener("click", () => {
+          qs("f-rep-ventas-periodo").value = "dia";
+          qs("f-rep-ventas-fecha").value = "";
+          qs("f-rep-ventas-q").value = "";
+          loadReporteVentasProfesional();
+        });
+        qs("f-rep-ticket-id").addEventListener("change", () => {
+          const id = String((qs("f-rep-ticket-id") && qs("f-rep-ticket-id").value) || "");
+          const rows = Array.isArray(state.tableCache.reporteVentas) ? state.tableCache.reporteVentas : [];
+          const selected = rows.find((r) => String(Number(r.pedido_id || 0)) === id);
+          renderTicketDetalleProfesional(selected || null);
+        });
+
+        qs("btn-rent-filtrar").addEventListener("click", renderRentabilidad);
+        qs("btn-rent-limpiar").addEventListener("click", () => {
+          qs("f-rent-q").value = "";
+          qs("f-rent-calidad").value = "";
+          renderRentabilidad();
+        });
+
+        qs("btn-ped-filtrar").addEventListener("click", () => {
+          state.pages.pedidos.page = 1;
+          loadPedidosActivos();
+        });
+        qs("btn-ped-limpiar").addEventListener("click", () => {
+          qs("f-ped-buscar").value = "";
+          qs("f-ped-desde").value = "";
+          qs("f-ped-hasta").value = "";
+          qs("f-ped-limit").value = "20";
+          state.pages.pedidos.page = 1;
+          loadPedidosActivos();
+        });
+        qs("btn-ped-prev").addEventListener("click", () => {
+          state.pages.pedidos.page = Math.max(1, Number(state.pages.pedidos.page || 1) - 1);
+          loadPedidosActivos();
+        });
+        qs("btn-ped-next").addEventListener("click", () => {
+          if (!state.pages.pedidos.hasMore) return;
+          state.pages.pedidos.page = Number(state.pages.pedidos.page || 1) + 1;
+          loadPedidosActivos();
+        });
+
+        qs("btn-compras-filtrar").addEventListener("click", renderComprasRecientes);
+        qs("btn-compras-limpiar").addEventListener("click", () => {
+          qs("f-compras-q").value = "";
+          renderComprasRecientes();
+        });
+
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState !== "visible") return;
           if (state.current === "ventas") {
@@ -2429,7 +3988,7 @@
             return;
           }
           if (rol === "repartidor" && !areaEntrega) {
-            toast("Para repartidor debes capturar area de entrega.", "error");
+            toast("Para repartidor debes capturar área de entrega.", "error");
             return;
           }
 
@@ -2473,19 +4032,45 @@
           await loadUsuarios();
         });
 
-        qs("btn-seg-filtrar").addEventListener("click", loadBitacoraSeguridad);
-        qs("btn-neg-filtrar").addEventListener("click", loadBitacoraNegocio);
+        qs("btn-seg-filtrar").addEventListener("click", () => {
+          state.pages.seg.page = 1;
+          loadBitacoraSeguridad();
+        });
+        qs("btn-neg-filtrar").addEventListener("click", () => {
+          state.pages.neg.page = 1;
+          loadBitacoraNegocio();
+        });
+        qs("btn-seg-prev").addEventListener("click", () => {
+          state.pages.seg.page = Math.max(1, Number(state.pages.seg.page || 1) - 1);
+          loadBitacoraSeguridad();
+        });
+        qs("btn-seg-next").addEventListener("click", () => {
+          if (!state.pages.seg.hasMore) return;
+          state.pages.seg.page = Number(state.pages.seg.page || 1) + 1;
+          loadBitacoraSeguridad();
+        });
+        qs("btn-neg-prev").addEventListener("click", () => {
+          state.pages.neg.page = Math.max(1, Number(state.pages.neg.page || 1) - 1);
+          loadBitacoraNegocio();
+        });
+        qs("btn-neg-next").addEventListener("click", () => {
+          if (!state.pages.neg.hasMore) return;
+          state.pages.neg.page = Number(state.pages.neg.page || 1) + 1;
+          loadBitacoraNegocio();
+        });
 
         qs("btn-seg-export").addEventListener("click", () => {
           const p = new URLSearchParams();
           const evento = qs("f-seg-evento").value.trim();
           const sev = qs("f-seg-sev").value;
           const actor = qs("f-seg-actor").value.trim();
+          const rango = qs("f-seg-rango").value;
           const desde = qs("f-seg-desde").value;
           const hasta = qs("f-seg-hasta").value;
           if (evento) p.set("tipo_evento", evento);
           if (sev) p.set("severidad", sev);
           if (actor) p.set("actor", actor);
+          if (rango) p.set("rango", rango);
           if (desde) p.set("fecha_desde", desde);
           if (hasta) p.set("fecha_hasta", hasta);
           window.location.href = "/api/admin/auditoria-seguridad.csv?" + p.toString();
@@ -2495,13 +4080,58 @@
           const p = new URLSearchParams();
           const tabla = qs("f-neg-tabla").value;
           const actor = qs("f-neg-actor").value.trim();
+          const rango = qs("f-neg-rango").value;
           const desde = qs("f-neg-desde").value;
           const hasta = qs("f-neg-hasta").value;
           if (tabla) p.set("tabla", tabla);
           if (actor) p.set("actor", actor);
+          if (rango) p.set("rango", rango);
           if (desde) p.set("fecha_desde", desde);
           if (hasta) p.set("fecha_hasta", hasta);
           window.location.href = "/api/admin/auditoria-negocio.csv?" + p.toString();
+        });
+
+        qs("btn-inv-filtrar").addEventListener("click", () => {
+          state.pages.inv.page = 1;
+          loadInventarioStock();
+        });
+        qs("btn-inv-limpiar").addEventListener("click", () => {
+          qs("f-inv-texto").value = "";
+          qs("f-inv-estado").value = "";
+          qs("f-inv-prov").value = "";
+          qs("f-inv-limit").value = "24";
+          state.pages.inv.page = 1;
+          loadInventarioStock();
+        });
+        qs("btn-inv-prev").addEventListener("click", () => {
+          state.pages.inv.page = Math.max(1, Number(state.pages.inv.page || 1) - 1);
+          loadInventarioStock();
+        });
+        qs("btn-inv-next").addEventListener("click", () => {
+          if (!state.pages.inv.hasMore) return;
+          state.pages.inv.page = Number(state.pages.inv.page || 1) + 1;
+          loadInventarioStock();
+        });
+
+        qs("btn-rec-filtrar").addEventListener("click", () => {
+          state.pages.rec.page = 1;
+          loadRecetas();
+        });
+        qs("btn-rec-limpiar").addEventListener("click", () => {
+          qs("f-rec-texto").value = "";
+          qs("f-rec-activa").value = "";
+          qs("f-rec-limit").value = "30";
+          state.pages.rec.page = 1;
+          loadRecetas();
+        });
+        qs("btn-rec-prev").addEventListener("click", () => {
+          state.pages.rec.page = Math.max(1, Number(state.pages.rec.page || 1) - 1);
+          loadRecetas();
+        });
+        qs("btn-rec-next").addEventListener("click", () => {
+          if (!state.pages.rec.hasMore) return;
+          state.pages.rec.page = Number(state.pages.rec.page || 1) + 1;
+          loadRecetas();
         });
 
         qs("campana-mensaje").addEventListener("input", (e) => {
@@ -2517,6 +4147,12 @@
             p.classList.toggle("active", p === pill);
           });
           updateSegmentCount();
+        });
+
+        qs("btn-camp-filtrar").addEventListener("click", renderCampanas);
+        qs("btn-camp-limpiar").addEventListener("click", () => {
+          qs("f-camp-q").value = "";
+          renderCampanas();
         });
 
         qs("form-campana").addEventListener("submit", async (event) => {
@@ -2585,6 +4221,13 @@
           } catch (_e) {
             toast("No se pudo guardar producto.", "error");
           }
+        });
+
+        qs("btn-prod-filtrar").addEventListener("click", renderProductosAdmin);
+        qs("btn-prod-limpiar").addEventListener("click", () => {
+          qs("f-prod-q").value = "";
+          qs("f-prod-estado").value = "";
+          renderProductosAdmin();
         });
 
         qs("form-insumo").addEventListener("submit", async (event) => {
@@ -2719,6 +4362,60 @@
             toast("No se pudo registrar la compra.", "error");
           }
         });
+
+        qs("btn-mov-filtrar").addEventListener("click", renderMovimientos);
+        qs("btn-mov-limpiar").addEventListener("click", () => {
+          qs("f-mov-q").value = "";
+          qs("f-mov-tipo").value = "";
+          renderMovimientos();
+        });
+
+        qs("btn-parser-filtrar").addEventListener("click", loadParserObservaciones);
+        qs("btn-parser-refresh").addEventListener("click", async () => {
+          await Promise.allSettled([loadParserFrases(), loadParserObservaciones()]);
+        });
+        qs("btn-parser-reglas-refresh").addEventListener("click", loadParserFrases);
+        qs("btn-parser-reglas-filtrar").addEventListener("click", renderParserFrases);
+        qs("btn-parser-reglas-limpiar").addEventListener("click", () => {
+          qs("f-parser-reglas-q").value = "";
+          qs("f-parser-reglas-activa").value = "";
+          renderParserFrases();
+        });
+        qs("btn-parser-simular").addEventListener("click", runParserSimulation);
+        qs("parser-sim-texto").addEventListener("keydown", (event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            runParserSimulation();
+          }
+        });
+
+        qs("form-parser-regla").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          try {
+            await api("/api/admin/parser/frases", {
+              method: "POST",
+              body: {
+                frase_original: qs("parser-regla-frase").value.trim(),
+                tipo_match: qs("parser-regla-tipo").value,
+                prioridad: Number(qs("parser-regla-prioridad").value || 100),
+                activa: qs("parser-regla-activa").value === "1",
+                needs_confirmation: qs("parser-regla-confirmacion").value === "1",
+                needs_clarification: qs("parser-regla-clarifica").value === "1",
+                items_json: parseJsonText(qs("parser-regla-items").value, []),
+                clarification_message: qs("parser-regla-msg").value.trim() || null,
+                notas: qs("parser-regla-notas").value.trim() || null
+              }
+            });
+            event.target.reset();
+            qs("parser-regla-prioridad").value = "100";
+            qs("parser-regla-activa").value = "1";
+            qs("parser-regla-confirmacion").value = "0";
+            qs("parser-regla-clarifica").value = "0";
+            await Promise.allSettled([loadParserFrases(), loadParserObservaciones()]);
+            toast("Regla curada creada.", "success");
+          } catch (_e) {
+            toast("No se pudo crear la regla. Revisa el JSON.", "error");
+          }
+        });
       }
 
       function boot() {
@@ -2732,3 +4429,4 @@
   </script>
 </body>
 </html>
+
