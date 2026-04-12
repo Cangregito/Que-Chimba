@@ -14,3 +14,6 @@ baileys_bridge/media_tmp/
 baileys_bridge/auth/
 
 .env
+
+backups/
+logs/

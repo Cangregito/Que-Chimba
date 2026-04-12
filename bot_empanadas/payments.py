@@ -23,6 +23,11 @@ import requests as http
 
 import db
 
+try:
+    from config_runtime import DEFAULT_BAILEYS_BRIDGE_URL, env_bool, env_str
+except Exception:
+    from bot_empanadas.config_runtime import DEFAULT_BAILEYS_BRIDGE_URL, env_bool, env_str
+
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────
@@ -39,7 +44,7 @@ COMISION_FIJA = 4.00          # $4.00 MXN fija por transacción
 # ─────────────────────────────────────────────────────────────────
 
 def _mp_token() -> str:
-    token = os.getenv("MP_ACCESS_TOKEN", "").strip()
+    token = env_str("MP_ACCESS_TOKEN", "").strip()
     if not token:
         raise RuntimeError(
             "MP_ACCESS_TOKEN no configurado. "
@@ -49,11 +54,11 @@ def _mp_token() -> str:
 
 
 def _base_url() -> str:
-    return os.getenv("PUBLIC_BASE_URL", "https://tu-ngrok-url.ngrok.io").rstrip("/")
+    return env_str("PUBLIC_BASE_URL", "https://tu-ngrok-url.ngrok.io").rstrip("/")
 
 
 def _use_sandbox() -> bool:
-    return os.getenv("MP_SANDBOX", "true").lower() != "false"
+    return env_bool("MP_SANDBOX", True)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -246,7 +251,7 @@ def enviar_whatsapp_pago(whatsapp_id: str, pedido_id: int, estado_mp: str) -> No
         f"Novedad en tu pedido #{pedido_id}: estado de pago actualizado a '{estado_mp}'.",
     )
 
-    bridge_url = os.getenv("BAILEYS_BRIDGE_URL", "http://localhost:3001").strip().rstrip("/")
+    bridge_url = env_str("BAILEYS_BRIDGE_URL", DEFAULT_BAILEYS_BRIDGE_URL).strip().rstrip("/")
     if not bridge_url:
         logger.warning("BAILEYS_BRIDGE_URL no configurado. Se omite notificacion de pago para pedido %s.", pedido_id)
         return

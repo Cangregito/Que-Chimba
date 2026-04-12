@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS proveedores (
     proveedor_id BIGSERIAL PRIMARY KEY,
     nombre        VARCHAR(120) NOT NULL,
     telefono      VARCHAR(30),
+    email         VARCHAR(120),
     creado_en     TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

@@ -4,11 +4,11 @@ param(
     [string]$DbName = "que_chimba",
     [string]$DbUser = "postgres",
     [PSCredential]$DbCredential,
-    [string]$N8nWebhookUrl = "http://localhost:5678/webhook/pedido-alerta",
     [string]$TtsProvider = "elevenlabs",
     [string]$TtsLang = "es",
     [string]$TtsTld = "com.co",
     [string]$WhisperModel = "large-v3",
+    [string]$SensitiveDataKey = "",
     [string]$ElevenLabsApiKey = "",
     [string]$ElevenLabsVoiceId = "",
     [string]$ElevenLabsModelId = "eleven_multilingual_v2",
@@ -39,14 +39,14 @@ function Write-Warn([string]$msg) {
     Write-Host "[WARN] $msg" -ForegroundColor Yellow
 }
 
-function Escape-SingleQuote([string]$value) {
+function ConvertTo-SingleQuotedLiteral([string]$value) {
     if ($null -eq $value) {
         return ""
     }
     return $value.Replace("'", "''")
 }
 
-function Mask-Secret([string]$value, [int]$visible = 4) {
+function Protect-SecretDisplay([string]$value, [int]$visible = 4) {
     if ([string]::IsNullOrWhiteSpace($value)) {
         return "(vacio)"
     }
@@ -89,7 +89,7 @@ function Test-TcpPort([string]$HostName, [int]$Port, [int]$TimeoutMs = 1200) {
     }
 }
 
-function Ensure-OllamaReady([string]$BaseUrl, [string]$Model, [string]$EnabledRaw) {
+function Test-OllamaReady([string]$BaseUrl, [string]$Model, [string]$EnabledRaw) {
     $enabledText = if ($null -eq $EnabledRaw) { "" } else { [string]$EnabledRaw }
     $isEnabled = $enabledText.Trim().ToLower() -in @("1", "true", "yes", "on")
     if (-not $isEnabled) {
@@ -208,12 +208,12 @@ $env:DB_PORT = $DbPort
 $env:DB_NAME = $DbName
 $env:DB_USER = $dbUserResolved
 $env:DB_PASSWORD = $dbPasswordPlain
-$env:N8N_PEDIDO_WEBHOOK_URL = $N8nWebhookUrl
 $env:TTS_PROVIDER = if (-not [string]::IsNullOrWhiteSpace($TtsProvider)) { $TtsProvider } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_PROVIDER"))) { "auto" } else { [Environment]::GetEnvironmentVariable("TTS_PROVIDER") }
 $env:TTS_LANG = if (-not [string]::IsNullOrWhiteSpace($TtsLang)) { $TtsLang } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_LANG"))) { "es" } else { [Environment]::GetEnvironmentVariable("TTS_LANG") }
 $env:TTS_TLD = if (-not [string]::IsNullOrWhiteSpace($TtsTld)) { $TtsTld } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("TTS_TLD"))) { "com.co" } else { [Environment]::GetEnvironmentVariable("TTS_TLD") }
 $requestedWhisperModel = if (-not [string]::IsNullOrWhiteSpace($WhisperModel)) { $WhisperModel } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("WHISPER_MODEL"))) { "large-v3" } else { [Environment]::GetEnvironmentVariable("WHISPER_MODEL") }
 $env:WHISPER_MODEL = Resolve-WhisperModel -RequestedModel $requestedWhisperModel
+$env:SENSITIVE_DATA_KEY = if (-not [string]::IsNullOrWhiteSpace($SensitiveDataKey)) { $SensitiveDataKey } else { [Environment]::GetEnvironmentVariable("SENSITIVE_DATA_KEY") }
 $env:ELEVENLABS_API_KEY = if (-not [string]::IsNullOrWhiteSpace($ElevenLabsApiKey)) { $ElevenLabsApiKey } else { [Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY") }
 $env:ELEVENLABS_VOICE_ID = if (-not [string]::IsNullOrWhiteSpace($ElevenLabsVoiceId)) { $ElevenLabsVoiceId } else { [Environment]::GetEnvironmentVariable("ELEVENLABS_VOICE_ID") }
 $env:ELEVENLABS_MODEL_ID = if (-not [string]::IsNullOrWhiteSpace($ElevenLabsModelId)) { $ElevenLabsModelId } elseif ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("ELEVENLABS_MODEL_ID"))) { "eleven_multilingual_v2" } else { [Environment]::GetEnvironmentVariable("ELEVENLABS_MODEL_ID") }
@@ -223,15 +223,23 @@ $env:LLM_LOCAL_BASE_URL = if ([string]::IsNullOrWhiteSpace([Environment]::GetEnv
 $env:LLM_LOCAL_MODEL = if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("LLM_LOCAL_MODEL"))) { "phi3:mini" } else { [Environment]::GetEnvironmentVariable("LLM_LOCAL_MODEL") }
 $env:LLM_LOCAL_TIMEOUT_SEC = if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("LLM_LOCAL_TIMEOUT_SEC"))) { "35" } else { [Environment]::GetEnvironmentVariable("LLM_LOCAL_TIMEOUT_SEC") }
 
-$voiceIdMasked = Mask-Secret -value ([Environment]::GetEnvironmentVariable("ELEVENLABS_VOICE_ID")) -visible 6
-$apiKeyMasked = Mask-Secret -value ([Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY")) -visible 6
+$voiceIdMasked = Protect-SecretDisplay -value ([Environment]::GetEnvironmentVariable("ELEVENLABS_VOICE_ID")) -visible 6
+$apiKeyMasked = Protect-SecretDisplay -value ([Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY")) -visible 6
+$sensitiveDataKeyMasked = Protect-SecretDisplay -value ([Environment]::GetEnvironmentVariable("SENSITIVE_DATA_KEY")) -visible 6
 Write-Info "TTS_PROVIDER efectivo: $($env:TTS_PROVIDER)"
 Write-Info "TTS_LANG efectivo: $($env:TTS_LANG)"
 Write-Info "TTS_TLD efectivo: $($env:TTS_TLD)"
 Write-Info "WHISPER_MODEL efectivo: $($env:WHISPER_MODEL)"
 Write-Info "BOT_REPLY_MODE efectivo: $($env:BOT_REPLY_MODE)"
+Write-Info "SENSITIVE_DATA_KEY (masked): $sensitiveDataKeyMasked"
 Write-Info "ELEVENLABS_VOICE_ID (masked): $voiceIdMasked"
 Write-Info "ELEVENLABS_API_KEY (masked): $apiKeyMasked"
+if ([string]::IsNullOrWhiteSpace($env:SENSITIVE_DATA_KEY)) {
+    Write-Warn "SENSITIVE_DATA_KEY no configurada. Los campos sensibles nuevos se guardaran sin cifrado en reposo."
+}
+else {
+    Write-Ok "SENSITIVE_DATA_KEY detectada. Cifrado de datos sensibles habilitado."
+}
 if ($env:TTS_PROVIDER -eq "elevenlabs" -and ([string]::IsNullOrWhiteSpace($env:ELEVENLABS_API_KEY) -or [string]::IsNullOrWhiteSpace($env:ELEVENLABS_VOICE_ID))) {
     Write-Warn "TTS_PROVIDER=elevenlabs pero falta ELEVENLABS_API_KEY o ELEVENLABS_VOICE_ID. Edita esos parametros en run_all.ps1 o exportalos antes de ejecutar."
 }
@@ -240,7 +248,7 @@ Write-Info "LLM_LOCAL_BASE_URL efectivo: $($env:LLM_LOCAL_BASE_URL)"
 Write-Info "LLM_LOCAL_MODEL efectivo: $($env:LLM_LOCAL_MODEL)"
 Write-Info "LLM_LOCAL_TIMEOUT_SEC efectivo: $($env:LLM_LOCAL_TIMEOUT_SEC)"
 
-Ensure-OllamaReady -BaseUrl $env:LLM_LOCAL_BASE_URL -Model $env:LLM_LOCAL_MODEL -EnabledRaw $env:LLM_LOCAL_ENABLED
+Test-OllamaReady -BaseUrl $env:LLM_LOCAL_BASE_URL -Model $env:LLM_LOCAL_MODEL -EnabledRaw $env:LLM_LOCAL_ENABLED
 
 if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("FLASK_SECRET"))) {
     $env:FLASK_SECRET = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
@@ -299,18 +307,11 @@ if (-not (Test-Path -LiteralPath $bridgeEnv) -and (Test-Path -LiteralPath $bridg
     Write-Info "Se creo baileys_bridge/.env desde .env.example"
 }
 
-if (-not $SkipDocker) {
-    Write-Info "Levantando n8n con docker compose..."
-    Push-Location $root
-    try {
-        docker compose up -d | Out-Host
-    }
-    finally {
-        Pop-Location
-    }
+if ($SkipDocker) {
+    Write-Warn "Docker omitido por parametro -SkipDocker"
 }
 else {
-    Write-Warn "Se omite docker compose por parametro -SkipDocker"
+    Write-Info "Docker compose esta deshabilitado (n8n no se usa). Usa -WithDocker para levantarlo si lo necesitas."
 }
 
 Write-Info "Iniciando Baileys bridge en una ventana nueva..."
@@ -323,18 +324,19 @@ Start-Process -FilePath "powershell.exe" -ArgumentList @(
 
 Write-Info "Iniciando Flask en una ventana nueva..."
 # Pasa variables por entorno heredado para no exponer secretos en linea de comandos.
-$evTtsProvider = Escape-SingleQuote($env:TTS_PROVIDER)
-$evTtsLang = Escape-SingleQuote($env:TTS_LANG)
-$evTtsTld = Escape-SingleQuote($env:TTS_TLD)
-$evWhisperModel = Escape-SingleQuote($env:WHISPER_MODEL)
-$evBotReplyMode = Escape-SingleQuote($env:BOT_REPLY_MODE)
-$evElevenApiKey = Escape-SingleQuote($env:ELEVENLABS_API_KEY)
-$evElevenVoiceId = Escape-SingleQuote($env:ELEVENLABS_VOICE_ID)
-$evElevenModelId = Escape-SingleQuote($env:ELEVENLABS_MODEL_ID)
-$evLlmLocalEnabled = Escape-SingleQuote($env:LLM_LOCAL_ENABLED)
-$evLlmLocalBaseUrl = Escape-SingleQuote($env:LLM_LOCAL_BASE_URL)
-$evLlmLocalModel = Escape-SingleQuote($env:LLM_LOCAL_MODEL)
-$evLlmLocalTimeout = Escape-SingleQuote($env:LLM_LOCAL_TIMEOUT_SEC)
+$evTtsProvider = ConvertTo-SingleQuotedLiteral($env:TTS_PROVIDER)
+$evTtsLang = ConvertTo-SingleQuotedLiteral($env:TTS_LANG)
+$evTtsTld = ConvertTo-SingleQuotedLiteral($env:TTS_TLD)
+$evWhisperModel = ConvertTo-SingleQuotedLiteral($env:WHISPER_MODEL)
+$evBotReplyMode = ConvertTo-SingleQuotedLiteral($env:BOT_REPLY_MODE)
+$evSensitiveDataKey = ConvertTo-SingleQuotedLiteral($env:SENSITIVE_DATA_KEY)
+$evElevenApiKey = ConvertTo-SingleQuotedLiteral($env:ELEVENLABS_API_KEY)
+$evElevenVoiceId = ConvertTo-SingleQuotedLiteral($env:ELEVENLABS_VOICE_ID)
+$evElevenModelId = ConvertTo-SingleQuotedLiteral($env:ELEVENLABS_MODEL_ID)
+$evLlmLocalEnabled = ConvertTo-SingleQuotedLiteral($env:LLM_LOCAL_ENABLED)
+$evLlmLocalBaseUrl = ConvertTo-SingleQuotedLiteral($env:LLM_LOCAL_BASE_URL)
+$evLlmLocalModel = ConvertTo-SingleQuotedLiteral($env:LLM_LOCAL_MODEL)
+$evLlmLocalTimeout = ConvertTo-SingleQuotedLiteral($env:LLM_LOCAL_TIMEOUT_SEC)
 
 $flaskCmd = "Set-Location -LiteralPath '$root'; " +
     "`$env:TTS_PROVIDER='$evTtsProvider'; " +
@@ -342,6 +344,7 @@ $flaskCmd = "Set-Location -LiteralPath '$root'; " +
     "`$env:TTS_TLD='$evTtsTld'; " +
     "`$env:WHISPER_MODEL='$evWhisperModel'; " +
     "`$env:BOT_REPLY_MODE='$evBotReplyMode'; " +
+    "`$env:SENSITIVE_DATA_KEY='$evSensitiveDataKey'; " +
     "`$env:ELEVENLABS_API_KEY='$evElevenApiKey'; " +
     "`$env:ELEVENLABS_VOICE_ID='$evElevenVoiceId'; " +
     "`$env:ELEVENLABS_MODEL_ID='$evElevenModelId'; " +
@@ -390,7 +393,6 @@ Write-Host ""
 Write-Host "URLs:" -ForegroundColor White
 Write-Host "- Flask:   http://localhost:5000" -ForegroundColor White
 Write-Host "- Baileys: http://localhost:3001/health" -ForegroundColor White
-Write-Host "- n8n:     http://localhost:5678" -ForegroundColor White
 Write-Host "" 
 if ($ShowDemoCreds) {
     Write-Host "Bootstrap de usuarios del panel:" -ForegroundColor White

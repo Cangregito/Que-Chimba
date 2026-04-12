@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Que Chimba | Repartidor</title>
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
   <style>
     :root {
       --bg: #FFFFFF;
@@ -330,6 +331,49 @@
     .alert.success { background: var(--green-bg); color: var(--green-fg); border-color: #CDDDBA; }
     .alert.error { background: var(--red-bg); color: var(--red-fg); border-color: #E3C3C3; }
 
+    .qr-scanner {
+      margin-top: 8px;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      padding: 8px;
+      display: none;
+    }
+
+    .qr-scanner.active {
+      display: block;
+    }
+
+    .qr-scanner-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .qr-scanner-head strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .qr-reader {
+      width: 100%;
+      max-width: 360px;
+      margin: 0 auto;
+      border: 0.5px solid var(--line);
+      border-radius: var(--r-sm);
+      overflow: hidden;
+      background: #000;
+    }
+
+    .qr-help {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-2);
+      text-align: center;
+    }
+
     @media (max-width: 1080px) {
       .main { grid-template-columns: 1fr; }
       .kpis { grid-template-columns: 1fr 1fr; }
@@ -367,7 +411,19 @@
 
       <div class="head">
         <h3>Pedidos asignados (estado listo)</h3>
-        <button class="btn" id="btn-refresh" type="button">Actualizar</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn" id="btn-scan-qr" type="button">Escanear QR</button>
+          <button class="btn" id="btn-refresh" type="button">Actualizar</button>
+        </div>
+      </div>
+
+      <div id="qr-scanner" class="qr-scanner" aria-live="polite">
+        <div class="qr-scanner-head">
+          <strong>Escaner QR de etiqueta de cocina</strong>
+          <button class="btn" id="btn-stop-scan" type="button">Cerrar</button>
+        </div>
+        <div id="qr-reader" class="qr-reader"></div>
+        <div class="qr-help">Apunta la camara al QR del pedido para abrir su confirmacion.</div>
       </div>
 
       <div class="orders" id="orders-container">
@@ -397,13 +453,19 @@
 
       const msgSuccess = document.getElementById("msg-success");
       const msgError = document.getElementById("msg-error");
+      const scannerPanel = document.getElementById("qr-scanner");
+      const scannerContainerId = "qr-reader";
 
       const statListos = document.getElementById("stat-listos");
       const statPendientes = document.getElementById("stat-pendientes");
       const statCps = document.getElementById("stat-cps");
       const btnLogout = document.getElementById("btn-logout");
+      const btnScanQr = document.getElementById("btn-scan-qr");
+      const btnStopScan = document.getElementById("btn-stop-scan");
 
       const REFRESH_MS = 12000;
+      let qrScanner = null;
+      let qrScannerRunning = false;
 
       function esc(value) {
         return String(value == null ? "" : value)
@@ -746,11 +808,113 @@
         window.open("https://www.google.com/maps/search/?api=1&query=" + q, "_blank", "noopener");
       }
 
+      function parseQrPayload(rawText) {
+        try {
+          let parsed = JSON.parse(rawText);
+          if (typeof parsed === "string") {
+            parsed = JSON.parse(parsed);
+          }
+
+          if (!parsed || typeof parsed !== "object") {
+            return null;
+          }
+
+          const idValue = parsed.pedido_id ?? parsed.pedido ?? parsed.id;
+          const pedidoId = Number(idValue);
+          if (!Number.isFinite(pedidoId)) {
+            return null;
+          }
+
+          return { pedidoId };
+        } catch (_err) {
+          return null;
+        }
+      }
+
+      function openConfirmFromQrText(rawText) {
+        const qrData = parseQrPayload(rawText);
+        if (!qrData) {
+          showError("QR invalido o no compatible con el formato de cocina.");
+          return;
+        }
+
+        const target = allPedidos.find((p) => Number(p.id) === Number(qrData.pedidoId));
+        if (!target) {
+          showError("El QR corresponde a un pedido que no esta en tu lista actual.");
+          return;
+        }
+
+        openConfirm(target.id);
+        showSuccess("Pedido #" + target.id + " detectado por QR.");
+      }
+
+      async function stopQrScanner() {
+        if (!qrScanner || !qrScannerRunning) {
+          if (scannerPanel) scannerPanel.classList.remove("active");
+          return;
+        }
+        try {
+          await qrScanner.stop();
+        } catch (_err) {
+        }
+        try {
+          await qrScanner.clear();
+        } catch (_err) {
+        }
+        qrScannerRunning = false;
+        if (scannerPanel) scannerPanel.classList.remove("active");
+      }
+
+      async function startQrScanner() {
+        hideMessages();
+        if (typeof Html5Qrcode === "undefined") {
+          showError("El escaner QR no esta disponible en este navegador.");
+          return;
+        }
+
+        if (!qrScanner) {
+          qrScanner = new Html5Qrcode(scannerContainerId);
+        }
+
+        if (qrScannerRunning) {
+          return;
+        }
+
+        if (scannerPanel) scannerPanel.classList.add("active");
+        try {
+          await qrScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 240, height: 240 } },
+            async (decodedText) => {
+              await stopQrScanner();
+              openConfirmFromQrText(decodedText);
+            },
+            () => {}
+          );
+          qrScannerRunning = true;
+        } catch (_err) {
+          if (scannerPanel) scannerPanel.classList.remove("active");
+          showError("No se pudo iniciar camara para escanear QR.");
+        }
+      }
+
       window.openConfirm = openConfirm;
       window.closeConfirm = closeConfirm;
       window.confirmarEntrega = confirmarEntrega;
       window.reenviarCodigo = reenviarCodigo;
       window.openMaps = openMaps;
+
+      if (btnScanQr) {
+        btnScanQr.addEventListener("click", () => {
+          startQrScanner();
+        });
+      }
+
+      if (btnStopScan) {
+        btnStopScan.addEventListener("click", () => {
+          stopQrScanner();
+        });
+      }
 
       document.getElementById("btn-refresh").addEventListener("click", () => {
         loadPedidos(true);
@@ -784,6 +948,9 @@
 
       window.addEventListener("beforeunload", () => {
         if (refreshTimer) clearTimeout(refreshTimer);
+        if (qrScannerRunning) {
+          stopQrScanner();
+        }
       });
     })();
   </script>

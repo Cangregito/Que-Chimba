@@ -1,6 +1,7 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const fsPromises = require("fs/promises");
 const axios = require("axios");
 const pino = require("pino");
 const qrcode = require("qrcode-terminal");
@@ -25,6 +26,8 @@ const BRIDGE_API_TOKEN = (process.env.BAILEYS_BRIDGE_API_TOKEN || "").trim();
 const AUTH_DIR = path.resolve(__dirname, process.env.BAILEYS_AUTH_DIR || "auth");
 const MEDIA_DIR = path.resolve(__dirname, process.env.BAILEYS_MEDIA_DIR || "media_tmp");
 const PUBLIC_BASE_URL = (process.env.BAILEYS_PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
+const MEDIA_TTL_HOURS = Math.max(1, Number(process.env.BAILEYS_MEDIA_TTL_HOURS || 24));
+const MEDIA_CLEANUP_MINUTES = Math.max(1, Number(process.env.BAILEYS_MEDIA_CLEANUP_MINUTES || 30));
 
 if (!fs.existsSync(AUTH_DIR)) {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -49,6 +52,29 @@ function requireBridgeToken(req, res, next) {
 }
 
 let sock = null;
+
+async function cleanupMediaDir() {
+  const cutoffTs = Date.now() - (MEDIA_TTL_HOURS * 60 * 60 * 1000);
+  try {
+    const entries = await fsPromises.readdir(MEDIA_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) {
+        continue;
+      }
+      const fullPath = path.join(MEDIA_DIR, entry.name);
+      try {
+        const stat = await fsPromises.stat(fullPath);
+        if (stat.mtimeMs < cutoffTs) {
+          await fsPromises.unlink(fullPath);
+        }
+      } catch (error) {
+        logger.debug({ err: error?.message, file: entry.name }, "No se pudo limpiar archivo temporal");
+      }
+    }
+  } catch (error) {
+    logger.debug({ err: error?.message }, "No se pudo ejecutar limpieza de media temporal");
+  }
+}
 
 function toJid(numberOrJid) {
   const raw = String(numberOrJid || "").trim();
@@ -219,7 +245,7 @@ async function saveIncomingMedia(msg) {
 
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
   const localPath = path.join(MEDIA_DIR, filename);
-  fs.writeFileSync(localPath, buffer);
+  await fsPromises.writeFile(localPath, buffer);
 
   return {
     mediaUrl: `${PUBLIC_BASE_URL}/media/${filename}`,
@@ -526,5 +552,21 @@ async function startSocket() {
 
 app.listen(PORT, () => {
   logger.info(`Baileys bridge escuchando en puerto ${PORT}`);
+
+  const nodeEnv = String(process.env.NODE_ENV || "development").trim().toLowerCase();
+  if (nodeEnv === "production") {
+    if (!BRIDGE_API_TOKEN) {
+      logger.warn("BAILEYS_BRIDGE_API_TOKEN no configurado en produccion; endpoints internos quedan sin token.");
+    }
+    if (!FLASK_WEBHOOK_TOKEN) {
+      logger.warn("BAILEYS_WEBHOOK_TOKEN no configurado en produccion; webhook Flask queda sin autenticacion de token.");
+    }
+  }
+
+  cleanupMediaDir().catch(() => {});
+  setInterval(() => {
+    cleanupMediaDir().catch(() => {});
+  }, MEDIA_CLEANUP_MINUTES * 60 * 1000);
+
   startSocket().catch((err) => logger.error({ err: String(err) }, "No se pudo iniciar Baileys"));
 });

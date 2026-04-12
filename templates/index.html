@@ -1215,11 +1215,11 @@ footer {
     </div>
     <div class="hero-stats reveal reveal-delay-4">
       <div>
-        <div class="hero-stat-val" id="stat-ventas">1,240</div>
+        <div class="hero-stat-val" id="stat-ventas">0</div>
         <div class="hero-stat-label">Empanadas vendidas</div>
       </div>
       <div>
-        <div class="hero-stat-val" id="stat-clientes">380</div>
+        <div class="hero-stat-val" id="stat-clientes">0</div>
         <div class="hero-stat-label">Clientes felices</div>
       </div>
       <div>
@@ -1540,19 +1540,19 @@ footer {
         <div class="footer-col-title">Contacto</div>
         <ul class="footer-links">
           <li><a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer">WhatsApp</a></li>
-          <li><a href="#">Instagram</a></li>
-          <li><a href="#">TikTok</a></li>
-          <li><a href="#">Facebook</a></li>
+          <li><a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+          <li><a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer">TikTok</a></li>
+          <li><a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer">Facebook</a></li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
       <div class="footer-copy">© 2025 Que Chimba Empanadas · Ciudad Juárez, México</div>
       <div class="footer-socials">
-        <a href="#" class="footer-social-link">IG</a>
-        <a href="#" class="footer-social-link">TK</a>
-        <a href="#" class="footer-social-link">FB</a>
-        <a href="#" class="footer-social-link">WA</a>
+        <a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="footer-social-link">IG</a>
+        <a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="footer-social-link">TK</a>
+        <a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="footer-social-link">FB</a>
+        <a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="footer-social-link">WA</a>
       </div>
     </div>
   </div>
@@ -1579,6 +1579,7 @@ document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
 // Animated counters
 function animateCounter(el, target, duration = 1800) {
+  if (!el) return;
   let start = 0;
   const step = target / (duration / 16);
   const timer = setInterval(() => {
@@ -1591,8 +1592,7 @@ function animateCounter(el, target, duration = 1800) {
 const statsObserver = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if (e.isIntersecting) {
-      animateCounter(document.getElementById('stat-ventas'), 1240);
-      animateCounter(document.getElementById('stat-clientes'), 380);
+      refreshPublicStats(true);
       statsObserver.disconnect();
     }
   });
@@ -1600,6 +1600,35 @@ const statsObserver = new IntersectionObserver((entries) => {
 
 const statsEl = document.getElementById('stat-ventas');
 if (statsEl) statsObserver.observe(statsEl);
+
+async function refreshPublicStats(animated = false) {
+  try {
+    const res = await fetch('/api/stats/publicas', { cache: 'no-store' });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const ventas = Number(data.total_empanadas_vendidas || 0);
+    const clientes = Number(data.total_clientes_felices || 0);
+
+    if (animated) {
+      animateCounter(document.getElementById('stat-ventas'), ventas);
+      animateCounter(document.getElementById('stat-clientes'), clientes);
+      return;
+    }
+
+    const ventasEl = document.getElementById('stat-ventas');
+    const clientesEl = document.getElementById('stat-clientes');
+    if (ventasEl) ventasEl.textContent = ventas.toLocaleString();
+    if (clientesEl) clientesEl.textContent = clientes.toLocaleString();
+  } catch (_err) {
+    // Mantener fallback visual si la API no responde.
+  }
+}
+
+// Refresco periodico para mantener estadisticas alineadas a datos reales.
+setInterval(() => {
+  refreshPublicStats(false);
+}, 3600000);
 
 // Mobile menu
 function toggleMenu() {

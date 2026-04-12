@@ -12,6 +12,18 @@ from psycopg2.extras import RealDictCursor
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
+_SCHEMA_COLUMNS_CACHE = {}
+_SENSITIVE_SCHEMA_INITIALIZED = False
+
+
+def _sensitive_data_key():
+    return (os.getenv("SENSITIVE_DATA_KEY", "") or "").strip()
+
+
+def _sensitive_encryption_enabled():
+    return bool(_sensitive_data_key())
+
+
 def _db_config():
     db_timezone = (os.getenv("DB_TIMEZONE", "America/Chihuahua") or "America/Chihuahua").strip()
     cfg = {
@@ -29,7 +41,9 @@ def _db_config():
 
 def get_connection():
     try:
-        return psycopg2.connect(**_db_config())
+        conn = psycopg2.connect(**_db_config())
+        _asegurar_seguridad_datos_sensibles(conn)
+        return conn
     except Exception as exc:
         raise RuntimeError(f"No se pudo conectar a PostgreSQL: {exc}") from exc
 
@@ -61,6 +75,31 @@ def _normalizar_texto_busqueda(value):
 
 
 def _tabla_tiene_columna(conn, tabla, columna):
+    table_name = str(tabla or "").strip().lower()
+    column_name = str(columna or "").strip().lower()
+    if not table_name or not column_name:
+        return False
+
+    cache_key = (id(conn), table_name)
+    cached_columns = _SCHEMA_COLUMNS_CACHE.get(cache_key)
+    if cached_columns is None:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = %s
+                """,
+                (table_name,),
+            )
+            cached_columns = {str(row[0]).lower() for row in (cur.fetchall() or [])}
+            _SCHEMA_COLUMNS_CACHE[cache_key] = cached_columns
+
+    if column_name in cached_columns:
+        return True
+
+    # Reintento de seguridad por si la tabla cambio de estructura durante la ejecucion.
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -71,9 +110,139 @@ def _tabla_tiene_columna(conn, tabla, columna):
               AND column_name = %s
             LIMIT 1
             """,
-            (tabla, columna),
+            (table_name, column_name),
         )
-        return cur.fetchone() is not None
+        exists = cur.fetchone() is not None
+    if exists:
+        _SCHEMA_COLUMNS_CACHE.setdefault(cache_key, set()).add(column_name)
+    return exists
+
+
+def _asegurar_seguridad_datos_sensibles(conn):
+    global _SENSITIVE_SCHEMA_INITIALIZED
+
+    key = _sensitive_data_key()
+    with conn.cursor() as cur:
+        cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+        cur.execute(
+            """
+            CREATE OR REPLACE FUNCTION encrypt_sensitive_text(value TEXT)
+            RETURNS BYTEA
+            LANGUAGE plpgsql
+            AS $$
+            DECLARE
+                k TEXT;
+            BEGIN
+                k := current_setting('app.sensitive_data_key', true);
+                IF value IS NULL OR k IS NULL OR k = '' THEN
+                    RETURN NULL;
+                END IF;
+                RETURN pgp_sym_encrypt(value, k, 'compress-algo=1, cipher-algo=aes256');
+            END;
+            $$
+            """
+        )
+        cur.execute(
+            """
+            CREATE OR REPLACE FUNCTION decrypt_sensitive_text(value BYTEA)
+            RETURNS TEXT
+            LANGUAGE plpgsql
+            AS $$
+            DECLARE
+                k TEXT;
+            BEGIN
+                k := current_setting('app.sensitive_data_key', true);
+                IF value IS NULL OR k IS NULL OR k = '' THEN
+                    RETURN NULL;
+                END IF;
+                RETURN pgp_sym_decrypt(value, k);
+            EXCEPTION WHEN OTHERS THEN
+                RETURN NULL;
+            END;
+            $$
+            """
+        )
+
+        if key:
+            cur.execute("SELECT set_config('app.sensitive_data_key', %s, false)", (key,))
+
+    if _SENSITIVE_SCHEMA_INITIALIZED:
+        return
+
+    with conn.cursor() as cur:
+        cur.execute("ALTER TABLE direcciones_cliente ADD COLUMN IF NOT EXISTS latitud_enc BYTEA")
+        cur.execute("ALTER TABLE direcciones_cliente ADD COLUMN IF NOT EXISTS longitud_enc BYTEA")
+        cur.execute("ALTER TABLE direcciones_cliente ADD COLUMN IF NOT EXISTS direccion_texto_enc BYTEA")
+        cur.execute("ALTER TABLE direcciones_cliente ADD COLUMN IF NOT EXISTS referencia_enc BYTEA")
+
+        cur.execute("ALTER TABLE datos_fiscales ADD COLUMN IF NOT EXISTS rfc_enc BYTEA")
+        cur.execute("ALTER TABLE datos_fiscales ADD COLUMN IF NOT EXISTS razon_social_enc BYTEA")
+        cur.execute("ALTER TABLE datos_fiscales ADD COLUMN IF NOT EXISTS regimen_fiscal_enc BYTEA")
+        cur.execute("ALTER TABLE datos_fiscales ADD COLUMN IF NOT EXISTS uso_cfdi_enc BYTEA")
+        cur.execute("ALTER TABLE datos_fiscales ADD COLUMN IF NOT EXISTS email_enc BYTEA")
+
+        cur.execute("ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS email VARCHAR(120)")
+
+        if key:
+            cur.execute(
+                """
+                UPDATE direcciones_cliente
+                SET
+                    latitud_enc = COALESCE(latitud_enc, encrypt_sensitive_text(latitud::TEXT)),
+                    longitud_enc = COALESCE(longitud_enc, encrypt_sensitive_text(longitud::TEXT)),
+                    direccion_texto_enc = COALESCE(direccion_texto_enc, encrypt_sensitive_text(direccion_texto)),
+                    referencia_enc = COALESCE(referencia_enc, encrypt_sensitive_text(referencia))
+                WHERE latitud IS NOT NULL
+                   OR longitud IS NOT NULL
+                   OR COALESCE(direccion_texto, '') <> ''
+                   OR COALESCE(referencia, '') <> ''
+                """
+            )
+            cur.execute(
+                """
+                UPDATE direcciones_cliente
+                SET
+                    latitud = CASE WHEN latitud_enc IS NOT NULL THEN NULL ELSE latitud END,
+                    longitud = CASE WHEN longitud_enc IS NOT NULL THEN NULL ELSE longitud END,
+                    direccion_texto = CASE WHEN direccion_texto_enc IS NOT NULL THEN '' ELSE COALESCE(direccion_texto, '') END,
+                    referencia = CASE WHEN referencia_enc IS NOT NULL THEN NULL ELSE referencia END
+                """
+            )
+
+            cur.execute(
+                """
+                UPDATE datos_fiscales
+                SET
+                    rfc_enc = COALESCE(rfc_enc, encrypt_sensitive_text(rfc)),
+                    razon_social_enc = COALESCE(razon_social_enc, encrypt_sensitive_text(razon_social)),
+                    regimen_fiscal_enc = COALESCE(regimen_fiscal_enc, encrypt_sensitive_text(regimen_fiscal)),
+                    uso_cfdi_enc = COALESCE(uso_cfdi_enc, encrypt_sensitive_text(uso_cfdi)),
+                    email_enc = COALESCE(email_enc, encrypt_sensitive_text(email))
+                WHERE COALESCE(rfc, '') <> ''
+                   OR COALESCE(razon_social, '') <> ''
+                   OR COALESCE(regimen_fiscal, '') <> ''
+                   OR COALESCE(uso_cfdi, '') <> ''
+                   OR COALESCE(email, '') <> ''
+                """
+            )
+            cur.execute(
+                """
+                UPDATE datos_fiscales
+                SET
+                    rfc = CASE WHEN rfc_enc IS NOT NULL THEN NULL ELSE rfc END,
+                    razon_social = CASE WHEN razon_social_enc IS NOT NULL THEN NULL ELSE razon_social END,
+                    regimen_fiscal = CASE WHEN regimen_fiscal_enc IS NOT NULL THEN NULL ELSE regimen_fiscal END,
+                    uso_cfdi = CASE WHEN uso_cfdi_enc IS NOT NULL THEN NULL ELSE uso_cfdi END,
+                    email = CASE WHEN email_enc IS NOT NULL THEN NULL ELSE email END
+                """
+            )
+
+    conn.commit()
+    _SENSITIVE_SCHEMA_INITIALIZED = True
+
+
+def _direccion_text_expr(alias="dc"):
+    return f"COALESCE(decrypt_sensitive_text({alias}.direccion_texto_enc), {alias}.direccion_texto, '')"
 
 
 ESTADOS_PEDIDO = {"recibido", "en_preparacion", "listo", "en_camino", "entregado", "cancelado"}
@@ -162,6 +331,7 @@ def _seleccionar_repartidor_para_area_cur(cur, area_pedido):
 
 
 def _auto_asignar_repartidor_pedido_cur(cur, pedido_id, asignado_por="sistema_auto"):
+    direccion_expr = _direccion_text_expr("dc")
     cur.execute(
         """
         SELECT ar.asignacion_id, ar.pedido_id, ar.repartidor_usuario, ar.asignado_por, ar.asignado_en, ar.activo
@@ -176,11 +346,11 @@ def _auto_asignar_repartidor_pedido_cur(cur, pedido_id, asignado_por="sistema_au
         return ya_asignado
 
     cur.execute(
-        """
+        f"""
         SELECT
             p.pedido_id,
             p.estado,
-            COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000')) AS area_entrega
+            COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING({direccion_expr} FROM '([0-9]{{5}})'), ''), '00000')) AS area_entrega
         FROM pedidos p
         LEFT JOIN direcciones_cliente dc ON dc.direccion_id = p.direccion_id
         WHERE p.pedido_id = %s
@@ -1815,6 +1985,188 @@ def _asegurar_columnas_clientes_y_direcciones(conn):
         )
 
 
+def guardar_direccion_cliente(
+    cliente_id,
+    lat=None,
+    lng=None,
+    alias=None,
+    direccion_texto=None,
+    codigo_postal=None,
+    referencia=None,
+    principal=True,
+):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_columnas_clientes_y_direcciones(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if _sensitive_encryption_enabled():
+                cur.execute(
+                    """
+                    INSERT INTO direcciones_cliente (
+                        cliente_id,
+                        latitud,
+                        longitud,
+                        alias,
+                        direccion_texto,
+                        codigo_postal,
+                        referencia,
+                        principal,
+                        actualizado_en,
+                        latitud_enc,
+                        longitud_enc,
+                        direccion_texto_enc,
+                        referencia_enc
+                    )
+                    VALUES (
+                        %s,
+                        NULL,
+                        NULL,
+                        %s,
+                        '',
+                        %s,
+                        NULL,
+                        %s,
+                        NOW(),
+                        encrypt_sensitive_text(%s::TEXT),
+                        encrypt_sensitive_text(%s::TEXT),
+                        encrypt_sensitive_text(%s),
+                        encrypt_sensitive_text(%s)
+                    )
+                    RETURNING direccion_id
+                    """,
+                    (
+                        cliente_id,
+                        alias,
+                        codigo_postal,
+                        bool(principal),
+                        None if lat is None else str(lat),
+                        None if lng is None else str(lng),
+                        direccion_texto,
+                        referencia,
+                    ),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO direcciones_cliente (
+                        cliente_id,
+                        latitud,
+                        longitud,
+                        alias,
+                        direccion_texto,
+                        codigo_postal,
+                        referencia,
+                        principal,
+                        actualizado_en
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    RETURNING direccion_id
+                    """,
+                    (
+                        cliente_id,
+                        lat,
+                        lng,
+                        alias,
+                        direccion_texto,
+                        codigo_postal,
+                        referencia,
+                        bool(principal),
+                    ),
+                )
+
+            row = cur.fetchone() or {}
+            conn.commit()
+            return row.get("direccion_id")
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def _guardar_datos_fiscales_cliente_cur(cur, cliente_id, datos_fiscales):
+    if _sensitive_encryption_enabled():
+        cur.execute(
+            """
+            INSERT INTO datos_fiscales (
+                cliente_id,
+                rfc,
+                razon_social,
+                regimen_fiscal,
+                uso_cfdi,
+                email,
+                actualizado_en,
+                rfc_enc,
+                razon_social_enc,
+                regimen_fiscal_enc,
+                uso_cfdi_enc,
+                email_enc
+            )
+            VALUES (
+                %s,
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                NOW(),
+                encrypt_sensitive_text(%s),
+                encrypt_sensitive_text(%s),
+                encrypt_sensitive_text(%s),
+                encrypt_sensitive_text(%s),
+                encrypt_sensitive_text(%s)
+            )
+            RETURNING fiscal_id
+            """,
+            (
+                cliente_id,
+                datos_fiscales.get("rfc"),
+                datos_fiscales.get("razon_social"),
+                datos_fiscales.get("regimen_fiscal"),
+                datos_fiscales.get("uso_cfdi"),
+                datos_fiscales.get("email"),
+            ),
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO datos_fiscales (cliente_id, rfc, razon_social, regimen_fiscal, uso_cfdi, email, actualizado_en)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            RETURNING fiscal_id
+            """,
+            (
+                cliente_id,
+                datos_fiscales.get("rfc"),
+                datos_fiscales.get("razon_social"),
+                datos_fiscales.get("regimen_fiscal"),
+                datos_fiscales.get("uso_cfdi"),
+                datos_fiscales.get("email"),
+            ),
+        )
+
+    return (cur.fetchone() or {}).get("fiscal_id")
+
+
+def guardar_datos_fiscales_cliente(cliente_id, datos_fiscales):
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            fiscal_id = _guardar_datos_fiscales_cliente_cur(cur, cliente_id=cliente_id, datos_fiscales=datos_fiscales or {})
+        conn.commit()
+        return fiscal_id
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
 def actualizar_cliente_basico(cliente_id, nombre=None, apellidos=None, genero_trato=None):
     conn = None
     try:
@@ -2046,22 +2398,11 @@ def crear_pedido_completo(cliente_id, datos_temp):
             if requiere_factura and not datos_fiscales_id:
                 datos_fiscales = datos.get("datos_fiscales") if isinstance(datos.get("datos_fiscales"), dict) else {}
                 if datos_fiscales:
-                    cur.execute(
-                        """
-                        INSERT INTO datos_fiscales (cliente_id, rfc, razon_social, regimen_fiscal, uso_cfdi, email, actualizado_en)
-                        VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                        RETURNING fiscal_id
-                        """,
-                        (
-                            cliente_id,
-                            datos_fiscales.get("rfc"),
-                            datos_fiscales.get("razon_social"),
-                            datos_fiscales.get("regimen_fiscal"),
-                            datos_fiscales.get("uso_cfdi"),
-                            datos_fiscales.get("email"),
-                        ),
+                    datos_fiscales_id = _guardar_datos_fiscales_cliente_cur(
+                        cur,
+                        cliente_id=cliente_id,
+                        datos_fiscales=datos_fiscales,
                     )
-                    datos_fiscales_id = (cur.fetchone() or {}).get("fiscal_id")
 
             # Generar codigo en SQL (fallback a helper Python si no existe funcion SQL).
             try:
@@ -2368,16 +2709,18 @@ def obtener_pedidos(
             clauses.append("p.creado_en < (%s::date + INTERVAL '1 day')")
             params.append(str(fecha_hasta).strip())
 
+        direccion_expr = _direccion_text_expr("dc")
+
         search = str(busqueda or "").strip()
         if search:
             clauses.append(
-                """
+                f"""
                 (
                     CAST(p.pedido_id AS TEXT) ILIKE %s
                     OR COALESCE(c.whatsapp_id, '') ILIKE %s
                     OR COALESCE(c.nombre, '') ILIKE %s
                     OR COALESCE(c.apellidos, '') ILIKE %s
-                    OR COALESCE(dc.direccion_texto, '') ILIKE %s
+                    OR COALESCE({direccion_expr}, '') ILIKE %s
                 )
                 """
             )
@@ -2405,8 +2748,8 @@ def obtener_pedidos(
                 c.whatsapp_id,
                 c.nombre,
                 c.apellidos,
-                COALESCE(dc.direccion_texto, 'Sin direccion') AS direccion_entrega,
-                COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000') AS codigo_postal,
+                COALESCE(NULLIF(MAX({direccion_expr}), ''), 'Sin direccion') AS direccion_entrega,
+                COALESCE(NULLIF(SUBSTRING(MAX({direccion_expr}) FROM '([0-9]{{5}})'), ''), '00000') AS codigo_postal,
                 COALESCE(SUM(dp.cantidad), 0)::INT AS cantidad_total,
                 COALESCE(
                     json_agg(
@@ -2427,7 +2770,7 @@ def obtener_pedidos(
             LEFT JOIN detalle_pedido dp ON dp.pedido_id = p.pedido_id
             LEFT JOIN productos pr ON pr.producto_id = dp.producto_id
             {where_sql}
-            GROUP BY p.pedido_id, p.estado, p.total, p.creado_en, c.cliente_id, c.whatsapp_id, c.nombre, c.apellidos, dc.direccion_texto
+            GROUP BY p.pedido_id, p.estado, p.total, p.creado_en, c.cliente_id, c.whatsapp_id, c.nombre, c.apellidos
             ORDER BY p.creado_en DESC
             {limit_sql}
         """
@@ -2687,15 +3030,16 @@ def asignar_pedido_repartidor(pedido_id, repartidor_usuario, asignado_por=None):
         conn = get_connection()
         _asegurar_tablas_operacion_pedidos(conn)
 
-        area_expr = "COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000'))"
+        direccion_expr = _direccion_text_expr("dc")
+        area_expr = f"COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING({direccion_expr} FROM '([0-9]{{5}})'), ''), '00000'))"
 
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                """
+                f"""
                 SELECT
                     p.pedido_id,
                     p.estado,
-                    COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000')) AS area_entrega
+                    {area_expr} AS area_entrega
                 FROM pedidos p
                 LEFT JOIN direcciones_cliente dc ON dc.direccion_id = p.direccion_id
                 WHERE p.pedido_id = %s
@@ -2772,7 +3116,8 @@ def obtener_pedidos_repartidor(repartidor_usuario=None, area_entrega=None):
         _asegurar_tablas_operacion_pedidos(conn)
 
         params = ["listo", "en_camino"]  # type: list[object]
-        area_expr = "COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{5})'), ''), '00000'))"
+        direccion_expr = _direccion_text_expr("dc")
+        area_expr = f"COALESCE(NULLIF(TRIM(dc.alias), ''), NULLIF(TRIM(dc.codigo_postal), ''), COALESCE(NULLIF(SUBSTRING({direccion_expr} FROM '([0-9]{{5}})'), ''), '00000'))"
         where_assignment = ""
         area_filter = _normalizar_area_entrega(area_entrega)
         if repartidor_usuario:
@@ -2799,9 +3144,9 @@ def obtener_pedidos_repartidor(repartidor_usuario=None, area_entrega=None):
                 c.nombre,
                 c.apellidos,
                 c.whatsapp_id,
-                COALESCE(dc.direccion_texto, 'Sin direccion') AS direccion_entrega,
-                COALESCE(NULLIF(SUBSTRING(COALESCE(dc.direccion_texto, '') FROM '([0-9]{{5}})'), ''), '00000') AS codigo_postal,
-                {area_expr} AS area_entrega,
+                COALESCE(NULLIF(MAX({direccion_expr}), ''), 'Sin direccion') AS direccion_entrega,
+                COALESCE(NULLIF(SUBSTRING(MAX({direccion_expr}) FROM '([0-9]{{5}})'), ''), '00000') AS codigo_postal,
+                MAX({area_expr}) AS area_entrega,
                 ar.repartidor_usuario,
                 COALESCE(
                     json_agg(
@@ -2821,7 +3166,7 @@ def obtener_pedidos_repartidor(repartidor_usuario=None, area_entrega=None):
             LEFT JOIN asignaciones_reparto ar ON ar.pedido_id = p.pedido_id AND ar.activo = TRUE
             WHERE p.estado IN (%s, %s)
             {where_assignment}
-            GROUP BY p.pedido_id, p.estado, p.total, p.metodo_pago, p.creado_en, c.nombre, c.apellidos, c.whatsapp_id, dc.direccion_texto, dc.alias, dc.codigo_postal, ar.repartidor_usuario
+            GROUP BY p.pedido_id, p.estado, p.total, p.metodo_pago, p.creado_en, c.nombre, c.apellidos, c.whatsapp_id, ar.repartidor_usuario
             ORDER BY p.creado_en ASC
         """
 
@@ -3237,6 +3582,9 @@ def obtener_reporte_ventas_profesional(periodo="dia", fecha_base=None, busqueda=
             costo_estimado_total = round(sum(float(r.get("costo_estimado") or 0) for r in rows), 2)
             utilidad_estimada_total = round(total_ventas - costo_estimado_total, 2)
             margen_estimado_pct = round((utilidad_estimada_total / total_ventas) * 100, 2) if total_ventas > 0 else 0.0
+            reserva_impuestos_pct = 16.0
+            reserva_impuestos_monto = round((total_ventas * reserva_impuestos_pct) / 100, 2)
+            utilidad_neta_estimada = round(utilidad_estimada_total - reserva_impuestos_monto, 2)
 
             prep_vals = [float(r.get("rapidez_preparacion_min")) for r in rows if r.get("rapidez_preparacion_min") is not None]
             entrega_vals = [float(r.get("rapidez_entrega_min")) for r in rows if r.get("rapidez_entrega_min") is not None]
@@ -3253,6 +3601,9 @@ def obtener_reporte_ventas_profesional(periodo="dia", fecha_base=None, busqueda=
                     "clientes_unicos": clientes_unicos,
                     "costo_estimado_total": costo_estimado_total,
                     "utilidad_estimada_total": utilidad_estimada_total,
+                    "reserva_impuestos_pct": reserva_impuestos_pct,
+                    "reserva_impuestos_monto": reserva_impuestos_monto,
+                    "utilidad_neta_estimada": utilidad_neta_estimada,
                     "margen_estimado_pct": margen_estimado_pct,
                     "rapidez_preparacion_promedio_min": rapidez_prep_promedio,
                     "rapidez_entrega_promedio_min": rapidez_entrega_promedio,
@@ -3300,6 +3651,7 @@ def obtener_rentabilidad_productos(limit=30):
                     GREATEST(COUNT(r.insumo_id) - COUNT(ci.insumo_id), 0)::INT AS componentes_sin_costo,
                     CASE
                         WHEN COUNT(r.insumo_id) = 0 THEN 'sin_receta'
+                        WHEN COUNT(ci.insumo_id) = 0 THEN 'sin_costos'
                         WHEN COUNT(ci.insumo_id) = COUNT(r.insumo_id) THEN 'completo'
                         ELSE 'incompleto'
                     END AS calidad_costo
@@ -3312,6 +3664,72 @@ def obtener_rentabilidad_productos(limit=30):
                 WHERE p.activo = TRUE
                 GROUP BY p.producto_id, p.nombre, p.variante, p.precio
                 ORDER BY margen_unitario DESC, p.nombre, p.variante
+                LIMIT %s
+                """,
+                (int(limit),),
+            )
+            return cur.fetchall()
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_diagnostico_costos_receta(limit=200):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tablas_inventario_real(conn)
+        _asegurar_tabla_compras_insumos(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                WITH costo_insumo AS (
+                    SELECT DISTINCT ON (c.insumo_id)
+                        c.insumo_id,
+                        COALESCE(c.costo_total / NULLIF(c.cantidad, 0), 0)::NUMERIC(12,4) AS costo_unitario
+                    FROM compras_insumos c
+                    WHERE c.costo_total IS NOT NULL
+                      AND c.cantidad > 0
+                    ORDER BY c.insumo_id, c.creado_en DESC
+                )
+                SELECT
+                    p.producto_id,
+                    p.nombre,
+                    p.variante,
+                    COUNT(r.insumo_id)::INT AS componentes_activos,
+                    COUNT(ci.insumo_id)::INT AS componentes_con_costo,
+                    GREATEST(COUNT(r.insumo_id) - COUNT(ci.insumo_id), 0)::INT AS componentes_sin_costo,
+                    ARRAY_REMOVE(
+                        ARRAY_AGG(i.nombre ORDER BY i.nombre)
+                            FILTER (WHERE r.insumo_id IS NOT NULL AND ci.insumo_id IS NULL),
+                        NULL
+                    ) AS insumos_sin_costo
+                    ,
+                    COALESCE(
+                        JSON_AGG(
+                            JSON_BUILD_OBJECT(
+                                'insumo_id', i.insumo_id,
+                                'nombre', i.nombre
+                            )
+                            ORDER BY i.nombre
+                        ) FILTER (WHERE r.insumo_id IS NOT NULL AND ci.insumo_id IS NULL),
+                        '[]'::json
+                    ) AS insumos_sin_costo_detalle
+                FROM productos p
+                LEFT JOIN recetas_producto_insumo r
+                    ON r.producto_id = p.producto_id
+                   AND r.activo = TRUE
+                LEFT JOIN insumos i
+                    ON i.insumo_id = r.insumo_id
+                LEFT JOIN costo_insumo ci
+                    ON ci.insumo_id = r.insumo_id
+                WHERE p.activo = TRUE
+                GROUP BY p.producto_id, p.nombre, p.variante
+                HAVING COUNT(r.insumo_id) > 0
+                   AND COUNT(ci.insumo_id) < COUNT(r.insumo_id)
+                ORDER BY componentes_sin_costo DESC, p.nombre, p.variante
                 LIMIT %s
                 """,
                 (int(limit),),
@@ -3430,10 +3848,12 @@ def obtener_contexto_cliente(cliente_id):
                         }
                     )
 
+            direccion_expr = _direccion_text_expr("dc")
+
             if has_metodo_entrega:
                 cur.execute(
-                    """
-                    SELECT dc.direccion_id, dc.direccion_texto, dc.codigo_postal
+                    f"""
+                    SELECT dc.direccion_id, {direccion_expr} AS direccion_texto, dc.codigo_postal
                     FROM pedidos p
                     JOIN direcciones_cliente dc ON dc.direccion_id = p.direccion_id
                     WHERE p.cliente_id = %s
@@ -3447,8 +3867,8 @@ def obtener_contexto_cliente(cliente_id):
                 )
             else:
                 cur.execute(
-                    """
-                    SELECT dc.direccion_id, dc.direccion_texto, dc.codigo_postal
+                    f"""
+                    SELECT dc.direccion_id, {direccion_expr} AS direccion_texto, dc.codigo_postal
                     FROM pedidos p
                     JOIN direcciones_cliente dc ON dc.direccion_id = p.direccion_id
                     WHERE p.cliente_id = %s
@@ -3499,7 +3919,8 @@ def obtener_alertas_inventario():
                     i.stock_actual,
                     i.stock_minimo,
                     (i.stock_minimo - i.stock_actual)::NUMERIC(10,3) AS faltante,
-                    pv.nombre AS proveedor
+                    pv.nombre AS proveedor,
+                    pv.email AS proveedor_email
                 FROM insumos i
                 LEFT JOIN proveedores pv ON pv.proveedor_id = i.proveedor_id
                 WHERE i.stock_actual < i.stock_minimo
@@ -3531,15 +3952,16 @@ def obtener_inventario(texto=None, estado_stock=None, proveedor=None, limit=None
                         COALESCE(i.nombre, '') ILIKE %s
                         OR COALESCE(i.unidad_medida, '') ILIKE %s
                         OR COALESCE(pv.nombre, '') ILIKE %s
+                        OR COALESCE(pv.email, '') ILIKE %s
                     )
                     """
                 )
-                params.extend([pattern, pattern, pattern])
+                params.extend([pattern, pattern, pattern, pattern])
 
             prov = str(proveedor or "").strip()
             if prov:
-                filtros.append("COALESCE(pv.nombre, '') ILIKE %s")
-                params.append(f"%{prov}%")
+                filtros.append("(COALESCE(pv.nombre, '') ILIKE %s OR COALESCE(pv.email, '') ILIKE %s)")
+                params.extend([f"%{prov}%", f"%{prov}%"])
 
             estado = str(estado_stock or "").strip().lower()
             if estado == "bajo":
@@ -3569,7 +3991,8 @@ def obtener_inventario(texto=None, estado_stock=None, proveedor=None, limit=None
                     i.stock_actual,
                     i.stock_minimo,
                     (i.stock_actual - i.stock_minimo)::NUMERIC(12,3) AS margen_stock,
-                    pv.nombre AS proveedor
+                    pv.nombre AS proveedor,
+                    pv.email AS proveedor_email
                 FROM insumos i
                 LEFT JOIN proveedores pv ON pv.proveedor_id = i.proveedor_id
                 {where_sql}
@@ -5321,6 +5744,266 @@ def crear_log_notificacion(payload):
     except Exception as exc:
         if conn:
             conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def _asegurar_tabla_logs_sistema(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS logs_sistema (
+                id BIGSERIAL PRIMARY KEY,
+                timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+                nivel VARCHAR(10) NOT NULL,
+                componente VARCHAR(40) NOT NULL,
+                funcion VARCHAR(120),
+                mensaje TEXT NOT NULL,
+                detalle TEXT,
+                whatsapp_id VARCHAR(30),
+                pedido_id BIGINT,
+                ip_origen VARCHAR(64),
+                duracion_ms INTEGER,
+                resuelto BOOLEAN NOT NULL DEFAULT FALSE,
+                resuelto_en TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_logs_sistema_timestamp
+                ON logs_sistema (timestamp DESC)
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_logs_sistema_nivel
+                ON logs_sistema (nivel)
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_logs_sistema_componente
+                ON logs_sistema (componente)
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_logs_sistema_resuelto
+                ON logs_sistema (resuelto)
+            """
+        )
+        conn.commit()
+
+
+def insertar_log_sistema(
+    nivel,
+    componente,
+    funcion,
+    mensaje,
+    detalle=None,
+    whatsapp_id=None,
+    pedido_id=None,
+    ip_origen=None,
+    duracion_ms=None,
+):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_logs_sistema(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO logs_sistema
+                    (nivel, componente, funcion, mensaje, detalle,
+                     whatsapp_id, pedido_id, ip_origen, duracion_ms)
+                VALUES
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, timestamp, nivel, componente, funcion, mensaje,
+                          detalle, whatsapp_id, pedido_id, ip_origen, duracion_ms, resuelto
+                """,
+                (
+                    str((nivel or "INFO")).upper()[:10],
+                    str((componente or "app")).lower()[:40],
+                    (str(funcion)[:120] if funcion else None),
+                    str(mensaje or "")[:500],
+                    (str(detalle) if detalle is not None else None),
+                    (str(whatsapp_id)[:30] if whatsapp_id else None),
+                    (int(pedido_id) if pedido_id not in (None, "") else None),
+                    (str(ip_origen)[:64] if ip_origen else None),
+                    (int(duracion_ms) if duracion_ms not in (None, "") else None),
+                ),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def obtener_logs_sistema(nivel=None, componente=None, limit=50, offset=0, solo_pendientes=False, q=None):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_logs_sistema(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            where_parts = []
+            params = []
+
+            nivel_norm = (str(nivel or "").strip().upper())
+            if nivel_norm:
+                where_parts.append("nivel = %s")
+                params.append(nivel_norm)
+
+            componente_norm = (str(componente or "").strip().lower())
+            if componente_norm:
+                where_parts.append("componente = %s")
+                params.append(componente_norm)
+
+            if solo_pendientes:
+                where_parts.append("resuelto = FALSE")
+                where_parts.append("nivel IN ('ERROR', 'CRITICAL')")
+
+            q_norm = (str(q or "").strip())
+            if q_norm:
+                where_parts.append("(mensaje ILIKE %s OR COALESCE(detalle, '') ILIKE %s)")
+                like = f"%{q_norm}%"
+                params.extend([like, like])
+
+            where_sql = ""
+            if where_parts:
+                where_sql = " WHERE " + " AND ".join(where_parts)
+
+            limit_int = max(1, min(500, int(limit)))
+            offset_int = max(0, int(offset))
+            params.extend([limit_int, offset_int])
+
+            cur.execute(
+                f"""
+                SELECT id, timestamp, nivel, componente, funcion,
+                       mensaje, detalle, whatsapp_id, pedido_id,
+                       ip_origen, duracion_ms, resuelto, resuelto_en
+                FROM logs_sistema
+                {where_sql}
+                ORDER BY timestamp DESC
+                LIMIT %s OFFSET %s
+                """,
+                params,
+            )
+            return cur.fetchall()
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def contar_logs_sistema(nivel=None, componente=None, solo_pendientes=False, q=None):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_logs_sistema(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            where_parts = []
+            params = []
+
+            nivel_norm = (str(nivel or "").strip().upper())
+            if nivel_norm:
+                where_parts.append("nivel = %s")
+                params.append(nivel_norm)
+
+            componente_norm = (str(componente or "").strip().lower())
+            if componente_norm:
+                where_parts.append("componente = %s")
+                params.append(componente_norm)
+
+            if solo_pendientes:
+                where_parts.append("resuelto = FALSE")
+                where_parts.append("nivel IN ('ERROR', 'CRITICAL')")
+
+            q_norm = (str(q or "").strip())
+            if q_norm:
+                where_parts.append("(mensaje ILIKE %s OR COALESCE(detalle, '') ILIKE %s)")
+                like = f"%{q_norm}%"
+                params.extend([like, like])
+
+            where_sql = ""
+            if where_parts:
+                where_sql = " WHERE " + " AND ".join(where_parts)
+
+            cur.execute(f"SELECT COUNT(*)::INT AS total FROM logs_sistema{where_sql}", params)
+            row = cur.fetchone() or {}
+            return int(row.get("total") or 0)
+    except Exception:
+        return 0
+    finally:
+        if conn:
+            conn.close()
+
+
+def marcar_log_sistema_resuelto(log_id):
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_logs_sistema(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                UPDATE logs_sistema
+                SET resuelto = TRUE,
+                    resuelto_en = COALESCE(resuelto_en, NOW())
+                WHERE id = %s
+                RETURNING id, resuelto, resuelto_en
+                """,
+                (int(log_id),),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            if not row:
+                return {"error": "Log no encontrado"}
+            return row
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return {"error": str(exc)}
+    finally:
+        if conn:
+            conn.close()
+
+
+def resumen_logs_sistema():
+    conn = None
+    try:
+        conn = get_connection()
+        _asegurar_tabla_logs_sistema(conn)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE nivel = 'ERROR' AND timestamp >= NOW() - INTERVAL '24 hours')::INT AS errores_24h,
+                    COUNT(*) FILTER (WHERE nivel = 'CRITICAL' AND timestamp >= NOW() - INTERVAL '24 hours')::INT AS criticos_24h,
+                    COUNT(*) FILTER (WHERE nivel = 'WARNING' AND timestamp >= NOW() - INTERVAL '24 hours')::INT AS warnings_24h,
+                    COUNT(*) FILTER (WHERE resuelto = FALSE AND nivel IN ('ERROR', 'CRITICAL'))::INT AS pendientes,
+                    MAX(timestamp) FILTER (WHERE nivel IN ('ERROR', 'CRITICAL')) AS ultimo_error
+                FROM logs_sistema
+                """
+            )
+            row = cur.fetchone() or {}
+            return {
+                "errores_24h": int(row.get("errores_24h") or 0),
+                "criticos_24h": int(row.get("criticos_24h") or 0),
+                "warnings_24h": int(row.get("warnings_24h") or 0),
+                "pendientes": int(row.get("pendientes") or 0),
+                "ultimo_error": row.get("ultimo_error"),
+            }
+    except Exception as exc:
         return {"error": str(exc)}
     finally:
         if conn:

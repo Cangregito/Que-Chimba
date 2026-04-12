@@ -6,6 +6,7 @@ import importlib
 import logging
 import difflib
 import json
+import time
 import unicodedata
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -498,6 +499,12 @@ def _get_timeout_env(name: str, default: float) -> float:
 LLM_REMOTE_TIMEOUT_SEC = _get_timeout_env("LLM_REMOTE_TIMEOUT_SEC", 20.0)
 LLM_LOCAL_TIMEOUT_SEC = _get_timeout_env("LLM_LOCAL_TIMEOUT_SEC", 30.0)
 LLM_STYLE_TIMEOUT_SEC = _get_timeout_env("LLM_STYLE_TIMEOUT_SEC", 3.5)
+LLM_LOCAL_RETRIES = int(_get_timeout_env("LLM_LOCAL_RETRIES", 2))
+LLM_LOCAL_RETRY_BACKOFF_SEC = _get_timeout_env("LLM_LOCAL_RETRY_BACKOFF_SEC", 0.4)
+LLM_LOCAL_FAIL_COOLDOWN_SEC = _get_timeout_env("LLM_LOCAL_FAIL_COOLDOWN_SEC", 20.0)
+
+_llm_local_failures = 0
+_llm_local_cooldown_until = 0.0
 
 
 def _now_iso():
@@ -509,6 +516,34 @@ def _normalizar_texto(texto):
 	norm = unicodedata.normalize("NFKD", raw)
 	without_accents = "".join(ch for ch in norm if not unicodedata.combining(ch))
 	return re.sub(r"\s+", " ", without_accents).strip()
+
+
+def _es_comando_reinicio(texto: str) -> bool:
+	t = _normalizar_texto(texto)
+	if not t:
+		return False
+	if t in {
+		"inicio",
+		"iniciar",
+		"reiniciar",
+		"reinicio",
+		"reinicia",
+		"reiniciar pedido",
+		"reinicar pedido",
+		"reiniciar conversacion",
+		"reiniciar la conversacion",
+		"reiniciar chat",
+		"empezar de nuevo",
+		"nuevo pedido",
+		"reset",
+	}:
+		return True
+	return (
+		"reiniciar pedido" in t
+		or "reinicar pedido" in t
+		or "reiniciar conversacion" in t
+		or "empezar de nuevo" in t
+	)
 
 
 def _es_error(value):
@@ -876,17 +911,15 @@ def _pulir_texto_con_ia(texto: str, datos_temp: Dict[str, Any]) -> str:
 
 	if _llm_local_disponible():
 		try:
-			resp = requests.post(
-				f"{LLM_LOCAL_BASE_URL}/api/generate",
-				json={
+			resp = _post_ollama_generate(
+				{
 					"model": LLM_LOCAL_MODEL,
 					"prompt": prompt,
 					"stream": False,
 					"options": {"temperature": 0.55},
 				},
-				timeout=LLM_STYLE_TIMEOUT_SEC,
+				LLM_STYLE_TIMEOUT_SEC,
 			)
-			resp.raise_for_status()
 			body = resp.json()
 			candidato = _validar_candidato((body.get("response") or "").strip())
 			if candidato:
@@ -1181,8 +1214,69 @@ def _llm_disponible() -> bool:
 	return bool(LLM_FALLBACK_ENABLED and LLM_API_KEY and requests is not None)
 
 
+def _llm_local_en_cooldown() -> bool:
+	global _llm_local_cooldown_until
+	if _llm_local_cooldown_until <= 0:
+		return False
+	now = time.monotonic()
+	if now >= _llm_local_cooldown_until:
+		_llm_local_cooldown_until = 0.0
+		return False
+	return True
+
+
 def _llm_local_disponible() -> bool:
+	if _llm_local_en_cooldown():
+		return False
 	return bool(LLM_LOCAL_ENABLED and LLM_LOCAL_MODEL and requests is not None)
+
+
+def _registrar_exito_llm_local() -> None:
+	global _llm_local_failures, _llm_local_cooldown_until
+	if _llm_local_failures or _llm_local_cooldown_until:
+		_llm_local_failures = 0
+		_llm_local_cooldown_until = 0.0
+
+
+def _registrar_fallo_llm_local(exc: Exception) -> None:
+	global _llm_local_failures, _llm_local_cooldown_until
+	_llm_local_failures += 1
+	retries = max(1, LLM_LOCAL_RETRIES)
+	if LLM_LOCAL_FAIL_COOLDOWN_SEC > 0 and _llm_local_failures >= retries:
+		_llm_local_cooldown_until = time.monotonic() + LLM_LOCAL_FAIL_COOLDOWN_SEC
+		logger.warning(
+			"LLM local entra en cooldown %.1fs tras %s fallos consecutivos: %s",
+			LLM_LOCAL_FAIL_COOLDOWN_SEC,
+			_llm_local_failures,
+			exc,
+		)
+	else:
+		logger.info("LLM local fallo %s/%s: %s", _llm_local_failures, retries, exc)
+
+
+def _post_ollama_generate(payload: Dict[str, Any], timeout_sec: float):
+	if requests is None:
+		return None
+	last_exc: Optional[Exception] = None
+	retries = max(1, LLM_LOCAL_RETRIES)
+	for attempt in range(1, retries + 1):
+		try:
+			resp = requests.post(
+				f"{LLM_LOCAL_BASE_URL}/api/generate",
+				json=payload,
+				timeout=timeout_sec,
+			)
+			resp.raise_for_status()
+			_registrar_exito_llm_local()
+			return resp
+		except Exception as exc:
+			last_exc = exc
+			_registrar_fallo_llm_local(exc)
+			if attempt < retries and LLM_LOCAL_RETRY_BACKOFF_SEC > 0:
+				time.sleep(LLM_LOCAL_RETRY_BACKOFF_SEC * attempt)
+	if last_exc:
+		raise last_exc
+	return None
 
 
 def _parsear_bool_flexible(value: Any) -> Optional[bool]:
@@ -1289,12 +1383,7 @@ def _extraer_slots_llm_local(texto: str) -> Dict[str, Any]:
 	}
 
 	try:
-		resp = requests.post(
-			f"{LLM_LOCAL_BASE_URL}/api/generate",
-			json=payload,
-			timeout=LLM_LOCAL_TIMEOUT_SEC,
-		)
-		resp.raise_for_status()
+		resp = _post_ollama_generate(payload, LLM_LOCAL_TIMEOUT_SEC)
 		body = resp.json()
 		content = (body.get("response") or "{}").strip()
 		data = json.loads(content)
@@ -1611,31 +1700,26 @@ def _guardar_direccion_en_db(cliente_id, lat=None, lng=None, codigo_postal=None,
 			direccion = "Direccion compartida por cliente"
 	if cp and "cp" not in _normalizar_texto(direccion):
 		direccion = f"{direccion} CP:{cp}"
-	data = {
-		"cliente_id": cliente_id,
-		"latitud": lat,
-		"longitud": lng,
-		"alias": "Direccion WhatsApp",
-		"direccion_texto": direccion,
-		"codigo_postal": cp,
-		"referencia": "Compartida por cliente en WhatsApp",
-		"principal": True,
-		"actualizado_en": datetime.utcnow(),
-	}
-	return _insert_dinamico("direcciones_cliente", data)
+	resultado = db.guardar_direccion_cliente(
+		cliente_id=cliente_id,
+		lat=lat,
+		lng=lng,
+		alias="Direccion WhatsApp",
+		direccion_texto=direccion,
+		codigo_postal=cp,
+		referencia="Compartida por cliente en WhatsApp",
+		principal=True,
+	)
+	if isinstance(resultado, dict) and resultado.get("error"):
+		return None
+	return resultado
 
 
 def _guardar_datos_fiscales_en_db(cliente_id, datos_fiscales):
-	data = {
-		"cliente_id": cliente_id,
-		"rfc": datos_fiscales.get("rfc"),
-		"razon_social": datos_fiscales.get("razon_social"),
-		"regimen_fiscal": datos_fiscales.get("regimen_fiscal"),
-		"uso_cfdi": datos_fiscales.get("uso_cfdi"),
-		"email": datos_fiscales.get("email"),
-		"actualizado_en": datetime.utcnow(),
-	}
-	_insert_dinamico("datos_fiscales", data)
+	resultado = db.guardar_datos_fiscales_cliente(cliente_id=cliente_id, datos_fiscales=datos_fiscales or {})
+	if isinstance(resultado, dict) and resultado.get("error"):
+		return None
+	return resultado
 
 
 def _actualizar_pedido_opcional(pedido_id, payload):
@@ -2746,6 +2830,7 @@ def handle_input_inesperado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 		opciones = "1) Efectivo\n2) Tarjeta"
 	else:
 		opciones = "Responde con una opcion valida del menu que te mostre."
+	opciones = f"{opciones}\n\nSi quieres empezar de nuevo escribe: Reiniciar pedido"
 	response = _armar_respuesta_comercial(texto, opciones, datos_temp)
 	out = _respuesta_to_handler_output(response, estado)
 	out["datos_temp"] = datos_temp
@@ -2790,6 +2875,20 @@ def process_message(whatsapp_id, tipo, texto, audio_path=None, lat=None, lng=Non
 			}
 
 		entrada = _normalizar_texto(mensaje)
+		if _es_comando_reinicio(entrada):
+			datos_temp = {}
+			_guardar_sesion(whatsapp_id, "inicio", datos_temp)
+			response = _armar_respuesta_comercial(
+				"Listo, reinicie tu pedido y tu conversacion desde cero.",
+				"1) Quiero pedir empanadas\n2) Es para evento\n3) Ver menu y precios",
+				datos_temp,
+			)
+			return {
+				"texto": str(response.get("contenido") or ""),
+				"audio_path": response.get("audio_filename"),
+				"nuevo_estado": "inicio",
+			}
+
 		datos_temp_local = _enriquecer_datos_desde_entrada(entrada, datos_temp, usar_llm=False)
 		usar_llm = _deberia_usar_llm(estado, entrada, datos_temp_local, audio_attempted)
 		if usar_llm and _faltan_slots_clave_por_estado(estado, datos_temp_local):
@@ -2846,7 +2945,7 @@ def process_message(whatsapp_id, tipo, texto, audio_path=None, lat=None, lng=Non
 
 	except Exception:
 		return {
-			"texto": "Ay parce, tuvimos un problemita. ¿Puede intentarlo en un momento?",
+			"texto": "Ay parce, tuvimos un problemita. Intentelo en un momento. Si quiere empezar de nuevo escriba: Reiniciar pedido.",
 			"audio_path": None,
 			"nuevo_estado": "confirmacion",
 		}
@@ -3009,6 +3108,16 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 			)
 
 		# Palabras clave globales.
+		if _es_comando_reinicio(entrada):
+			estado = "inicio"
+			datos_temp = {}
+			_guardar_sesion(whatsapp_id, estado, datos_temp)
+			return _armar_respuesta_comercial(
+				"Listo, reinicie tu pedido y tu conversacion desde cero.",
+				"1) Quiero pedir empanadas\n2) Es para evento\n3) Ver menu y precios",
+				datos_temp,
+			)
+
 		if "cancelar" in entrada:
 			estado = "inicio"
 			datos_temp = {}

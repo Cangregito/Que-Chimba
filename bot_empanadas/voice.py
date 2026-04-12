@@ -6,6 +6,7 @@ import uuid
 import importlib
 import asyncio
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
@@ -29,6 +30,34 @@ logger = logging.getLogger(__name__)
 
 AUDIO_TEMP_DIR = Path(__file__).resolve().parent / "audios_temp"
 AUDIO_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _parse_positive_int_env(name: str, default: int) -> int:
+    raw = (os.getenv(name, str(default)) or str(default)).strip()
+    try:
+        value = int(raw)
+        return value if value > 0 else default
+    except (TypeError, ValueError):
+        return default
+
+
+_AUDIO_TEMP_TTL_HOURS = _parse_positive_int_env("AUDIO_TEMP_TTL_HOURS", 24)
+
+
+def _cleanup_temp_audios(max_age_hours: int = _AUDIO_TEMP_TTL_HOURS) -> None:
+    cutoff_ts = max(1, max_age_hours) * 60 * 60
+    now = int(datetime.utcnow().timestamp())
+    for pattern in ("*.ogg", "*.mp3", "*.wav"):
+        for file_path in AUDIO_TEMP_DIR.glob(pattern):
+            try:
+                age = now - int(file_path.stat().st_mtime)
+                if age > cutoff_ts:
+                    file_path.unlink()
+            except OSError:
+                continue
+
+
+_cleanup_temp_audios()
 
 FRASES_COLOMBIANAS = {
     "bienvenida": [
@@ -444,6 +473,7 @@ def generar_audio_colombiano(estado: str, datos_dinamicos: Optional[Dict[str, An
 
 
 def _generar_audio_desde_texto(texto: str) -> str:
+    _cleanup_temp_audios()
     unique_id = str(uuid.uuid4())
     mp3_path = AUDIO_TEMP_DIR / f"{unique_id}.mp3"
     ogg_path = AUDIO_TEMP_DIR / f"{unique_id}.ogg"

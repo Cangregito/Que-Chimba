@@ -353,6 +353,10 @@
       background: var(--bg);
     }
 
+    .sistema-table-wrap {
+      max-height: none;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -742,6 +746,50 @@
       .form-grid.cols-3 {
         grid-template-columns: 1fr;
       }
+
+      #section-sistema table,
+      #section-sistema thead,
+      #section-sistema tbody,
+      #section-sistema th,
+      #section-sistema td,
+      #section-sistema tr {
+        display: block;
+      }
+
+      #section-sistema thead {
+        display: none;
+      }
+
+      #section-sistema tr {
+        border: 0.5px solid var(--line);
+        border-radius: var(--r-sm);
+        margin-bottom: 10px;
+        padding: 8px;
+        background: var(--bg);
+      }
+
+      #section-sistema td {
+        border: none;
+        border-bottom: 0.5px dashed var(--line);
+        padding: 7px 6px 7px 44%;
+        position: relative;
+        min-height: 28px;
+      }
+
+      #section-sistema td:last-child {
+        border-bottom: none;
+      }
+
+      #section-sistema td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 8px;
+        top: 7px;
+        width: 40%;
+        color: var(--text-2);
+        font-size: 12px;
+        font-weight: 500;
+      }
     }
   </style>
 </head>
@@ -756,6 +804,7 @@
       <nav class="nav" id="sidebar-nav">
         <button class="nav-item active" data-section="ventas" type="button"><span class="dot blue"></span>Ventas</button>
         <button class="nav-item" data-section="operacion" type="button"><span class="dot green"></span>Operacion DB</button>
+        <button class="nav-item" data-section="sistema" type="button"><span class="dot amber"></span>Sistema</button>
         <button class="nav-item" data-section="seguridad" type="button"><span class="dot red"></span>Seguridad</button>
         <button class="nav-item" data-section="campanas" type="button"><span class="dot amber"></span>Campañas</button>
         <button class="nav-item" data-section="inventario" type="button"><span class="dot darkgreen"></span>Inventario</button>
@@ -982,12 +1031,14 @@
                   <option value="">Todas</option>
                   <option value="completo">Completa</option>
                   <option value="incompleto">Incompleta</option>
+                  <option value="sin_costos">Sin costos</option>
                   <option value="sin_receta">Sin receta</option>
                 </select>
               </div>
               <div class="field" style="align-self:end; display:flex; gap:8px;">
                 <button class="btn" id="btn-rent-filtrar" type="button">Filtrar</button>
                 <button class="btn" id="btn-rent-limpiar" type="button">Limpiar</button>
+                <button class="btn secondary" id="btn-rent-diagnostico" type="button">Diagnosticar faltantes</button>
               </div>
             </div>
             <div class="table-wrap">
@@ -999,10 +1050,31 @@
                     <th>Precio</th>
                     <th>Costo</th>
                     <th>Margen %</th>
+                    <th>Comp.</th>
+                    <th>Sin costo</th>
                     <th>Calidad receta</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-rentabilidad"></tbody>
+              </table>
+            </div>
+            <div class="small" style="margin-top:8px;">
+              Completa: todos los insumos activos de la receta tienen costo. Incompleta: faltan costos en algunos insumos. Sin costos: hay receta activa, pero ningun insumo tiene costo cargado.
+            </div>
+
+            <div class="table-wrap" style="margin-top:10px; max-height:260px;" id="rent-diagnostico-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Comp.</th>
+                    <th>Sin costo</th>
+                    <th>Insumos faltantes</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-rent-diagnostico">
+                  <tr><td colspan="4" class="muted">Usa "Diagnosticar faltantes" para ver detalle.</td></tr>
+                </tbody>
               </table>
             </div>
           </article>
@@ -1070,6 +1142,142 @@
                 </thead>
                 <tbody id="tbody-compras-recientes"></tbody>
               </table>
+            </div>
+          </article>
+
+        </section>
+
+        <section class="section" id="section-sistema">
+          <div class="row kpi-4">
+            <article class="flat card">
+              <p class="kpi-label">Errores 24h</p>
+              <div class="kpi-number" id="kpi-sis-errores">0</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Criticos 24h</p>
+              <div class="kpi-number" id="kpi-sis-criticos">0</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Warnings 24h</p>
+              <div class="kpi-number" id="kpi-sis-warnings">0</div>
+            </article>
+            <article class="flat card">
+              <p class="kpi-label">Pendientes</p>
+              <div class="kpi-number" id="kpi-sis-pendientes">0</div>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card-head">
+              <h3>Backups y operaciones</h3>
+            </div>
+            <div class="form-grid cols-4" style="margin-bottom:10px;">
+              <div style="padding:10px; background:var(--blue-bg); border-radius:var(--r-sm); border-left:4px solid var(--blue-fg);">
+                <p style="margin:0; font-size:12px; color:var(--text-2);">Total Backups</p>
+                <p style="margin:0; font-size:18px; font-weight:600;" id="stat-total-backups">0</p>
+              </div>
+              <div style="padding:10px; background:var(--green-bg); border-radius:var(--r-sm); border-left:4px solid var(--green-fg);">
+                <p style="margin:0; font-size:12px; color:var(--text-2);">Tamaño Total</p>
+                <p style="margin:0; font-size:18px; font-weight:600;" id="stat-total-size">0 MB</p>
+              </div>
+              <div style="padding:10px; background:var(--amber-bg); border-radius:var(--r-sm); border-left:4px solid var(--amber-fg);">
+                <p style="margin:0; font-size:12px; color:var(--text-2);">Ultimo Backup</p>
+                <p style="margin:0; font-size:12px; font-weight:600;" id="stat-ultimo-backup">No disponible</p>
+              </div>
+              <div style="padding:10px; background:var(--red-bg); border-radius:var(--r-sm); border-left:4px solid var(--red-fg);">
+                <p style="margin:0; font-size:12px; color:var(--text-2);">Proxima ejecucion</p>
+                <p style="margin:0; font-size:12px; font-weight:600;" id="stat-proxima-ejecucion">02:00 (diario)</p>
+              </div>
+            </div>
+
+            <div style="margin-bottom:10px;">
+              <label style="font-size:12px; font-weight:500;">Filtros:</label>
+              <div class="form-grid cols-2" style="margin-top:8px;">
+                <select id="filter-log-type" style="padding:8px; border:0.5px solid var(--line); border-radius:var(--r-sm);">
+                  <option value="">Todos los tipos</option>
+                  <option value="backup">Solo Backups</option>
+                  <option value="verify">Solo Verificaciones</option>
+                </select>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn" id="btn-logs-refresh" type="button">Refrescar</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-wrap" style="max-height:320px; overflow-y:auto;">
+              <table>
+                <thead style="position:sticky; top:0; background:var(--surface); z-index:10;">
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Timestamp</th>
+                    <th>Nivel</th>
+                    <th>Mensaje</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-logs-backups"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field">
+                <label for="f-sis-nivel">Nivel</label>
+                <select id="f-sis-nivel">
+                  <option value="">Todos</option>
+                  <option value="CRITICAL">CRITICAL</option>
+                  <option value="ERROR">ERROR</option>
+                  <option value="WARNING">WARNING</option>
+                  <option value="INFO">INFO</option>
+                  <option value="DEBUG">DEBUG</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-sis-componente">Componente</label>
+                <select id="f-sis-componente">
+                  <option value="">Todos</option>
+                  <option value="flask">flask</option>
+                  <option value="bot">bot</option>
+                  <option value="voice">voice</option>
+                  <option value="db">db</option>
+                  <option value="baileys">baileys</option>
+                  <option value="backup">backup</option>
+                  <option value="externo">externo</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-sis-q">Buscar texto</label>
+                <input id="f-sis-q" placeholder="mensaje o detalle" />
+              </div>
+              <div class="field" style="align-self:end; display:flex; gap:8px; align-items:center;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2);">
+                  <input type="checkbox" id="f-sis-pendientes" />
+                  Solo pendientes
+                </label>
+                <button class="btn" id="btn-sis-filtrar" type="button">Filtrar</button>
+                <button class="btn" id="btn-sis-limpiar" type="button">Limpiar</button>
+              </div>
+            </div>
+
+            <div class="table-wrap sistema-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Nivel</th>
+                    <th>Componente</th>
+                    <th>Funcion</th>
+                    <th>Mensaje</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-sistema-logs"></tbody>
+              </table>
+            </div>
+            <div class="row-actions" style="margin-top:10px;">
+              <button class="btn" id="btn-sis-prev" type="button">Anterior</button>
+              <button class="btn" id="btn-sis-next" type="button">Siguiente</button>
+              <span class="small" id="lbl-sis-page">Página 1</span>
             </div>
           </article>
         </section>
@@ -1773,6 +1981,7 @@
         loaded: {
           ventas: false,
           operacion: false,
+          sistema: false,
           seguridad: false,
           campanas: false,
           inventario: false,
@@ -1804,6 +2013,7 @@
         },
         pages: {
           pedidos: { page: 1, hasMore: false },
+          sistema: { page: 1, hasMore: false },
           seg: { page: 1, hasMore: false },
           neg: { page: 1, hasMore: false },
           inv: { page: 1, hasMore: false },
@@ -1819,6 +2029,10 @@
         operacion: {
           title: "Operacion DB",
           subtitle: "Rentabilidad, pedidos activos y auditoria operativa."
+        },
+        sistema: {
+          title: "Sistema",
+          subtitle: "Monitoreo de eventos, errores y componentes internos."
         },
         seguridad: {
           title: "Seguridad",
@@ -2045,6 +2259,7 @@
 
       function qualityBadge(value) {
         if (value === "completo") return "<span class='badge green'>Completa</span>";
+        if (value === "sin_costos") return "<span class='badge amber'>Sin costos</span>";
         if (value === "incompleto") return "<span class='badge amber'>Incompleta</span>";
         return "<span class='badge red'>Sin receta</span>";
       }
@@ -2514,6 +2729,134 @@
         }
       }
 
+      async function loadBackupStats() {
+        try {
+          const stats = await api("/api/admin/backup/estadisticas");
+          qs("stat-total-backups").textContent = num(stats.total_backups || 0);
+          qs("stat-total-size").textContent = (stats.total_size_mb || 0).toFixed(2) + " MB";
+          qs("stat-ultimo-backup").textContent = stats.ultimo_backup || "No disponible";
+          qs("stat-proxima-ejecucion").textContent = stats.proxima_ejecucion || "02:00 (diario)";
+        } catch (_e) {
+          console.warn("No se pudieron cargar stats de backups.", _e);
+        }
+      }
+
+      async function loadBackupLogs() {
+        try {
+          const filterType = (qs("filter-log-type") && qs("filter-log-type").value) || "";
+          const limit = 50;
+          const logs = await api("/api/admin/logs/backups?limit=" + limit);
+          
+          const tb = qs("tbody-logs-backups");
+          let filtered = logs.logs || [];
+          
+          if (filterType) {
+            filtered = filtered.filter(log => log.type === filterType);
+          }
+          
+          if (!filtered.length) {
+            tb.innerHTML = "<tr><td colspan='4' class='muted'>Sin logs disponibles.</td></tr>";
+            return;
+          }
+          
+          tb.innerHTML = filtered.map((log) => {
+            const levelColor = log.level === "ERROR" ? "color:var(--red-fg);" : "color:var(--green-fg);";
+            const typeLabel = log.type === "backup" ? "Backup" : "Verificacion";
+            return (
+              "<tr>" +
+                "<td>" + typeLabel + "</td>" +
+                "<td><small>" + html(log.timestamp || "-") + "</small></td>" +
+                "<td><span style='" + levelColor + "font-size:11px;'><strong>" + html(log.level) + "</strong></span></td>" +
+                "<td><small>" + html(log.message || "-") + "</small></td>" +
+              "</tr>"
+            );
+          }).join("");
+        } catch (_e) {
+          console.warn("No se pudieron cargar logs de backups.", _e);
+          qs("tbody-logs-backups").innerHTML = "<tr><td colspan='4' class='muted'>Error cargando logs.</td></tr>";
+        }
+      }
+
+      async function loadSistemaResumen() {
+        try {
+          const summary = await api("/api/logs/resumen");
+          qs("kpi-sis-errores").textContent = num(summary.errores_24h || 0);
+          qs("kpi-sis-criticos").textContent = num(summary.criticos_24h || 0);
+          qs("kpi-sis-warnings").textContent = num(summary.warnings_24h || 0);
+          qs("kpi-sis-pendientes").textContent = num(summary.pendientes || 0);
+        } catch (_e) {
+          toast("No se pudo cargar resumen del sistema.", "error");
+        }
+      }
+
+      async function resolverLogSistema(logId) {
+        try {
+          await api("/api/logs/" + Number(logId) + "/resolver", { method: "PATCH" });
+          await Promise.allSettled([loadSistemaResumen(), loadSistemaLogs()]);
+        } catch (_e) {
+          toast("No se pudo marcar como resuelto.", "error");
+        }
+      }
+
+      async function loadSistemaLogs() {
+        showTableLoading("tbody-sistema-logs", 6);
+        try {
+          const pageSize = 30;
+          const page = Math.max(1, Number(state.pages.sistema.page || 1));
+          const params = new URLSearchParams();
+          params.set("limit", String(pageSize + 1));
+          params.set("offset", String((page - 1) * pageSize));
+
+          const nivel = (qs("f-sis-nivel") && qs("f-sis-nivel").value || "").trim();
+          const componente = (qs("f-sis-componente") && qs("f-sis-componente").value || "").trim();
+          const q = (qs("f-sis-q") && qs("f-sis-q").value || "").trim();
+          const pendientes = !!(qs("f-sis-pendientes") && qs("f-sis-pendientes").checked);
+
+          if (nivel) params.set("nivel", nivel);
+          if (componente) params.set("componente", componente);
+          if (q) params.set("q", q);
+          if (pendientes) params.set("pendientes", "true");
+
+          const payload = await api("/api/logs?" + params.toString());
+          const rowsRaw = Array.isArray(payload.items) ? payload.items : [];
+          const rows = rowsRaw.slice(0, pageSize);
+          state.pages.sistema.hasMore = rowsRaw.length > pageSize;
+
+          const total = Number(payload.total || 0);
+          const totalPages = Math.max(1, Math.ceil(total / pageSize));
+          qs("lbl-sis-page").textContent = "Página " + page + " de " + totalPages + " · " + num(total) + " registros";
+
+          const tb = qs("tbody-sistema-logs");
+          if (!rows.length) {
+            tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin logs para el filtro actual.</td></tr>";
+            return;
+          }
+
+          tb.innerHTML = rows.map((r) => {
+            const level = String(r.nivel || "INFO").toUpperCase();
+            const levelClass = level === "CRITICAL" || level === "ERROR" ? "red" : (level === "WARNING" ? "amber" : "blue");
+            const estado = r.resuelto
+              ? "<span class='badge green'>Resuelto</span>"
+              : ((level === "ERROR" || level === "CRITICAL")
+                ? "<button class='btn xs' type='button' onclick='window.__resolverLogSistema(" + Number(r.id || 0) + ")'>Resolver</button>"
+                : "<span class='muted'>N/A</span>");
+            return (
+              "<tr>" +
+                "<td data-label='Fecha'>" + html(dateTime(r.timestamp)) + "</td>" +
+                "<td data-label='Nivel'><span class='badge " + levelClass + "'>" + html(level) + "</span></td>" +
+                "<td data-label='Componente'>" + html(r.componente || "-") + "</td>" +
+                "<td data-label='Funcion'>" + html(r.funcion || "-") + "</td>" +
+                "<td data-label='Mensaje' title='" + html(r.detalle || "") + "'>" + html(r.mensaje || "-") + "</td>" +
+                "<td data-label='Estado'>" + estado + "</td>" +
+              "</tr>"
+            );
+          }).join("");
+        } catch (_e) {
+          const tb = qs("tbody-sistema-logs");
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>No se pudo cargar logs del sistema.</td></tr>";
+        }
+      }
+
       function renderRentabilidad() {
         const tb = qs("tbody-rentabilidad");
         const q = normalizeText((qs("f-rent-q") && qs("f-rent-q").value) || "");
@@ -2527,7 +2870,7 @@
         });
 
         if (!list.length) {
-          tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin datos para el filtro actual.</td></tr>";
+          tb.innerHTML = "<tr><td colspan='8' class='muted'>Sin datos para el filtro actual.</td></tr>";
           return;
         }
 
@@ -2539,6 +2882,8 @@
               "<td>" + mxn(r.precio_venta) + "</td>" +
               "<td>" + mxn(r.costo_estimado_unitario) + "</td>" +
               "<td>" + Number(r.margen_pct || 0).toFixed(2) + "%</td>" +
+              "<td>" + num(r.componentes_activos || 0) + "</td>" +
+              "<td>" + num(r.componentes_sin_costo || 0) + "</td>" +
               "<td>" + qualityBadge(r.calidad_costo) + "</td>" +
             "</tr>"
           );
@@ -2546,15 +2891,80 @@
       }
 
       async function loadRentabilidad() {
-        showTableLoading("tbody-rentabilidad", 6);
+        showTableLoading("tbody-rentabilidad", 8);
         try {
           const rows = await api("/api/admin/rentabilidad-productos?limit=50");
           state.tableCache.rentabilidad = Array.isArray(rows) ? rows : [];
           renderRentabilidad();
         } catch (_e) {
           const tb = qs("tbody-rentabilidad");
-          tb.innerHTML = "<tr><td colspan='6' class='muted'>No se pudo cargar rentabilidad.</td></tr>";
+          tb.innerHTML = "<tr><td colspan='8' class='muted'>No se pudo cargar rentabilidad.</td></tr>";
         }
+      }
+
+      async function loadRentabilidadDiagnostico() {
+        const tb = qs("tbody-rent-diagnostico");
+        if (!tb) return;
+        showTableLoading("tbody-rent-diagnostico", 4);
+        try {
+          const rows = await api("/api/admin/rentabilidad-diagnostico?limit=200");
+          const list = Array.isArray(rows) ? rows : [];
+          if (!list.length) {
+            tb.innerHTML = "<tr><td colspan='4' class='muted'>No hay faltantes de costo. Todo esta completo.</td></tr>";
+            return;
+          }
+
+          tb.innerHTML = list.map((r) => {
+            const faltantesDetalle = Array.isArray(r.insumos_sin_costo_detalle) ? r.insumos_sin_costo_detalle : [];
+            const faltantesNombre = Array.isArray(r.insumos_sin_costo) ? r.insumos_sin_costo : [];
+            const faltantesSource = faltantesDetalle.length
+              ? faltantesDetalle.map((x) => ({ insumo_id: Number(x.insumo_id || 0), nombre: String(x.nombre || "") }))
+              : faltantesNombre.map((name) => {
+                  const insumo = findInsumoByAliases([String(name || "")]);
+                  return {
+                    insumo_id: Number(insumo && insumo.insumo_id ? insumo.insumo_id : 0),
+                    nombre: String(name || "")
+                  };
+                });
+            const faltantesTxt = faltantesSource.length
+              ? faltantesSource.map((x) => (
+                  "<button class='btn xs btn-diag-cargar' type='button' data-insumo-id='" + Number(x.insumo_id || 0) + "' data-insumo-nombre='" + html(x.nombre || "") + "'>" + html(x.nombre || "-") + "</button>"
+                )).join(" ")
+              : "-";
+            const nombre = [r.nombre || "-", r.variante || ""].filter(Boolean).join(" · ");
+            return (
+              "<tr>" +
+                "<td>" + html(nombre) + "</td>" +
+                "<td>" + num(r.componentes_activos || 0) + "</td>" +
+                "<td><span class='badge amber'>" + num(r.componentes_sin_costo || 0) + "</span></td>" +
+                "<td>" + faltantesTxt + "</td>" +
+              "</tr>"
+            );
+          }).join("");
+        } catch (_e) {
+          tb.innerHTML = "<tr><td colspan='4' class='muted'>No se pudo cargar el diagnostico.</td></tr>";
+        }
+      }
+
+      function abrirCompraDesdeDiagnostico(insumoId, insumoNombre) {
+        let idNum = Number(insumoId || 0);
+        if (idNum <= 0 && insumoNombre) {
+          const match = findInsumoByAliases([String(insumoNombre)]);
+          if (match && match.insumo_id) {
+            idNum = Number(match.insumo_id);
+          }
+        }
+        const drawer = qs("drawer-compra");
+        if (!drawer) return;
+        const select = qs("compra-insumo");
+        if (select && idNum > 0) {
+          select.value = String(idNum);
+        }
+        if (qs("compra-cantidad")) qs("compra-cantidad").value = "1";
+        if (qs("compra-costo")) qs("compra-costo").value = "";
+        if (qs("compra-proveedor")) qs("compra-proveedor").value = "";
+        drawer.classList.add("open");
+        toast("Registrar costo para: " + String(insumoNombre || "insumo"), "warn");
       }
 
       function productosLabel(items) {
@@ -3747,14 +4157,14 @@
           const notif = data.data && data.data.notificacion_whatsapp;
           if (notif && notif.intentada) {
             if (notif.enviada) {
-              statusEl.textContent = "✓ " + numero + " actualizado y notificación enviada a " + (notif.destino || "cliente");
-              if (resEl) resEl.innerHTML = '<span style="color: var(--green-fg);">✓ Notificación enviada a ' + notif.destino + '</span>';
+              statusEl.textContent = numero + " actualizado y notificación enviada a " + (notif.destino || "cliente");
+              if (resEl) resEl.innerHTML = '<span style="color: var(--green-fg);">Notificación enviada a ' + notif.destino + '</span>';
             } else {
               statusEl.textContent = numero + " actualizado (notificación no enviada)";
-              if (resEl) resEl.innerHTML = '<span style="color: var(--amber-fg);">⚠ ' + (notif.motivo || "Sin detalle") + '</span>';
+              if (resEl) resEl.innerHTML = '<span style="color: var(--amber-fg);">' + (notif.motivo || "Sin detalle") + '</span>';
             }
           } else {
-            statusEl.textContent = "✓ " + numero + " actualizado";
+            statusEl.textContent = numero + " actualizado";
           }
           await loadTickets();
         } catch (err) {
@@ -3809,6 +4219,16 @@
             loadRentabilidad(),
             loadPedidosActivos(),
             loadComprasRecientes()
+          ]);
+          return;
+        }
+
+        if (sectionName === "sistema") {
+          await Promise.allSettled([
+            loadSistemaResumen(),
+            loadSistemaLogs(),
+            loadBackupStats(),
+            loadBackupLogs()
           ]);
           return;
         }
@@ -3881,6 +4301,14 @@
             }
           }, 30000);
         }
+
+        if (state.current === "sistema") {
+          state.timers.pedidosActivos = setInterval(() => {
+            if (document.visibilityState === "visible") {
+              Promise.allSettled([loadSistemaResumen(), loadSistemaLogs()]);
+            }
+          }, 30000);
+        }
       }
 
       function wireCommonEvents() {
@@ -3933,6 +4361,19 @@
           qs("f-rent-q").value = "";
           qs("f-rent-calidad").value = "";
           renderRentabilidad();
+        });
+        qs("btn-rent-diagnostico").addEventListener("click", async () => {
+          if (!Array.isArray(state.inventoryCache) || !state.inventoryCache.length) {
+            await loadCatalogosInventario();
+          }
+          await loadRentabilidadDiagnostico();
+        });
+        qs("tbody-rent-diagnostico").addEventListener("click", (event) => {
+          const btn = event.target.closest(".btn-diag-cargar");
+          if (!btn) return;
+          const insumoId = Number(btn.getAttribute("data-insumo-id") || 0);
+          const insumoNombre = btn.getAttribute("data-insumo-nombre") || "";
+          abrirCompraDesdeDiagnostico(insumoId, insumoNombre);
         });
 
         qs("btn-ped-filtrar").addEventListener("click", () => {
@@ -4355,7 +4796,9 @@
             await Promise.allSettled([
               loadInventarioStock(),
               loadMovimientos(),
-              loadComprasRecientes()
+              loadComprasRecientes(),
+              loadRentabilidad(),
+              loadRentabilidadDiagnostico()
             ]);
             toast("Compra registrada.", "success");
           } catch (_e) {
@@ -4416,6 +4859,47 @@
             toast("No se pudo crear la regla. Revisa el JSON.", "error");
           }
         });
+
+        // Event listeners para logs de backups
+        if (qs("filter-log-type")) {
+          qs("filter-log-type").addEventListener("change", loadBackupLogs);
+        }
+        if (qs("btn-logs-refresh")) {
+          qs("btn-logs-refresh").addEventListener("click", async () => {
+            await Promise.allSettled([loadBackupStats(), loadBackupLogs()]);
+          });
+        }
+
+        window.__resolverLogSistema = resolverLogSistema;
+        if (qs("btn-sis-filtrar")) {
+          qs("btn-sis-filtrar").addEventListener("click", () => {
+            state.pages.sistema.page = 1;
+            loadSistemaLogs();
+          });
+        }
+        if (qs("btn-sis-limpiar")) {
+          qs("btn-sis-limpiar").addEventListener("click", () => {
+            qs("f-sis-nivel").value = "";
+            qs("f-sis-componente").value = "";
+            qs("f-sis-q").value = "";
+            qs("f-sis-pendientes").checked = false;
+            state.pages.sistema.page = 1;
+            loadSistemaLogs();
+          });
+        }
+        if (qs("btn-sis-prev")) {
+          qs("btn-sis-prev").addEventListener("click", () => {
+            state.pages.sistema.page = Math.max(1, Number(state.pages.sistema.page || 1) - 1);
+            loadSistemaLogs();
+          });
+        }
+        if (qs("btn-sis-next")) {
+          qs("btn-sis-next").addEventListener("click", () => {
+            if (!state.pages.sistema.hasMore) return;
+            state.pages.sistema.page = Number(state.pages.sistema.page || 1) + 1;
+            loadSistemaLogs();
+          });
+        }
       }
 
       function boot() {

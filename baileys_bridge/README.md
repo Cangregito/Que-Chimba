@@ -1,48 +1,42 @@
 # Baileys Bridge
 
-Puente Node.js que conecta WhatsApp Web con el back-end Flask de Que Chimba.
+Puente Node.js (Express + Baileys) que conecta WhatsApp con el back-end Flask de Que Chimba.
 
-## Objetivo
+Este documento refleja el comportamiento actual de [index.js](index.js).
 
-Este servicio reemplaza el transporte anterior de WhatsApp y ahora cumple tres funciones:
+## 1. Responsabilidad del servicio
 
-- recibir mensajes entrantes desde Baileys
-- guardar media entrante temporalmente en `media_tmp/`
-- reenviar el mensaje al webhook Flask `POST /webhook/baileys`
-- enviar al cliente la respuesta que Flask genere en texto o audio
+El bridge hace cuatro cosas principales:
 
-## Flujo actual
+- Mantiene la sesion de WhatsApp Web con Baileys.
+- Recibe mensajes entrantes (texto, audio, imagen, video, documento).
+- Publica esos eventos hacia Flask en `POST /webhook/baileys`.
+- Entrega al cliente final la respuesta generada por Flask (texto o nota de voz).
+
+## 2. Flujo operativo
 
 ```text
 WhatsApp
-  -> Baileys
+  -> Baileys (socket)
   -> Express bridge
-  -> Flask /webhook/baileys
+  -> Flask webhook (/webhook/baileys)
   -> respuesta { tipo, contenido, audio_url? }
-  -> bridge envia texto o audio al cliente
+  -> envio a cliente por WhatsApp
 ```
 
-## Archivos principales
+Detalles actuales del flujo:
 
-```text
-baileys_bridge/
-├── index.js
-├── package.json
-├── package-lock.json
-├── .env.example
-├── .gitignore
-├── README.md
-├── auth/
-└── media_tmp/
-```
+- El bridge ignora mensajes de grupos y estados.
+- Los adjuntos se guardan temporalmente en `media_tmp/` y se exponen en `/media/*`.
+- Si Flask falla, el bridge intenta responder con un mensaje de fallback.
 
-## Requisitos
+## 3. Requisitos
 
-- Node.js 20+
-- una sesion de WhatsApp disponible para escanear QR
-- Flask corriendo en `http://localhost:5000` o la URL que configures
+- Node.js 20 o superior.
+- Una sesion de WhatsApp disponible para escanear QR.
+- Flask disponible en la URL configurada en `FLASK_BAILEYS_WEBHOOK_URL`.
 
-## Instalacion
+## 4. Instalacion local
 
 ```powershell
 Set-Location baileys_bridge
@@ -50,48 +44,43 @@ npm install
 Copy-Item .env.example .env
 ```
 
-## Variables de entorno
+## 5. Variables de entorno
 
-Archivo base: `.env.example`
+Archivo base: [.env.example](.env.example)
 
-```text
-BAILEYS_BRIDGE_PORT=3001
-FLASK_BAILEYS_WEBHOOK_URL=http://localhost:5000/webhook/baileys
-BAILEYS_PUBLIC_BASE_URL=http://localhost:3001
-BAILEYS_AUTH_DIR=auth
-BAILEYS_MEDIA_DIR=media_tmp
-LOG_LEVEL=info
-```
+Variables usadas por el bridge:
 
-### Descripcion de cada variable
+- `BAILEYS_BRIDGE_PORT`: puerto HTTP del bridge. Default: `3001`.
+- `FLASK_BAILEYS_WEBHOOK_URL`: endpoint Flask receptor de mensajes. Default: `http://localhost:5000/webhook/baileys`.
+- `BAILEYS_WEBHOOK_TOKEN`: token opcional que el bridge envia a Flask en header `x-bridge-token`.
+- `BAILEYS_BRIDGE_API_TOKEN`: token opcional para proteger endpoints internos `/api/*` del bridge.
+- `BAILEYS_PUBLIC_BASE_URL`: URL base publica para servir media temporal. Default: `http://localhost:<PORT>`.
+- `BAILEYS_AUTH_DIR`: directorio de credenciales Baileys. Default: `auth`.
+- `BAILEYS_MEDIA_DIR`: directorio de media temporal. Default: `media_tmp`.
+- `BAILEYS_MEDIA_TTL_HOURS`: horas de vida de archivos en media temporal. Default: `24`.
+- `BAILEYS_MEDIA_CLEANUP_MINUTES`: frecuencia de limpieza automatica. Default: `30`.
+- `LOG_LEVEL`: nivel de log para pino. Default: `info`.
 
-- `BAILEYS_BRIDGE_PORT`: puerto HTTP del bridge
-- `FLASK_BAILEYS_WEBHOOK_URL`: endpoint Flask que procesa mensajes
-- `BAILEYS_PUBLIC_BASE_URL`: URL base para servir media temporal
-- `BAILEYS_AUTH_DIR`: carpeta donde Baileys guarda credenciales de sesion
-- `BAILEYS_MEDIA_DIR`: carpeta temporal para audios, imagenes y documentos entrantes
-- `LOG_LEVEL`: nivel de logs para `pino`
-
-## Ejecucion
+## 6. Ejecucion
 
 ```powershell
 npm start
 ```
 
-Al iniciar:
+Durante el arranque:
 
-1. el servidor Express levanta en el puerto configurado
-2. Baileys solicita QR si no hay sesion guardada
-3. escaneas el QR desde WhatsApp
-4. el bridge queda listo para recibir y contestar mensajes
+1. Levanta Express en el puerto configurado.
+2. Inicializa el socket Baileys y muestra QR si no hay sesion valida.
+3. Crea `auth/` y `media_tmp/` si no existen.
+4. Inicia limpieza periodica de media temporal.
 
-## Endpoints expuestos
+## 7. Endpoints expuestos
 
-### `GET /health`
+### GET /health
 
-Devuelve estado del bridge y si Baileys esta conectado.
+Estado basico del servicio y conexion de Baileys.
 
-Respuesta esperada:
+Respuesta ejemplo:
 
 ```json
 {
@@ -101,9 +90,11 @@ Respuesta esperada:
 }
 ```
 
-### `POST /api/send-text`
+### POST /api/send-text
 
-Envia texto a un cliente.
+Envia texto a un destino.
+
+Body:
 
 ```json
 {
@@ -112,9 +103,11 @@ Envia texto a un cliente.
 }
 ```
 
-### `POST /api/send-audio`
+### POST /api/send-audio
 
-Envia una nota de voz usando una URL publica servida por Flask.
+Envia nota de voz descargando audio desde `audioUrl`.
+
+Body:
 
 ```json
 {
@@ -124,23 +117,54 @@ Envia una nota de voz usando una URL publica servida por Flask.
 }
 ```
 
-## Integracion con Flask
+### POST /api/send-options
 
-El bridge manda a Flask un payload como este:
+Envia botones de opcion rapida (maximo 3).
+
+Body:
+
+```json
+{
+  "to": "52XXXXXXXXXX",
+  "text": "Selecciona una opcion",
+  "options": [
+    "Pollo",
+    "Carne",
+    "Mixta"
+  ]
+}
+```
+
+### Autenticacion de endpoints internos
+
+- Si `BAILEYS_BRIDGE_API_TOKEN` esta vacio, `/api/*` acepta solicitudes sin token.
+- Si `BAILEYS_BRIDGE_API_TOKEN` tiene valor, cada solicitud a `/api/*` debe incluir header `x-bridge-token` con ese valor.
+
+## 8. Contrato con Flask
+
+Payload enviado a Flask (`POST FLASK_BAILEYS_WEBHOOK_URL`):
 
 ```json
 {
   "whatsapp_id": "5216560000000",
+  "whatsapp_jid": "5216560000000@s.whatsapp.net",
   "mensaje": "hola",
   "media_url": "http://localhost:3001/media/archivo.ogg",
   "media_type": "audio/ogg; codecs=opus",
+  "media_kind": "audio",
   "latitude": null,
   "longitude": null,
-  "message_id": "ABC123"
+  "message_id": "ABC123",
+  "reply_id": "opt_pollo"
 }
 ```
 
-Y espera una respuesta como esta:
+Headers hacia Flask:
+
+- `Content-Type: application/json`
+- `x-bridge-token: <BAILEYS_WEBHOOK_TOKEN>` (solo si fue configurado)
+
+Respuesta esperada desde Flask:
 
 ```json
 {
@@ -152,46 +176,56 @@ Y espera una respuesta como esta:
 }
 ```
 
-O bien:
+Respuesta de audio:
 
 ```json
 {
   "ok": true,
   "data": {
     "tipo": "audio",
-    "contenido": "Ay que chimba",
+    "contenido": "Te mando la nota de voz",
     "audio_url": "http://localhost:5000/audio/archivo.ogg"
   }
 }
 ```
 
-## Carpetas generadas en runtime
+## 9. Estructura relevante
 
-- `auth/`: credenciales de la sesion de WhatsApp
-- `media_tmp/`: archivos entrantes guardados temporalmente
+```text
+baileys_bridge/
+|- index.js
+|- package.json
+|- .env.example
+|- auth/
+`- media_tmp/
+```
 
-Ambas carpetas estan ignoradas por Git y se pueden regenerar.
+- `auth/`: estado de sesion de WhatsApp (multi-file auth).
+- `media_tmp/`: archivos temporales descargados de mensajes entrantes.
 
-## Problemas comunes
+## 10. Problemas comunes
 
-### El QR no aparece
+### No aparece QR o no conecta
 
-- revisa que `npm install` haya terminado correctamente
-- confirma que usas Node.js 20+
-- borra `auth/` si la sesion anterior quedo inconsistente
+- Verifica version de Node (`node -v`) y dependencias (`npm install`).
+- Si la sesion quedo corrupta, elimina `auth/` y reinicia.
 
-### Flask no responde
+### Flask no recibe mensajes
 
-- revisa `FLASK_BAILEYS_WEBHOOK_URL`
-- confirma que Flask este corriendo y responda en `/health`
+- Revisa `FLASK_BAILEYS_WEBHOOK_URL`.
+- Si Flask valida token, confirma `BAILEYS_WEBHOOK_TOKEN`.
+- Verifica conectividad entre puertos locales (3001 -> 5000).
 
-### El audio no sale
+### Falla envio por /api/* con 401
 
-- confirma que Flask este sirviendo la URL de `audio_url`
-- revisa que `PUBLIC_BASE_URL` del back-end apunte a una URL accesible
-- verifica que el archivo `.ogg` exista en `bot_empanadas/audios_temp/`
+- Si definiste `BAILEYS_BRIDGE_API_TOKEN`, envia header `x-bridge-token` correcto.
 
-## Estado actual del stack
+### Audio no se entrega
 
-- Si ves referencias viejas a Twilio en otra documentacion, ya no aplican a este bridge.
-- El transporte principal de WhatsApp en el proyecto actual es Baileys.
+- Verifica que `audio_url` sea accesible desde el host del bridge.
+- El bridge descarga audio con timeout de 30s; revisa latencia y disponibilidad.
+
+## 11. Notas de stack
+
+- Este bridge es el transporte activo de WhatsApp para el proyecto.
+- Referencias antiguas a Twilio no aplican para el flujo actual de produccion local.
