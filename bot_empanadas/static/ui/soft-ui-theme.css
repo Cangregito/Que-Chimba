@@ -1,0 +1,87 @@
+:root {
+  --bg: #F8F9FA;
+  --surface: #FFFFFF;
+  --line: #F1F5F9;
+  --text: #111827;
+  --text-2: #6B7280;
+  --text-3: #9CA3AF;
+  --accent: #4F46E5;
+  --accent-bg: #EEF2FF;
+  --blue-bg: #EEF2FF;
+  --blue-fg: #4338CA;
+  --green-bg: #ECFDF3;
+  --green-fg: #047857;
+  --amber-bg: #FFFBEB;
+  --amber-fg: #B45309;
+  --red-bg: #FFF1F2;
+  --red-fg: #BE123C;
+  --r-sm: 12px;
+  --r-lg: 20px;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 12px 24px rgba(15, 23, 42, 0.08);
+  --t: 300ms ease;
+}
+
+.soft-page {
+  background: var(--bg);
+  background-image:
+    radial-gradient(circle at 8% 0%, rgba(79, 70, 229, 0.08), transparent 35%),
+    radial-gradient(circle at 90% 20%, rgba(16, 185, 129, 0.08), transparent 32%);
+}
+
+.soft-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--t), transform var(--t);
+}
+
+.soft-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.soft-empty {
+  border: 1px dashed #E2E8F0;
+  border-radius: var(--r-lg);
+  background: #FFFFFF;
+  color: var(--text-3);
+}
+
+.soft-btn-active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: #E0E7FF;
+}
+
+.soft-btn-ghost {
+  color: var(--text-2);
+  background: transparent;
+}
+
+.soft-btn-ghost:hover {
+  background: #F9FAFB;
+  color: var(--text);
+}
+
+@keyframes soft-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.soft-rise {
+  animation: soft-rise 420ms ease both;
+}
+
+.soft-rise-delay-1 { animation-delay: 60ms; }
+.soft-rise-delay-2 { animation-delay: 120ms; }
+.soft-rise-delay-3 { animation-delay: 180ms; }
+

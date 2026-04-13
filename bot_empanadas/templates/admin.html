@@ -4,27 +4,50 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Que Chimba | Panel Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["Manrope", "Segoe UI", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <script crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="/static/ui/soft-ui-components.js"></script>
+  <link rel="stylesheet" href="/static/ui/soft-ui-theme.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+
     :root {
-      --bg: #FFFFFF;
-      --surface: #F8F8F7;
-      --line: #E5E5E3;
-      --text: #1A1A1A;
-      --text-2: #6B6B6B;
-      --text-3: #9B9B9B;
-      --accent: #1F2328;
-      --blue-bg: #E6F1FB;
-      --blue-fg: #0C447C;
-      --green-bg: #EAF3DE;
-      --green-fg: #27500A;
-      --amber-bg: #FAEEDA;
-      --amber-fg: #633806;
-      --red-bg: #FCEBEB;
-      --red-fg: #791F1F;
-      --r-sm: 8px;
-      --r-lg: 12px;
-      --t: 120ms ease;
+      --bg: #F8F9FA;
+      --surface: #FFFFFF;
+      --line: #F1F5F9;
+      --text: #111827;
+      --text-2: #6B7280;
+      --text-3: #9CA3AF;
+      --accent: #4F46E5;
+      --accent-bg: #EEF2FF;
+      --blue-bg: #EEF2FF;
+      --blue-fg: #4338CA;
+      --green-bg: #ECFDF3;
+      --green-fg: #047857;
+      --amber-bg: #FFFBEB;
+      --amber-fg: #B45309;
+      --red-bg: #FFF1F2;
+      --red-fg: #BE123C;
+      --r-sm: 12px;
+      --r-lg: 20px;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 12px 24px rgba(15, 23, 42, 0.08);
+      --t: 300ms ease;
     }
 
     * {
@@ -39,8 +62,9 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: 'Manrope', 'Segoe UI', sans-serif;
       font-weight: 400;
+      background-image: radial-gradient(circle at 8% 0%, rgba(79, 70, 229, 0.08), transparent 35%), radial-gradient(circle at 90% 20%, rgba(16, 185, 129, 0.08), transparent 32%);
     }
 
     button,
@@ -62,26 +86,29 @@
       position: sticky;
       top: 0;
       height: 100vh;
-      border-right: 0.5px solid var(--line);
-      background: var(--surface);
-      padding: 14px;
+      border-right: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.84);
+      backdrop-filter: blur(10px);
+      padding: 20px 14px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 20px;
+      animation: ui-rise 380ms ease both;
     }
 
     .brand {
-      padding: 8px;
-      border: 0.5px solid var(--line);
+      padding: 14px;
+      border: 1px solid var(--line);
       border-radius: var(--r-sm);
-      background: var(--bg);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
     }
 
     .brand h1 {
       margin: 0;
       font-size: 15px;
-      font-weight: 500;
-      letter-spacing: 0.01em;
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }
 
     .brand p {
@@ -98,27 +125,29 @@
 
     .nav-item {
       width: 100%;
-      border: 0.5px solid transparent;
+      border: 1px solid transparent;
       background: transparent;
       border-radius: var(--r-sm);
       text-align: left;
-      padding: 10px 10px;
+      padding: 11px 12px;
       display: flex;
       align-items: center;
       gap: 8px;
       color: var(--text-2);
-      transition: background var(--t), opacity var(--t);
+      transition: background var(--t), color var(--t), border-color var(--t);
       cursor: pointer;
     }
 
     .nav-item:hover {
-      background: var(--bg);
+      background: #F9FAFB;
+      color: var(--text);
     }
 
     .nav-item.active {
-      background: var(--bg);
-      color: var(--text);
-      border-color: var(--line);
+      background: var(--accent-bg);
+      color: var(--accent);
+      border-color: #E0E7FF;
+      font-weight: 600;
     }
 
     .dot {
@@ -136,13 +165,14 @@
 
     .session {
       margin-top: auto;
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-sm);
-      background: var(--bg);
-      padding: 10px;
+      background: var(--surface);
+      padding: 12px;
       font-size: 12px;
       color: var(--text-2);
       line-height: 1.5;
+      box-shadow: var(--shadow-sm);
     }
 
     .session strong {
@@ -158,28 +188,31 @@
     .main-inner {
       max-width: 1400px;
       margin: 0 auto;
-      padding: 16px;
+      padding: 28px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 20px;
     }
 
     .topbar {
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
       background: var(--surface);
-      padding: 12px;
+      padding: 18px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
       flex-wrap: wrap;
+      box-shadow: var(--shadow-sm);
+      animation: ui-rise 430ms ease both;
     }
 
     .topbar h2 {
       margin: 0;
-      font-size: 16px;
-      font-weight: 500;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .subtle {
@@ -191,12 +224,13 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .section {
       display: none;
       flex-direction: column;
-      gap: 12px;
+      gap: 18px;
     }
 
     .section.active {
@@ -205,7 +239,7 @@
 
     .row {
       display: grid;
-      gap: 10px;
+      gap: 16px;
     }
 
     .row.kpi-4 {
@@ -225,30 +259,39 @@
     }
 
     .card {
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-lg);
-      background: var(--bg);
-      padding: 12px;
+      background: var(--surface);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--t), transform var(--t);
+      animation: ui-rise 500ms ease both;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
     }
 
     .card.flat {
-      border: none;
+      border: 1px solid var(--line);
       background: var(--surface);
-      border-radius: var(--r-sm);
-      padding: 16px;
+      border-radius: var(--r-lg);
+      padding: 20px;
     }
 
     .kpi-label {
       margin: 0;
       color: var(--text-2);
-      font-size: 12px;
+      font-size: 13px;
     }
 
     .kpi-number {
       margin-top: 8px;
-      font-size: 24px;
+      font-size: 28px;
       line-height: 1.1;
-      font-weight: 500;
+      font-weight: 700;
+      letter-spacing: -0.03em;
       color: var(--text);
     }
 
@@ -275,29 +318,31 @@
     }
 
     .btn {
-      border: 0.5px solid var(--line);
+      border: 1px solid transparent;
       border-radius: var(--r-sm);
-      background: var(--surface);
-      color: var(--text);
-      padding: 8px 12px;
-      min-height: 34px;
+      background: transparent;
+      color: var(--text-2);
+      padding: 10px 14px;
+      min-height: 38px;
       cursor: pointer;
-      transition: background var(--t), opacity var(--t);
+      transition: background var(--t), color var(--t), border-color var(--t), box-shadow var(--t);
     }
 
     .btn:hover {
-      background: #EFEFEE;
+      background: #F9FAFB;
+      color: var(--text);
     }
 
     .btn.primary {
-      background: var(--accent);
-      color: #FFFFFF;
-      border-color: var(--accent);
+      background: var(--accent-bg);
+      color: var(--accent);
+      border-color: #E0E7FF;
+      font-weight: 600;
     }
 
     .btn.primary:hover {
-      opacity: 0.92;
-      background: var(--accent);
+      background: #E0E7FF;
+      opacity: 1;
     }
 
     .btn.xs {
@@ -308,12 +353,13 @@
 
     .btn.secondary {
       background: transparent;
-      color: var(--text);
-      border-color: var(--line);
+      color: var(--text-2);
+      border-color: transparent;
     }
 
     .btn.secondary:hover {
-      background: var(--surface);
+      background: #F9FAFB;
+      color: var(--text);
     }
 
     .btn:focus-visible,
@@ -321,7 +367,7 @@
     input:focus-visible,
     select:focus-visible,
     textarea:focus-visible {
-      outline: 2px solid rgba(12, 68, 124, 0.35);
+      outline: 2px solid rgba(79, 70, 229, 0.25);
       outline-offset: 1px;
     }
 
@@ -333,24 +379,25 @@
       display: inline-flex;
       align-items: center;
       border-radius: 999px;
-      padding: 4px 10px;
+      padding: 5px 11px;
       font-size: 12px;
-      font-weight: 500;
-      border: 0.5px solid transparent;
+      font-weight: 600;
+      border: 1px solid transparent;
       white-space: nowrap;
     }
 
-    .badge.blue { background: var(--blue-bg); color: var(--blue-fg); }
-    .badge.green { background: var(--green-bg); color: var(--green-fg); }
-    .badge.amber { background: var(--amber-bg); color: var(--amber-fg); }
-    .badge.red { background: var(--red-bg); color: var(--red-fg); }
+    .badge.blue { background: #EEF2FF; color: #4338CA; border-color: #E0E7FF; }
+    .badge.green { background: #ECFDF3; color: #047857; border-color: #D1FAE5; }
+    .badge.amber { background: #FFFBEB; color: #B45309; border-color: #FDE68A; }
+    .badge.red { background: #FFF1F2; color: #BE123C; border-color: #FFE4E6; }
 
     .table-wrap {
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
       overflow: auto;
       max-height: 360px;
-      background: var(--bg);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
     }
 
     .sistema-table-wrap {
@@ -365,20 +412,31 @@
 
     th,
     td {
-      border-bottom: 0.5px solid var(--line);
+      border-bottom: 1px solid #F8FAFC;
       text-align: left;
-      padding: 8px;
+      padding: 12px;
       font-size: 13px;
       vertical-align: top;
     }
 
     th {
-      background: var(--surface);
+      background: #F8FAFC;
       color: var(--text-2);
-      font-weight: 500;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
       position: sticky;
       top: 0;
       z-index: 1;
+    }
+
+    tbody tr {
+      transition: background var(--t);
+    }
+
+    tbody tr:hover {
+      background: #F8FAFC;
     }
 
     tr:last-child td {
@@ -391,31 +449,36 @@
 
     .status {
       display: inline-block;
-      padding: 4px 8px;
+      padding: 5px 10px;
       border-radius: 999px;
       font-size: 11px;
-      font-weight: 500;
+      font-weight: 600;
       text-transform: capitalize;
+      border: 1px solid transparent;
     }
 
     .status.abierto {
-      background: var(--blue-bg);
-      color: var(--blue-fg);
+      background: #EEF2FF;
+      color: #4338CA;
+      border-color: #E0E7FF;
     }
 
     .status.en_proceso {
-      background: var(--amber-bg);
-      color: var(--amber-fg);
+      background: #FFFBEB;
+      color: #B45309;
+      border-color: #FDE68A;
     }
 
     .status.resuelto {
-      background: var(--green-bg);
-      color: var(--green-fg);
+      background: #ECFDF3;
+      color: #047857;
+      border-color: #D1FAE5;
     }
 
     .status.cerrado {
-      background: var(--red-bg);
-      color: var(--red-fg);
+      background: #FFF1F2;
+      color: #BE123C;
+      border-color: #FFE4E6;
     }
 
     .meta {
@@ -451,26 +514,30 @@
       width: 100%;
       min-height: 60px;
       resize: vertical;
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
-      padding: 8px;
-      background: var(--bg);
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: #F9FAFB;
       color: var(--text);
       font-family: inherit;
-      font-size: 12px;
+      font-size: 13px;
+      transition: background var(--t), border-color var(--t), box-shadow var(--t);
     }
 
     .notes:focus {
       outline: none;
-      border-color: var(--accent);
+      background: #FFFFFF;
+      border-color: #A5B4FC;
+      box-shadow: 0 0 0 3px rgba(224, 231, 255, 0.95);
     }
 
     .chart-box {
       height: 250px;
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
-      background: var(--bg);
-      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--surface);
+      padding: 12px;
+      box-shadow: var(--shadow-sm);
     }
 
     .chart-box canvas {
@@ -485,10 +552,27 @@
     }
 
     .stock-card {
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
-      background: var(--bg);
-      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--surface);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--t);
+    }
+
+    .stock-card:hover {
+      box-shadow: var(--shadow-md);
+    }
+
+    @keyframes ui-rise {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .stock-name {
@@ -791,9 +875,33 @@
         font-weight: 500;
       }
     }
+
+    .app {
+      grid-template-columns: 220px minmax(0, 1fr);
+    }
+
+    .main-inner {
+      padding: clamp(20px, 2.5vw, 32px);
+      gap: 24px;
+    }
+
+    .topbar {
+      padding: 18px;
+      gap: 14px;
+      position: sticky;
+      top: 10px;
+      z-index: 20;
+      backdrop-filter: blur(6px);
+    }
+
+    .topbar h2 {
+      font-size: clamp(18px, 1rem + 0.9vw, 22px);
+      line-height: 1.2;
+    }
+
   </style>
 </head>
-<body>
+<body class="soft-page">
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
@@ -821,61 +929,38 @@
 
     <main class="main">
       <div class="main-inner">
+        <div id="react-ui-admin-strip"></div>
         <header class="topbar">
           <div>
             <h2 id="page-title">Ventas</h2>
             <div class="subtle" id="page-subtitle">Vista en tiempo real de ventas y clientes.</div>
           </div>
           <div class="topbar-actions">
-            <button class="btn" id="btn-logout" type="button">Salir</button>
+            <div id="react-ui-admin-top-actions"></div>
           </div>
         </header>
 
         <section class="section active" id="section-ventas">
-          <div class="row kpi-4">
-            <article class="flat card">
-              <p class="kpi-label">Ventas hoy</p>
-              <div class="kpi-number" id="kpi-ventas-hoy">$0.00</div>
-              <div class="kpi-trend" id="kpi-ventas-hoy-trend">0.0% vs ayer</div>
-            </article>
-            <article class="flat card">
-              <p class="kpi-label">Ventas mes</p>
-              <div class="kpi-number" id="kpi-ventas-mes">$0.00</div>
-              <div class="kpi-trend" id="kpi-ventas-mes-trend">0.0% vs mes anterior</div>
-            </article>
-            <article class="flat card">
-              <p class="kpi-label">Ticket promedio</p>
-              <div class="kpi-number" id="kpi-ticket-promedio">$0.00</div>
-              <div class="kpi-trend">Promedio de pedidos de hoy</div>
-            </article>
-            <article class="flat card">
-              <p class="kpi-label">Pedidos hoy</p>
-              <div class="kpi-number" id="kpi-pedidos-hoy">0</div>
-              <div class="kpi-trend">Pedidos no cancelados</div>
-            </article>
-          </div>
+          <div id="react-ui-admin-kpis-primary"></div>
 
           <article class="card">
-            <div class="card-head">
-              <h3>Ventas por hora (hoy)</h3>
-              <button class="btn" type="button" id="btn-refresh-ventas-dia">Refrescar</button>
-            </div>
+            <div id="react-ui-admin-head-ventas-dia"></div>
             <div id="ventas-dia-slot" class="chart-box"><canvas id="chart-ventas-dia"></canvas></div>
           </article>
 
           <div class="row grid-2">
             <article class="card">
-              <div class="card-head"><h3>Ventas por día (mes actual)</h3></div>
+              <div id="react-ui-admin-head-ventas-mes"></div>
               <div id="ventas-mes-slot" class="chart-box"><canvas id="chart-ventas-mes"></canvas></div>
             </article>
             <article class="card">
-              <div class="card-head"><h3>Ventas por mes (año actual)</h3></div>
+              <div id="react-ui-admin-head-ventas-ano"></div>
               <div id="ventas-ano-slot" class="chart-box"><canvas id="chart-ventas-ano"></canvas></div>
             </article>
           </div>
 
           <article class="card">
-            <div class="card-head"><h3>Reporte profesional de ventas</h3></div>
+            <div id="react-ui-admin-head-reporte-ventas"></div>
             <div class="form-grid cols-3" style="margin-bottom:10px;">
               <div class="field">
                 <label for="f-rep-ventas-periodo">Periodo</label>
@@ -896,29 +981,7 @@
               </div>
             </div>
 
-            <div class="row kpi-4" style="margin-bottom:10px;">
-              <article class="flat card">
-                <p class="kpi-label">Ventas periodo</p>
-                <div class="kpi-number" id="kpi-rep-ventas">$0.00</div>
-              </article>
-              <article class="flat card">
-                <p class="kpi-label">Pedidos</p>
-                <div class="kpi-number" id="kpi-rep-pedidos">0</div>
-              </article>
-              <article class="flat card">
-                <p class="kpi-label">Ticket promedio</p>
-                <div class="kpi-number" id="kpi-rep-ticket">$0.00</div>
-              </article>
-              <article class="flat card">
-                <p class="kpi-label">Rapidez promedio</p>
-                <div class="kpi-number" id="kpi-rep-rapidez">-</div>
-              </article>
-              <article class="flat card">
-                <p class="kpi-label">Utilidad estimada</p>
-                <div class="kpi-number" id="kpi-rep-utilidad">$0.00</div>
-                <div class="kpi-trend" id="kpi-rep-margen">0.00% margen</div>
-              </article>
-            </div>
+            <div id="react-ui-admin-kpis-report" style="margin-bottom:10px;"></div>
 
             <div class="row grid-2" style="margin-bottom:10px;">
               <article class="flat card">
@@ -957,7 +1020,7 @@
           </article>
 
           <article class="card">
-            <div class="card-head"><h3>Reporte profesional de KPIs (Día / Mes / Año)</h3></div>
+            <div id="react-ui-admin-head-reporte-kpis"></div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -976,7 +1039,7 @@
           </article>
 
           <article class="card">
-            <div class="card-head"><h3>Top 20 clientes</h3></div>
+            <div id="react-ui-admin-head-top-clientes"></div>
             <div class="form-grid cols-3" style="margin-bottom:10px;">
               <div class="field"><label for="f-top-clientes-q">Buscar</label><input id="f-top-clientes-q" placeholder="nombre o whatsapp" /></div>
               <div class="field" style="align-self:end; display:flex; gap:8px;">
@@ -1022,7 +1085,7 @@
           </div>
 
           <article class="card">
-            <div class="card-head"><h3>Rentabilidad por producto</h3></div>
+            <div id="react-ui-admin-head-rentabilidad"></div>
             <div class="form-grid cols-3" style="margin-bottom:10px;">
               <div class="field"><label for="f-rent-q">Buscar</label><input id="f-rent-q" placeholder="producto o variante" /></div>
               <div class="field">
@@ -1080,7 +1143,7 @@
           </article>
 
           <article class="card">
-            <div class="card-head"><h3>Pedidos recientes (activos)</h3></div>
+            <div id="react-ui-admin-head-pedidos-recientes"></div>
             <div class="form-grid cols-3" style="margin-bottom:10px;">
               <div class="field"><label for="f-ped-buscar">Buscar</label><input id="f-ped-buscar" placeholder="#pedido, cliente, whatsapp" /></div>
               <div class="field"><label for="f-ped-desde">Desde</label><input id="f-ped-desde" type="date" /></div>
@@ -1121,7 +1184,7 @@
           </article>
 
           <article class="card">
-            <div class="card-head"><h3>Ultimas compras de inventario</h3></div>
+            <div id="react-ui-admin-head-compras-inventario"></div>
             <div class="form-grid cols-3" style="margin-bottom:10px;">
               <div class="field"><label for="f-compras-q">Buscar</label><input id="f-compras-q" placeholder="insumo o registrado por" /></div>
               <div class="field" style="align-self:end; display:flex; gap:8px;">
@@ -1968,6 +2031,7 @@
       <div class="field"><label for="compra-cantidad">Cantidad</label><input id="compra-cantidad" type="number" min="0" step="0.001" required /></div>
       <div class="field"><label for="compra-costo">Costo total</label><input id="compra-costo" type="number" min="0" step="0.01" /></div>
       <div class="field"><label for="compra-proveedor">Proveedor</label><input id="compra-proveedor" /></div>
+      <div class="field full"><small class="muted">Tip: en insumos con unidad g/ml captura 1000 para 1 kg/1 L.</small></div>
       <div class="field full"><label for="compra-notas">Notas</label><textarea id="compra-notas" maxlength="400"></textarea></div>
       <div class="field full"><button class="btn primary" type="submit">Guardar compra</button></div>
     </form>
@@ -1976,7 +2040,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    (function () {
+    function initAdminPanel() {
       const state = {
         loaded: {
           ventas: false,
@@ -4312,10 +4376,16 @@
       }
 
       function wireCommonEvents() {
-        const logoutBtn = qs("btn-logout");
-        if (logoutBtn) {
-          logoutBtn.addEventListener("click", async () => {
-            logoutBtn.disabled = true;
+        if (!window.__qcAdminLogoutBound) {
+          document.addEventListener("click", async (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            const logoutBtn = target.closest("#btn-logout");
+            if (!logoutBtn) return;
+            if (logoutBtn.dataset.busy === "1") return;
+
+            logoutBtn.dataset.busy = "1";
+            logoutBtn.setAttribute("disabled", "disabled");
             logoutBtn.textContent = "Saliendo...";
             try {
               await fetch("/logout", {
@@ -4328,6 +4398,7 @@
               window.location.href = "/login";
             }
           });
+          window.__qcAdminLogoutBound = true;
         }
 
         qs("btn-refresh-ventas-dia").addEventListener("click", () => {
@@ -4781,14 +4852,28 @@
           const insumoId = Number(qs("compra-insumo").value);
           const selected = state.inventoryCache.find((i) => Number(i.insumo_id) === insumoId);
           const insumoNombre = selected ? selected.nombre : "";
+          const unidad = String((selected && selected.unidad_medida) || "").toLowerCase();
+          const cantidad = Number(qs("compra-cantidad").value || 0);
+          let confirmarUnidadBase = false;
+
+          if ((unidad === "g" || unidad === "ml") && cantidad === 1) {
+            const confirmarLiteral = window.confirm("Detectamos cantidad=1 para un insumo en " + unidad + ".\n\nSi compraste 1 kg o 1 L debes capturar 1000.\n\nPulsa Aceptar solo si de verdad quieres registrar 1 " + unidad + ".");
+            if (!confirmarLiteral) {
+              toast("Registro cancelado. Captura 1000 para 1 kg/1 L.", "warn");
+              return;
+            }
+            confirmarUnidadBase = true;
+          }
+
           try {
             await api("/api/inventario/compras", {
               method: "POST",
               body: {
                 insumo: insumoNombre,
-                cantidad: Number(qs("compra-cantidad").value || 0),
+                cantidad,
                 costo_total: Number(qs("compra-costo").value || 0) || null,
-                proveedor: qs("compra-proveedor").value.trim() || null
+                proveedor: qs("compra-proveedor").value.trim() || null,
+                confirmar_unidad_base: confirmarUnidadBase
               }
             });
             qs("drawer-compra").classList.remove("open");
@@ -4802,7 +4887,7 @@
             ]);
             toast("Compra registrada.", "success");
           } catch (_e) {
-            toast("No se pudo registrar la compra.", "error");
+            toast((_e && _e.message) || "No se pudo registrar la compra.", "error");
           }
         });
 
@@ -4909,8 +4994,141 @@
       }
 
       boot();
-    })();
+    }
   </script>
+  <script>
+    window.addEventListener("DOMContentLoaded", function () {
+      function ensureAdminFallbackNodes() {
+        const topActions = document.getElementById("react-ui-admin-top-actions");
+        if (topActions && !document.getElementById("btn-logout")) {
+          topActions.innerHTML = "<button class='btn' id='btn-logout' type='button'>Salir</button>";
+        }
+
+        const primaryKpis = document.getElementById("react-ui-admin-kpis-primary");
+        if (primaryKpis && !document.getElementById("kpi-ventas-hoy")) {
+          primaryKpis.innerHTML =
+            "<div class='row kpi-4'>" +
+              "<article class='flat card'><p class='kpi-label'>Ventas hoy</p><div class='kpi-number' id='kpi-ventas-hoy'>$0.00</div><div class='kpi-trend' id='kpi-ventas-hoy-trend'>0.0% vs ayer</div></article>" +
+              "<article class='flat card'><p class='kpi-label'>Ventas mes</p><div class='kpi-number' id='kpi-ventas-mes'>$0.00</div><div class='kpi-trend' id='kpi-ventas-mes-trend'>0.0% vs mes anterior</div></article>" +
+              "<article class='flat card'><p class='kpi-label'>Ticket promedio</p><div class='kpi-number' id='kpi-ticket-promedio'>$0.00</div><div class='kpi-trend'>Promedio de pedidos de hoy</div></article>" +
+              "<article class='flat card'><p class='kpi-label'>Pedidos hoy</p><div class='kpi-number' id='kpi-pedidos-hoy'>0</div><div class='kpi-trend'>Pedidos no cancelados</div></article>" +
+            "</div>";
+        }
+
+        const reportKpis = document.getElementById("react-ui-admin-kpis-report");
+        if (reportKpis && !document.getElementById("kpi-rep-ventas")) {
+          reportKpis.innerHTML =
+            "<div class='row kpi-4'>" +
+              "<article class='flat card'><p class='kpi-label'>Ventas periodo</p><div class='kpi-number' id='kpi-rep-ventas'>$0.00</div></article>" +
+              "<article class='flat card'><p class='kpi-label'>Pedidos</p><div class='kpi-number' id='kpi-rep-pedidos'>0</div></article>" +
+              "<article class='flat card'><p class='kpi-label'>Ticket promedio</p><div class='kpi-number' id='kpi-rep-ticket'>$0.00</div></article>" +
+              "<article class='flat card'><p class='kpi-label'>Rapidez promedio</p><div class='kpi-number' id='kpi-rep-rapidez'>-</div></article>" +
+              "<article class='flat card'><p class='kpi-label'>Utilidad estimada</p><div class='kpi-number' id='kpi-rep-utilidad'>$0.00</div><div class='kpi-trend' id='kpi-rep-margen'>0.00% margen</div></article>" +
+            "</div>";
+        }
+
+        const headVentasDia = document.getElementById("react-ui-admin-head-ventas-dia");
+        if (headVentasDia && !document.getElementById("btn-refresh-ventas-dia")) {
+          headVentasDia.innerHTML = "<div class='card-head'><h3>Ventas por hora (hoy)</h3><button class='btn' type='button' id='btn-refresh-ventas-dia'>Refrescar</button></div>";
+        }
+
+        const simpleHeads = [
+          ["react-ui-admin-head-ventas-mes", "Ventas por día (mes actual)"],
+          ["react-ui-admin-head-ventas-ano", "Ventas por mes (año actual)"],
+          ["react-ui-admin-head-reporte-ventas", "Reporte profesional de ventas"],
+          ["react-ui-admin-head-reporte-kpis", "Reporte profesional de KPIs (Día / Mes / Año)"],
+          ["react-ui-admin-head-top-clientes", "Top 20 clientes"],
+          ["react-ui-admin-head-rentabilidad", "Rentabilidad por producto"],
+          ["react-ui-admin-head-pedidos-recientes", "Pedidos recientes (activos)"],
+          ["react-ui-admin-head-compras-inventario", "Ultimas compras de inventario"]
+        ];
+
+        simpleHeads.forEach(function (entry) {
+          const node = document.getElementById(entry[0]);
+          if (node && !node.innerHTML.trim()) {
+            node.innerHTML = "<div class='card-head'><h3>" + entry[1] + "</h3></div>";
+          }
+        });
+      }
+
+      if (window.QCSoftUI && typeof window.QCSoftUI.mountSoftHeaderStrip === "function") {
+        window.QCSoftUI.mountSoftHeaderStrip("react-ui-admin-strip", {
+          items: [
+            { tone: "indigo", text: "Admin" },
+            { tone: "emerald", text: "UI React + Tailwind" },
+            { tone: "amber", text: "Soft UI" }
+          ]
+        });
+
+        if (typeof window.QCSoftUI.mountSoftKpiRow === "function") {
+          window.QCSoftUI.mountSoftKpiRow("react-ui-admin-kpis-primary", {
+            items: [
+              { label: "Ventas hoy", valueId: "kpi-ventas-hoy", initialValue: "$0.00", subtitleId: "kpi-ventas-hoy-trend", subtitle: "0.0% vs ayer" },
+              { label: "Ventas mes", valueId: "kpi-ventas-mes", initialValue: "$0.00", subtitleId: "kpi-ventas-mes-trend", subtitle: "0.0% vs mes anterior" },
+              { label: "Ticket promedio", valueId: "kpi-ticket-promedio", initialValue: "$0.00", subtitle: "Promedio de pedidos de hoy" },
+              { label: "Pedidos hoy", valueId: "kpi-pedidos-hoy", initialValue: "0", subtitle: "Pedidos no cancelados" }
+            ]
+          });
+
+          window.QCSoftUI.mountSoftKpiRow("react-ui-admin-kpis-report", {
+            items: [
+              { label: "Ventas periodo", valueId: "kpi-rep-ventas", initialValue: "$0.00" },
+              { label: "Pedidos", valueId: "kpi-rep-pedidos", initialValue: "0" },
+              { label: "Ticket promedio", valueId: "kpi-rep-ticket", initialValue: "$0.00" },
+              { label: "Rapidez promedio", valueId: "kpi-rep-rapidez", initialValue: "-" },
+              { label: "Utilidad estimada", valueId: "kpi-rep-utilidad", initialValue: "$0.00", subtitleId: "kpi-rep-margen", subtitle: "0.00% margen" }
+            ]
+          });
+        }
+
+        if (typeof window.QCSoftUI.mountSoftActionButtons === "function") {
+          window.QCSoftUI.mountSoftActionButtons("react-ui-admin-top-actions", {
+            items: [
+              { id: "btn-logout", text: "Salir", tone: "ghost" }
+            ]
+          });
+        }
+
+        if (typeof window.QCSoftUI.mountSoftCardHeader === "function") {
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-ventas-dia", {
+            title: "Ventas por hora (hoy)",
+            action: { id: "btn-refresh-ventas-dia", text: "Refrescar" }
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-ventas-mes", {
+            title: "Ventas por día (mes actual)"
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-ventas-ano", {
+            title: "Ventas por mes (año actual)"
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-reporte-ventas", {
+            title: "Reporte profesional de ventas"
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-reporte-kpis", {
+            title: "Reporte profesional de KPIs (Día / Mes / Año)"
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-top-clientes", {
+            title: "Top 20 clientes"
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-rentabilidad", {
+            title: "Rentabilidad por producto"
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-pedidos-recientes", {
+            title: "Pedidos recientes (activos)"
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-compras-inventario", {
+            title: "Ultimas compras de inventario"
+          });
+        }
+      }
+
+      ensureAdminFallbackNodes();
+
+      if (typeof initAdminPanel === "function") {
+        initAdminPanel();
+      }
+    });
+  </script>
+
 </body>
 </html>
 

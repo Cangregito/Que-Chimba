@@ -248,6 +248,7 @@ def register_report_routes(app, deps: dict):
         cantidad = payload.get("cantidad")
         proveedor = payload.get("proveedor")
         costo_total = payload.get("costo_total")
+        confirmar_unidad_base = bool(payload.get("confirmar_unidad_base"))
 
         created = db.registrar_compra_insumo(
             insumo=insumo,
@@ -256,6 +257,7 @@ def register_report_routes(app, deps: dict):
             costo_total=costo_total,
             creado_por=session.get("user", {}).get("username"),
             actor_rol=session.get("user", {}).get("rol", "admin"),
+            confirmar_unidad_base=confirmar_unidad_base,
         )
         if isinstance(created, dict) and created.get("error"):
             return error(created["error"], 400)

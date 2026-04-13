@@ -4,27 +4,50 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Que Chimba | Cocina</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["Manrope", "Segoe UI", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <script crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="/static/ui/soft-ui-components.js"></script>
+  <link rel="stylesheet" href="/static/ui/soft-ui-theme.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+
     :root {
-      --bg: #FFFFFF;
-      --surface: #F8F8F7;
-      --line: #E5E5E3;
-      --text: #1A1A1A;
-      --text-2: #6B6B6B;
-      --text-3: #9B9B9B;
-      --accent: #1F2328;
-      --blue-bg: #E6F1FB;
-      --blue-fg: #0C447C;
-      --green-bg: #EAF3DE;
-      --green-fg: #27500A;
-      --amber-bg: #FAEEDA;
-      --amber-fg: #633806;
-      --red-bg: #FCEBEB;
-      --red-fg: #791F1F;
-      --r-sm: 8px;
-      --r-lg: 12px;
-      --t: 120ms ease;
+      --bg: #F8F9FA;
+      --surface: #FFFFFF;
+      --line: #F1F5F9;
+      --text: #111827;
+      --text-2: #6B7280;
+      --text-3: #9CA3AF;
+      --accent: #4F46E5;
+      --accent-bg: #EEF2FF;
+      --blue-bg: #EEF2FF;
+      --blue-fg: #4338CA;
+      --green-bg: #ECFDF3;
+      --green-fg: #047857;
+      --amber-bg: #FFFBEB;
+      --amber-fg: #B45309;
+      --red-bg: #FFF1F2;
+      --red-fg: #BE123C;
+      --r-sm: 12px;
+      --r-lg: 20px;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 12px 24px rgba(15, 23, 42, 0.08);
+      --t: 300ms ease;
     }
 
     * { box-sizing: border-box; }
@@ -36,8 +59,9 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: 'Manrope', 'Segoe UI', sans-serif;
       font-weight: 400;
+      background-image: radial-gradient(circle at 5% 0%, rgba(79, 70, 229, 0.08), transparent 35%), radial-gradient(circle at 92% 22%, rgba(16, 185, 129, 0.08), transparent 30%);
     }
 
     button,
@@ -51,29 +75,32 @@
     .main {
       max-width: 1440px;
       margin: 0 auto;
-      padding: 16px;
+      padding: 28px;
       display: grid;
-      gap: 12px;
+      gap: 20px;
       grid-template-columns: 2fr 1fr;
     }
 
     .top {
       grid-column: 1 / -1;
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-lg);
       background: var(--surface);
-      padding: 12px;
+      padding: 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
       flex-wrap: wrap;
+      box-shadow: var(--shadow-sm);
+      animation: ui-rise 420ms ease both;
     }
 
     .top h1 {
       margin: 0;
-      font-size: 16px;
-      font-weight: 500;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .sub {
@@ -85,110 +112,135 @@
     .kpis {
       display: grid;
       grid-template-columns: repeat(4, minmax(120px, 1fr));
-      gap: 8px;
+      gap: 12px;
       width: 100%;
     }
 
     .kpi {
-      background: var(--bg);
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
-      padding: 10px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      padding: 18px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--t);
+      animation: ui-rise 520ms ease both;
+    }
+
+    .kpi:nth-child(2) { animation-delay: 50ms; }
+    .kpi:nth-child(3) { animation-delay: 90ms; }
+    .kpi:nth-child(4) { animation-delay: 130ms; }
+
+    .kpi:hover {
+      box-shadow: var(--shadow-md);
     }
 
     .kpi p {
       margin: 0;
       color: var(--text-2);
-      font-size: 12px;
+      font-size: 13px;
     }
 
     .kpi h2 {
       margin: 6px 0 0;
-      font-size: 22px;
-      font-weight: 500;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
     }
 
     .panel {
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-lg);
-      background: var(--bg);
-      padding: 12px;
+      background: var(--surface);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      animation: ui-rise 480ms ease both;
     }
+
+    .panel:nth-of-type(2) { animation-delay: 60ms; }
+    .panel:nth-of-type(3) { animation-delay: 120ms; }
 
     .head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 14px;
       flex-wrap: wrap;
     }
 
     .head h3 {
       margin: 0;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }
 
     .btn {
-      border: 0.5px solid var(--line);
+      border: 1px solid transparent;
       border-radius: var(--r-sm);
-      background: var(--surface);
-      color: var(--text);
-      padding: 8px 12px;
-      min-height: 34px;
+      background: transparent;
+      color: var(--text-2);
+      padding: 10px 14px;
+      min-height: 38px;
       cursor: pointer;
-      transition: background var(--t), opacity var(--t);
+      transition: background var(--t), color var(--t), border-color var(--t), box-shadow var(--t);
     }
 
-    .btn:hover { background: #EFEFEE; }
+    .btn:hover {
+      background: #F9FAFB;
+      color: var(--text);
+    }
 
     .btn.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #FFFFFF;
+      background: var(--accent-bg);
+      border-color: #E0E7FF;
+      color: var(--accent);
+      font-weight: 600;
     }
 
     .btn:focus-visible,
     input:focus-visible,
     select:focus-visible,
     textarea:focus-visible {
-      outline: 2px solid rgba(12, 68, 124, 0.35);
+      outline: 2px solid rgba(79, 70, 229, 0.25);
       outline-offset: 1px;
     }
 
     .chip {
       border-radius: 999px;
-      padding: 4px 10px;
+      padding: 5px 11px;
       font-size: 12px;
-      font-weight: 500;
-      border: 0.5px solid transparent;
+      font-weight: 600;
+      border: 1px solid transparent;
       display: inline-flex;
       align-items: center;
     }
 
-    .chip.blue { background: var(--blue-bg); color: var(--blue-fg); }
-    .chip.green { background: var(--green-bg); color: var(--green-fg); }
-    .chip.amber { background: var(--amber-bg); color: var(--amber-fg); }
-    .chip.red { background: var(--red-bg); color: var(--red-fg); }
+    .chip.blue { background: #EEF2FF; color: #4338CA; border-color: #E0E7FF; }
+    .chip.green { background: #ECFDF3; color: #047857; border-color: #D1FAE5; }
+    .chip.amber { background: #FFFBEB; color: #B45309; border-color: #FDE68A; }
+    .chip.red { background: #FFF1F2; color: #BE123C; border-color: #FFE4E6; }
 
     .board {
       display: grid;
       grid-template-columns: repeat(3, minmax(210px, 1fr));
-      gap: 8px;
+      gap: 12px;
     }
 
     .col {
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
-      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      background: #F8FAFC;
       min-height: 360px;
-      padding: 8px;
-      transition: background var(--t), opacity var(--t);
+      padding: 12px;
+      transition: background var(--t), box-shadow var(--t);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
     }
 
     .col.drag-over {
-      background: #ECECEB;
+      background: #EEF2FF;
+      box-shadow: var(--shadow-md);
     }
 
     .col-title {
@@ -196,25 +248,40 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 13px;
-      font-weight: 500;
+      font-size: 14px;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      background: #F8FAFC;
+      padding-bottom: 6px;
+      z-index: 2;
     }
 
     .list {
       display: grid;
       gap: 8px;
+      max-height: calc(100vh - 360px);
+      overflow: auto;
+      padding-right: 2px;
     }
 
     .card {
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-sm);
-      background: var(--bg);
-      padding: 10px;
+      background: var(--surface);
+      padding: 14px;
       cursor: grab;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--t), transform var(--t), border-color var(--t);
     }
 
-    .card.warn { border-color: #DABB8D; }
-    .card.urgent { border-color: #D4AAAA; background: #FFF8F8; }
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+
+    .card.warn { border-color: #FDE68A; }
+    .card.urgent { border-color: #FFE4E6; background: #FFF1F2; }
     .card:active { cursor: grabbing; }
 
     .card-head {
@@ -228,15 +295,16 @@
 
     .card-head h4 {
       margin: 0;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }
 
     .meta {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px 10px;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-2);
       margin-bottom: 8px;
     }
@@ -247,7 +315,7 @@
       margin: 0;
       padding-left: 18px;
       color: var(--text-2);
-      font-size: 12px;
+      font-size: 13px;
       line-height: 1.5;
     }
 
@@ -259,13 +327,13 @@
     }
 
     .empty {
-      border: 0.5px dashed var(--line);
-      border-radius: var(--r-sm);
+      border: 1px dashed #E2E8F0;
+      border-radius: var(--r-lg);
       color: var(--text-3);
-      font-size: 12px;
+      font-size: 13px;
       text-align: center;
-      padding: 12px;
-      background: var(--bg);
+      padding: 14px;
+      background: #FFFFFF;
     }
 
     .zones {
@@ -276,10 +344,11 @@
     }
 
     .zone {
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
       background: var(--surface);
-      padding: 8px;
+      padding: 12px;
+      box-shadow: var(--shadow-sm);
     }
 
     .zone h4 {
@@ -298,12 +367,12 @@
 
     .error {
       margin-top: 8px;
-      color: var(--red-fg);
-      background: var(--red-bg);
-      border: 0.5px solid #E3C3C3;
+      color: #BE123C;
+      background: #FFF1F2;
+      border: 1px solid #FFE4E6;
       border-radius: var(--r-sm);
-      padding: 8px;
-      font-size: 12px;
+      padding: 10px;
+      font-size: 13px;
       display: none;
     }
 
@@ -317,7 +386,7 @@
     .s-line {
       height: 9px;
       border-radius: 999px;
-      background: #ECECEB;
+      background: #E2E8F0;
       animation: pulse 1.2s ease infinite;
     }
 
@@ -325,6 +394,17 @@
       0% { opacity: 1; }
       50% { opacity: 0.55; }
       100% { opacity: 1; }
+    }
+
+    @keyframes ui-rise {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @media (max-width: 1150px) {
@@ -350,28 +430,63 @@
         grid-template-columns: 1fr;
       }
     }
+
+    .main {
+      max-width: 1320px;
+      padding: clamp(16px, 2.2vw, 30px);
+      gap: 24px;
+      grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    #react-ui-cocina-top-actions {
+      grid-column: 2;
+      grid-row: 1;
+      justify-self: end;
+    }
+
+    #react-ui-cocina-kpis {
+      grid-row: 2;
+      grid-column: 1 / -1;
+    }
+
+    .card {
+      padding: 12px;
+    }
+
+    .card-head {
+      margin-bottom: 10px;
+    }
+
+    .meta {
+      gap: 4px 10px;
+    }
+
   </style>
 </head>
-<body>
+<body class="soft-page">
   <main class="main">
+    <div id="react-ui-cocina-strip"></div>
     <header class="top">
       <div>
         <h1>Panel de Cocina</h1>
         <div class="sub" id="lastUpdate">Ultima actualizacion: -</div>
       </div>
-      <button class="btn" id="btn-logout" type="button">Salir</button>
-      <div class="kpis">
-        <article class="kpi"><p>Total en cola</p><h2 id="kpi-total">0</h2></article>
-        <article class="kpi"><p>Recibidos</p><h2 id="kpi-recibidos">0</h2></article>
-        <article class="kpi"><p>En preparacion</p><h2 id="kpi-prep">0</h2></article>
-        <article class="kpi"><p>Listos</p><h2 id="kpi-listos">0</h2></article>
-      </div>
+      <div id="react-ui-cocina-top-actions"></div>
+      <div id="react-ui-cocina-kpis"></div>
     </header>
 
     <section class="panel">
       <div class="head">
-        <h3>Flujo de pedidos</h3>
-        <button class="btn" id="btn-refresh" type="button">Actualizar</button>
+        <div id="react-ui-cocina-flow-heading"></div>
+        <div id="react-ui-cocina-actions"></div>
       </div>
 
       <div class="board" id="kanbanBoard">
@@ -396,15 +511,95 @@
 
     <aside class="panel">
       <div class="head">
-        <h3>Agrupado por CP</h3>
-        <span class="sub">Ayuda para salida de reparto</span>
+        <div id="react-ui-cocina-zones-heading"></div>
       </div>
       <div id="zoneContainer" class="zones"></div>
     </aside>
   </main>
 
   <script>
-    (function () {
+    window.addEventListener("DOMContentLoaded", function () {
+      function ensureCocinaFallbackNodes() {
+        const topActions = document.getElementById("react-ui-cocina-top-actions");
+        if (topActions && !document.getElementById("btn-logout")) {
+          topActions.innerHTML = "<button class='btn' id='btn-logout' type='button'>Salir</button>";
+        }
+
+        const flowActions = document.getElementById("react-ui-cocina-actions");
+        if (flowActions && !document.getElementById("btn-refresh")) {
+          flowActions.innerHTML = "<button class='btn' id='btn-refresh' type='button'>Actualizar</button>";
+        }
+
+        const kpis = document.getElementById("react-ui-cocina-kpis");
+        if (kpis && !document.getElementById("kpi-total")) {
+          kpis.innerHTML =
+            "<div class='kpis'>" +
+              "<article class='kpi'><p>Total en cola</p><h2 id='kpi-total'>0</h2></article>" +
+              "<article class='kpi'><p>Recibidos</p><h2 id='kpi-recibidos'>0</h2></article>" +
+              "<article class='kpi'><p>En preparacion</p><h2 id='kpi-prep'>0</h2></article>" +
+              "<article class='kpi'><p>Listos</p><h2 id='kpi-listos'>0</h2></article>" +
+            "</div>";
+        }
+      }
+
+      if (window.QCSoftUI && typeof window.QCSoftUI.mountSoftHeaderStrip === "function") {
+        window.QCSoftUI.mountSoftHeaderStrip("react-ui-cocina-strip", {
+          items: [
+            { tone: "indigo", text: "Cocina" },
+            { tone: "emerald", text: "Kanban operativo" },
+            { tone: "amber", text: "UI React + Tailwind" }
+          ]
+        });
+
+        if (typeof window.QCSoftUI.mountSoftPanelHeading === "function") {
+          window.QCSoftUI.mountSoftPanelHeading("react-ui-cocina-flow-heading", {
+            title: "Flujo de pedidos",
+            subtitle: "Recibido, preparacion y listo",
+            icon: "chef-hat",
+            tone: "indigo"
+          });
+          window.QCSoftUI.mountSoftPanelHeading("react-ui-cocina-zones-heading", {
+            title: "Agrupado por CP",
+            subtitle: "Ayuda para salida de reparto",
+            icon: "map-pinned",
+            tone: "emerald"
+          });
+        }
+
+        if (typeof window.QCSoftUI.mountSoftKpiRow === "function") {
+          window.QCSoftUI.mountSoftKpiRow("react-ui-cocina-kpis", {
+            items: [
+              { label: "Total en cola", valueId: "kpi-total", initialValue: "0" },
+              { label: "Recibidos", valueId: "kpi-recibidos", initialValue: "0" },
+              { label: "En preparacion", valueId: "kpi-prep", initialValue: "0" },
+              { label: "Listos", valueId: "kpi-listos", initialValue: "0" }
+            ]
+          });
+        }
+
+        if (typeof window.QCSoftUI.mountSoftActionButtons === "function") {
+          window.QCSoftUI.mountSoftActionButtons("react-ui-cocina-actions", {
+            items: [
+              { id: "btn-refresh", text: "Actualizar", tone: "ghost" }
+            ]
+          });
+
+          window.QCSoftUI.mountSoftActionButtons("react-ui-cocina-top-actions", {
+            items: [
+              { id: "btn-logout", text: "Salir", tone: "ghost" }
+            ]
+          });
+        }
+      }
+
+      ensureCocinaFallbackNodes();
+
+      if (typeof initCocinaPanel === "function") {
+        setTimeout(initCocinaPanel, 0);
+      }
+    });
+
+    function initCocinaPanel() {
       const API_QUEUE_URL = "/api/pedidos?estado=recibido,en_preparacion,listo";
       const API_STATUS_BASE = "/api/pedidos";
       const REFRESH_MS = 15000;
@@ -432,6 +627,15 @@
       let refreshTimer = null;
       let isFetching = false;
 
+      const UI_BTN_GHOST = "btn rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200";
+      const UI_BTN_PRIMARY = "btn primary rounded-xl bg-indigo-50 text-indigo-600 font-medium hover:bg-indigo-100 transition-colors duration-200";
+      const UI_CHIP = {
+        blue: "chip blue rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100",
+        amber: "chip amber rounded-full bg-amber-50 text-amber-700 border border-amber-100",
+        green: "chip green rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100",
+        red: "chip red rounded-full bg-rose-50 text-rose-700 border border-rose-100"
+      };
+
       function esc(value) {
         return String(value == null ? "" : value)
           .replaceAll("&", "&amp;")
@@ -446,6 +650,10 @@
           .replaceAll("\\", "\\\\")
           .replaceAll("'", "\\'")
           .replaceAll("\n", " ");
+      }
+
+      function emptyState(text) {
+        return "<div class='empty rounded-2xl border border-dashed border-gray-200 bg-white/90 text-gray-500'>" + esc(text) + "</div>";
       }
 
       function showError(message) {
@@ -497,10 +705,10 @@
       }
 
       function stateChip(state) {
-        if (state === "recibido") return "<span class='chip blue'>Recibido</span>";
-        if (state === "en_preparacion") return "<span class='chip amber'>En preparacion</span>";
-        if (state === "listo") return "<span class='chip green'>Listo</span>";
-        return "<span class='chip red'>" + esc(state) + "</span>";
+        if (state === "recibido") return "<span class='" + UI_CHIP.blue + "'>Recibido</span>";
+        if (state === "en_preparacion") return "<span class='" + UI_CHIP.amber + "'>En preparacion</span>";
+        if (state === "listo") return "<span class='" + UI_CHIP.green + "'>Listo</span>";
+        return "<span class='" + UI_CHIP.red + "'>" + esc(state) + "</span>";
       }
 
       function normalizeOrder(raw) {
@@ -542,19 +750,19 @@
         const ageText = mins == null ? "Sin hora" : (mins + " min");
         const actions = [];
         if (order.state === "recibido") {
-          actions.push("<button class='btn' data-action='prep' data-id='" + esc(order.id) + "'>En preparacion</button>");
+          actions.push("<button class='" + UI_BTN_GHOST + "' data-action='prep' data-id='" + esc(order.id) + "'>En preparacion</button>");
         }
         if (order.state === "recibido" || order.state === "en_preparacion") {
-          actions.push("<button class='btn primary' data-action='ready' data-id='" + esc(order.id) + "'>Listo para entregar</button>");
+          actions.push("<button class='" + UI_BTN_PRIMARY + "' data-action='ready' data-id='" + esc(order.id) + "'>Listo para entregar</button>");
         }
-        actions.push("<button class='btn' data-action='print' data-id='" + esc(order.id) + "'>Imprimir QR</button>");
+        actions.push("<button class='" + UI_BTN_GHOST + "' data-action='print' data-id='" + esc(order.id) + "'>Imprimir QR</button>");
 
         return (
-          "<article class='card " + p + "' draggable='true' data-draggable-id='" + esc(order.id) + "'>" +
+          "<article class='card " + p + " bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300' draggable='true' data-draggable-id='" + esc(order.id) + "'>" +
             "<div class='card-head'>" +
               "<h4>Pedido #" + esc(order.number) + "</h4>" +
               "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>" +
-                (p === "urgent" ? "<span class='chip red'>" + esc(ageText) + "</span>" : (p === "warn" ? "<span class='chip amber'>" + esc(ageText) + "</span>" : "<span class='chip blue'>" + esc(ageText) + "</span>")) +
+                (p === "urgent" ? "<span class='" + UI_CHIP.red + "'>" + esc(ageText) + "</span>" : (p === "warn" ? "<span class='" + UI_CHIP.amber + "'>" + esc(ageText) + "</span>" : "<span class='" + UI_CHIP.blue + "'>" + esc(ageText) + "</span>")) +
                 stateChip(order.state) +
               "</div>" +
             "</div>" +
@@ -594,16 +802,16 @@
         nodes.kPrep.textContent = String(prep.length);
         nodes.kListo.textContent = String(listo.length);
 
-        nodes.recibido.innerHTML = rec.length ? rec.map(buildCard).join("") : "<div class='empty'>No hay pedidos recibidos.</div>";
-        nodes.prep.innerHTML = prep.length ? prep.map(buildCard).join("") : "<div class='empty'>No hay pedidos en preparacion.</div>";
-        nodes.listo.innerHTML = listo.length ? listo.map(buildCard).join("") : "<div class='empty'>No hay pedidos listos.</div>";
+        nodes.recibido.innerHTML = rec.length ? rec.map(buildCard).join("") : emptyState("No hay pedidos recibidos.");
+        nodes.prep.innerHTML = prep.length ? prep.map(buildCard).join("") : emptyState("No hay pedidos en preparacion.");
+        nodes.listo.innerHTML = listo.length ? listo.map(buildCard).join("") : emptyState("No hay pedidos listos.");
 
         setDragAndDrop();
       }
 
       function renderZones() {
         if (!currentOrders.length) {
-          nodes.zone.innerHTML = "<div class='empty'>Sin pedidos para agrupar.</div>";
+          nodes.zone.innerHTML = emptyState("Sin pedidos para agrupar.");
           return;
         }
 
@@ -779,14 +987,23 @@
         }
       });
 
-      nodes.refresh.addEventListener("click", () => {
-        fetchOrders(true);
-      });
+      if (nodes.refresh) {
+        nodes.refresh.addEventListener("click", () => {
+          fetchOrders(true);
+        });
+      }
 
-      if (nodes.logout) {
-        nodes.logout.addEventListener("click", async () => {
-          nodes.logout.disabled = true;
-          nodes.logout.textContent = "Saliendo...";
+      if (!window.__qcCocinaLogoutBound) {
+        document.addEventListener("click", async (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          const logoutBtn = target.closest("#btn-logout");
+          if (!logoutBtn) return;
+          if (logoutBtn.dataset.busy === "1") return;
+
+          logoutBtn.dataset.busy = "1";
+          logoutBtn.setAttribute("disabled", "disabled");
+          logoutBtn.textContent = "Saliendo...";
           try {
             await fetch("/logout", {
               method: "POST",
@@ -798,6 +1015,7 @@
             window.location.href = "/login";
           }
         });
+        window.__qcCocinaLogoutBound = true;
       }
 
       fetchOrders(true).catch(() => {});
@@ -812,7 +1030,7 @@
       window.addEventListener("beforeunload", () => {
         if (refreshTimer) clearTimeout(refreshTimer);
       });
-    })();
+    }
   </script>
 </body>
 </html>

@@ -2362,7 +2362,6 @@ def crear_pedido_completo(cliente_id, datos_temp):
             return {"error": "No hay items en datos_temp para crear el pedido."}
 
         conn = get_connection()
-        conn.autocommit = False
 
         _asegurar_tablas_operacion_pedidos(conn)
         _asegurar_tablas_inventario_real(conn)
@@ -4293,7 +4292,15 @@ def _descontar_inventario_por_pedido(cur, pedido_id, items, actor_usuario=None, 
     return {"ok": True, "movimientos": movimientos}
 
 
-def registrar_compra_insumo(insumo, cantidad, proveedor=None, costo_total=None, creado_por=None, actor_rol="admin"):
+def registrar_compra_insumo(
+    insumo,
+    cantidad,
+    proveedor=None,
+    costo_total=None,
+    creado_por=None,
+    actor_rol="admin",
+    confirmar_unidad_base=False,
+):
     conn = None
     try:
         nombre_insumo = (insumo or "").strip()
@@ -4325,6 +4332,7 @@ def registrar_compra_insumo(insumo, cantidad, proveedor=None, costo_total=None, 
                 (nombre_insumo,),
             )
             insumo_row = cur.fetchone()
+            insumo_existente = bool(insumo_row)
 
             if not insumo_row:
                 stock_antes = 0.0
@@ -4339,6 +4347,18 @@ def registrar_compra_insumo(insumo, cantidad, proveedor=None, costo_total=None, 
                 insumo_row = cur.fetchone()
             else:
                 stock_antes = float(insumo_row["stock_actual"])
+
+            unidad_medida = str(insumo_row.get("unidad_medida") or "").strip().lower()
+            if unidad_medida in {"g", "ml"} and abs(qty - 1.0) < 1e-9 and not bool(confirmar_unidad_base):
+                return {
+                    "error": (
+                        "Cantidad 1 detectada para un insumo en g/ml. "
+                        "Si compraste 1 kg o 1 L, captura 1000 en cantidad. "
+                        "Si realmente es 1 g/ml, confirma el registro con confirmar_unidad_base=true."
+                    )
+                }
+
+            if insumo_existente:
                 cur.execute(
                     """
                     UPDATE insumos

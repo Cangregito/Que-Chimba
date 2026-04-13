@@ -399,6 +399,24 @@ def _formatear_carrito(items: list, total: int) -> str:
 	return "\n".join(lineas)
 
 
+def _sincronizar_campos_legacy_desde_items(datos_temp: Dict[str, Any]) -> None:
+	items = datos_temp.get("items") or []
+	if not isinstance(items, list) or not items:
+		return
+
+	datos_temp["tipo_servicio"] = datos_temp.get("tipo_servicio") or "individual"
+	if len(items) != 1:
+		for key in ("producto_id", "producto_nombre", "cantidad", "precio_unitario"):
+			datos_temp.pop(key, None)
+		return
+
+	item = items[0] if isinstance(items[0], dict) else {}
+	datos_temp["producto_id"] = int(item.get("producto_id") or 0)
+	datos_temp["producto_nombre"] = str(item.get("producto_nombre") or item.get("nombre") or "Producto").strip()
+	datos_temp["cantidad"] = int(item.get("cantidad") or 0)
+	datos_temp["precio_unitario"] = _to_float(item.get("precio_unit") or item.get("precio_unitario"), 0)
+
+
 def _registrar_observabilidad_parser(cliente: dict, mensaje: str, extraccion: Dict[str, Any], estado_origen: str = "seleccion_producto") -> None:
 	confidence_score = float(extraccion.get("confidence_score") or 0)
 	needs_clarification = bool(extraccion.get("needs_clarification"))
@@ -879,9 +897,46 @@ def _texto_tiene_datos_numericos_preservados(base: str, candidato: str) -> bool:
 	return all(n.lower() in lc for n in numeros_base)
 
 
+def _debe_omitir_pulido_ia(texto: str) -> bool:
+	t = _normalizar_texto(texto)
+	if not t:
+		return True
+
+	patrones_operativos = [
+		"pedido",
+		"carrito",
+		"menu del dia",
+		"menu dinamico",
+		"metodo de entrega",
+		"metodo de pago",
+		"domicilio",
+		"recoger",
+		"local",
+		"direccion",
+		"codigo postal",
+		"factura",
+		"datos fiscales",
+		"nombre completo",
+		"codigo de entrega",
+		"confirm",
+		"cotizar",
+		"evento",
+		"pago",
+	]
+	if any(patron in t for patron in patrones_operativos):
+		return True
+
+	if any(t.startswith(prefijo) for prefijo in ["escribe", "responde", "comparte", "elige", "dime", "digame", "pasame"]):
+		return True
+
+	return False
+
+
 def _pulir_texto_con_ia(texto: str, datos_temp: Dict[str, Any]) -> str:
 	base = (texto or "").strip()
 	if not base:
+		return base
+	if _debe_omitir_pulido_ia(base):
 		return base
 	if not LLM_STYLE_ENABLED or requests is None:
 		return base
@@ -2198,6 +2253,20 @@ def _manejar_metodo_pago(text, datos_temp):
 
 
 def _resumen_pedido(datos_temp):
+	items = datos_temp.get("items") or []
+	if isinstance(items, list) and items:
+		total = int(datos_temp.get("total") or 0)
+		if total <= 0:
+			total = int(sum(int(i.get("cantidad") or 0) * _to_float(i.get("precio_unit") or i.get("precio_unitario"), 0) for i in items if isinstance(i, dict)))
+		piezas = [f"Tipo: {datos_temp.get('tipo_servicio', 'individual')}", _formatear_carrito(items, total)]
+		if datos_temp.get("metodo_entrega"):
+			piezas.append(f"Entrega: {datos_temp['metodo_entrega']}")
+		if datos_temp.get("metodo_entrega") == "domicilio" and datos_temp.get("direccion_texto"):
+			piezas.append(f"Direccion: {datos_temp['direccion_texto']}")
+		if datos_temp.get("metodo_pago"):
+			piezas.append(f"Pago: {datos_temp['metodo_pago']}")
+		return "\n".join(piezas)
+
 	piezas = []
 	tipo = datos_temp.get("tipo_servicio", "individual")
 	piezas.append(f"Tipo: {tipo}")
@@ -2554,6 +2623,7 @@ def handle_seleccion_producto(sesion: dict, mensaje: str, cliente: dict) -> dict
 
 	datos_temp["items"] = items
 	datos_temp["total"] = total
+	_sincronizar_campos_legacy_desde_items(datos_temp)
 	datos_temp["parser_confidence_score"] = float(extraccion.get("confidence_score") or 0)
 	datos_temp["parser_parse_mode"] = str(extraccion.get("parse_mode") or "unknown")
 	resumen = _formatear_carrito(items, total)
@@ -2718,6 +2788,7 @@ def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 				datos_temp["cliente_apellidos"] = " ".join(partes[1:])
 
 		_persistir_datos_cliente(cliente, datos_temp)
+		_normalizar_items_legacy(datos_temp)
 
 		items = datos_temp.get("items") or []
 		if not items:
@@ -2778,6 +2849,7 @@ def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 		out["datos_temp"] = nuevos_datos
 		return out
 	except Exception:
+		logger.exception("Error al confirmar pedido en handle_completado")
 		response = _armar_respuesta_comercial(
 			"Ay parce, hubo un problemita. ¿Puede intentarlo en un momento?",
 			"No perdi su carrito, intentemos confirmar otra vez.",

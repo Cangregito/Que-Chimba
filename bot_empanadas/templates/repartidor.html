@@ -4,27 +4,50 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Que Chimba | Repartidor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["Manrope", "Segoe UI", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <script crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="/static/ui/soft-ui-components.js"></script>
+  <link rel="stylesheet" href="/static/ui/soft-ui-theme.css" />
   <script src="https://unpkg.com/html5-qrcode" defer></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+
     :root {
-      --bg: #FFFFFF;
-      --surface: #F8F8F7;
-      --line: #E5E5E3;
-      --text: #1A1A1A;
-      --text-2: #6B6B6B;
-      --text-3: #9B9B9B;
-      --accent: #1F2328;
-      --blue-bg: #E6F1FB;
-      --blue-fg: #0C447C;
-      --green-bg: #EAF3DE;
-      --green-fg: #27500A;
-      --amber-bg: #FAEEDA;
-      --amber-fg: #633806;
-      --red-bg: #FCEBEB;
-      --red-fg: #791F1F;
-      --r-sm: 8px;
-      --r-lg: 12px;
-      --t: 120ms ease;
+      --bg: #F8F9FA;
+      --surface: #FFFFFF;
+      --line: #F1F5F9;
+      --text: #111827;
+      --text-2: #6B7280;
+      --text-3: #9CA3AF;
+      --accent: #4F46E5;
+      --accent-bg: #EEF2FF;
+      --blue-bg: #EEF2FF;
+      --blue-fg: #4338CA;
+      --green-bg: #ECFDF3;
+      --green-fg: #047857;
+      --amber-bg: #FFFBEB;
+      --amber-fg: #B45309;
+      --red-bg: #FFF1F2;
+      --red-fg: #BE123C;
+      --r-sm: 12px;
+      --r-lg: 20px;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 12px 24px rgba(15, 23, 42, 0.08);
+      --t: 300ms ease;
     }
 
     * { box-sizing: border-box; }
@@ -36,8 +59,9 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: 'Manrope', 'Segoe UI', sans-serif;
       font-weight: 400;
+      background-image: radial-gradient(circle at 10% 0%, rgba(79, 70, 229, 0.08), transparent 35%), radial-gradient(circle at 88% 18%, rgba(16, 185, 129, 0.08), transparent 28%);
     }
 
     button,
@@ -51,29 +75,32 @@
     .main {
       max-width: 1360px;
       margin: 0 auto;
-      padding: 16px;
+      padding: 28px;
       display: grid;
       grid-template-columns: 1.75fr 1fr;
-      gap: 12px;
+      gap: 20px;
     }
 
     .top {
       grid-column: 1 / -1;
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-lg);
       background: var(--surface);
-      padding: 12px;
+      padding: 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
       flex-wrap: wrap;
+      box-shadow: var(--shadow-sm);
+      animation: ui-rise 420ms ease both;
     }
 
     .top h1 {
       margin: 0;
-      font-size: 16px;
-      font-weight: 500;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .sub {
@@ -84,52 +111,68 @@
 
     .chip {
       border-radius: 999px;
-      padding: 4px 10px;
+      padding: 5px 11px;
       font-size: 12px;
-      font-weight: 500;
-      border: 0.5px solid transparent;
+      font-weight: 600;
+      border: 1px solid transparent;
       display: inline-flex;
       align-items: center;
       white-space: nowrap;
     }
 
-    .chip.blue { background: var(--blue-bg); color: var(--blue-fg); }
-    .chip.green { background: var(--green-bg); color: var(--green-fg); }
-    .chip.amber { background: var(--amber-bg); color: var(--amber-fg); }
-    .chip.red { background: var(--red-bg); color: var(--red-fg); }
+    .chip.blue { background: #EEF2FF; color: #4338CA; border-color: #E0E7FF; }
+    .chip.green { background: #ECFDF3; color: #047857; border-color: #D1FAE5; }
+    .chip.amber { background: #FFFBEB; color: #B45309; border-color: #FDE68A; }
+    .chip.red { background: #FFF1F2; color: #BE123C; border-color: #FFE4E6; }
 
     .kpis {
       display: grid;
       grid-template-columns: repeat(3, minmax(120px, 1fr));
-      gap: 8px;
+      gap: 12px;
       width: 100%;
     }
 
     .kpi {
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
-      background: var(--bg);
-      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--surface);
+      padding: 18px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--t);
+      animation: ui-rise 520ms ease both;
+    }
+
+    .kpi:nth-child(2) { animation-delay: 60ms; }
+    .kpi:nth-child(3) { animation-delay: 110ms; }
+
+    .kpi:hover {
+      box-shadow: var(--shadow-md);
     }
 
     .kpi p {
       margin: 0;
       color: var(--text-2);
-      font-size: 12px;
+      font-size: 13px;
     }
 
     .kpi h2 {
       margin: 6px 0 0;
-      font-size: 22px;
-      font-weight: 500;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
     }
 
     .panel {
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-lg);
-      background: var(--bg);
-      padding: 12px;
+      background: var(--surface);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      animation: ui-rise 500ms ease both;
     }
+
+    .panel:nth-of-type(2) { animation-delay: 70ms; }
+    .panel:nth-of-type(3) { animation-delay: 130ms; }
 
     .head {
       display: flex;
@@ -137,54 +180,75 @@
       justify-content: space-between;
       gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: 10px;
+      margin-bottom: 14px;
     }
 
     .head h3 {
       margin: 0;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }
 
     .btn {
-      border: 0.5px solid var(--line);
+      border: 1px solid transparent;
       border-radius: var(--r-sm);
-      background: var(--surface);
-      color: var(--text);
-      padding: 8px 12px;
-      min-height: 34px;
+      background: transparent;
+      color: var(--text-2);
+      padding: 10px 14px;
+      min-height: 38px;
       cursor: pointer;
-      transition: background var(--t), opacity var(--t);
+      transition: background var(--t), color var(--t), border-color var(--t), box-shadow var(--t);
     }
 
-    .btn:hover { background: #EFEFEE; }
+    .btn:hover {
+      background: #F9FAFB;
+      color: var(--text);
+    }
 
     .btn.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #FFFFFF;
+      background: var(--accent-bg);
+      border-color: #E0E7FF;
+      color: var(--accent);
+      font-weight: 600;
     }
 
     .btn:focus-visible,
     input:focus-visible,
     select:focus-visible,
     textarea:focus-visible {
-      outline: 2px solid rgba(12, 68, 124, 0.35);
+      outline: 2px solid rgba(79, 70, 229, 0.25);
       outline-offset: 1px;
     }
 
     .orders,
     .route {
       display: grid;
-      gap: 8px;
+      gap: 12px;
+    }
+
+    aside.panel {
+      position: sticky;
+      top: 18px;
+      align-self: start;
+      max-height: calc(100vh - 36px);
+      overflow: auto;
     }
 
     .order-card,
     .route-card {
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
       background: var(--surface);
-      padding: 10px;
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--t), transform var(--t);
+    }
+
+    .order-card:hover,
+    .route-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
     }
 
     .order-head {
@@ -193,20 +257,21 @@
       justify-content: space-between;
       gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
 
     .order-id {
       margin: 0;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }
 
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px 10px;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-2);
       margin-bottom: 8px;
     }
@@ -217,12 +282,12 @@
     }
 
     .products {
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-sm);
-      background: var(--bg);
-      padding: 8px;
+      background: #F8FAFC;
+      padding: 10px;
       margin-bottom: 8px;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-2);
       white-space: pre-wrap;
       line-height: 1.45;
@@ -231,23 +296,24 @@
     .actions {
       display: grid;
       grid-template-columns: repeat(3, minmax(120px, 1fr));
-      gap: 6px;
+      gap: 8px;
+      margin-top: 2px;
     }
 
     .confirm-box {
       display: none;
       margin-top: 8px;
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-sm);
-      background: var(--bg);
-      padding: 8px;
+      background: #F8FAFC;
+      padding: 10px;
     }
 
     .confirm-box.active { display: block; }
 
     .confirm-box label {
       display: block;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-2);
       margin-bottom: 6px;
     }
@@ -264,11 +330,20 @@
 
     .confirm-row input {
       width: 100%;
-      border: 0.5px solid var(--line);
-      border-radius: var(--r-sm);
-      background: #FFFFFF;
-      padding: 8px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: #F9FAFB;
+      padding: 10px 14px;
       text-transform: uppercase;
+      font-size: 13px;
+      transition: background var(--t), border-color var(--t), box-shadow var(--t);
+    }
+
+    .confirm-row input:focus {
+      outline: none;
+      background: #FFFFFF;
+      border-color: #A5B4FC;
+      box-shadow: 0 0 0 3px rgba(224, 231, 255, 0.95);
     }
 
     .small-note {
@@ -288,17 +363,18 @@
       width: 24px;
       height: 24px;
       border-radius: 999px;
-      background: var(--accent);
-      color: #FFFFFF;
+      background: var(--accent-bg);
+      color: var(--accent);
+      border: 1px solid #E0E7FF;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 700;
     }
 
     .route-main {
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-2);
       line-height: 1.4;
     }
@@ -309,34 +385,34 @@
     }
 
     .empty {
-      border: 0.5px dashed var(--line);
-      border-radius: var(--r-sm);
+      border: 1px dashed #E2E8F0;
+      border-radius: var(--r-lg);
       color: var(--text-3);
-      font-size: 12px;
+      font-size: 13px;
       text-align: center;
-      padding: 12px;
-      background: var(--surface);
+      padding: 14px;
+      background: #FFFFFF;
     }
 
     .alert {
       display: none;
       border-radius: var(--r-sm);
-      border: 0.5px solid transparent;
-      padding: 8px;
-      font-size: 12px;
+      border: 1px solid transparent;
+      padding: 10px;
+      font-size: 13px;
       margin-bottom: 8px;
     }
 
     .alert.show { display: block; }
-    .alert.success { background: var(--green-bg); color: var(--green-fg); border-color: #CDDDBA; }
-    .alert.error { background: var(--red-bg); color: var(--red-fg); border-color: #E3C3C3; }
+    .alert.success { background: #ECFDF3; color: #047857; border-color: #D1FAE5; }
+    .alert.error { background: #FFF1F2; color: #BE123C; border-color: #FFE4E6; }
 
     .qr-scanner {
       margin-top: 8px;
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-sm);
-      background: var(--surface);
-      padding: 8px;
+      background: #F8FAFC;
+      padding: 10px;
       display: none;
     }
 
@@ -353,15 +429,15 @@
     }
 
     .qr-scanner-head strong {
-      font-size: 13px;
-      font-weight: 500;
+      font-size: 14px;
+      font-weight: 600;
     }
 
     .qr-reader {
       width: 100%;
       max-width: 360px;
       margin: 0 auto;
-      border: 0.5px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-sm);
       overflow: hidden;
       background: #000;
@@ -369,9 +445,20 @@
 
     .qr-help {
       margin-top: 8px;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-2);
       text-align: center;
+    }
+
+    @keyframes ui-rise {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @media (max-width: 1080px) {
@@ -387,22 +474,66 @@
       .route-card { grid-template-columns: auto 1fr; }
       .route-card .btn { grid-column: 1 / -1; }
     }
+
+    .main {
+      max-width: 1320px;
+      padding: clamp(16px, 2.2vw, 30px);
+      gap: 24px;
+      grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .top .chip.blue {
+      grid-column: 1;
+      grid-row: 2;
+      justify-self: start;
+    }
+
+    #react-ui-repartidor-top-actions {
+      grid-column: 2;
+      grid-row: 1;
+      justify-self: end;
+    }
+
+    #react-ui-repartidor-kpis {
+      grid-row: 3;
+      grid-column: 1 / -1;
+    }
+
+    .actions {
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    }
+
+    .order-card,
+    .route-card {
+      padding: 12px;
+    }
+
+    .products {
+      margin-bottom: 10px;
+      padding: 9px;
+    }
+
   </style>
 </head>
-<body>
+<body class="soft-page">
   <main class="main">
+    <div id="react-ui-repartidor-strip"></div>
     <section class="top">
       <div>
         <h1>Panel de Repartidor</h1>
         <div class="sub">Confirmacion de entregas por codigo y ruta por CP.</div>
       </div>
       <div class="chip blue">Repartidor: {{ (user.username if user else 'demo') }}</div>
-      <button class="btn" id="btn-logout" type="button">Salir</button>
-      <div class="kpis">
-        <article class="kpi"><p>Pedidos listos</p><h2 id="stat-listos">0</h2></article>
-        <article class="kpi"><p>Pendientes confirmar</p><h2 id="stat-pendientes">0</h2></article>
-        <article class="kpi"><p>CP unicos</p><h2 id="stat-cps">0</h2></article>
-      </div>
+      <div id="react-ui-repartidor-top-actions"></div>
+      <div id="react-ui-repartidor-kpis"></div>
     </section>
 
     <section class="panel">
@@ -410,11 +541,8 @@
       <div id="msg-error" class="alert error" role="alert" aria-live="assertive"></div>
 
       <div class="head">
-        <h3>Pedidos asignados (estado listo)</h3>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn" id="btn-scan-qr" type="button">Escanear QR</button>
-          <button class="btn" id="btn-refresh" type="button">Actualizar</button>
-        </div>
+        <div id="react-ui-repartidor-orders-heading"></div>
+        <div id="react-ui-repartidor-actions"></div>
       </div>
 
       <div id="qr-scanner" class="qr-scanner" aria-live="polite">
@@ -427,23 +555,118 @@
       </div>
 
       <div class="orders" id="orders-container">
-        <div class="empty">Cargando pedidos...</div>
+        <div id="react-ui-repartidor-orders-empty"></div>
       </div>
     </section>
 
     <aside class="panel">
       <div class="head">
-        <h3>Ruta sugerida</h3>
-        <span class="sub">Orden por CP</span>
+        <div id="react-ui-repartidor-route-heading"></div>
       </div>
       <div class="route" id="route-container">
-        <div class="empty">La ruta aparecera cuando haya pedidos listos.</div>
+        <div id="react-ui-repartidor-route-empty"></div>
       </div>
     </aside>
   </main>
 
   <script>
-    (function () {
+    window.addEventListener("DOMContentLoaded", function () {
+      function ensureRepartidorFallbackNodes() {
+        const kpiHost = document.getElementById("react-ui-repartidor-kpis");
+        if (kpiHost && !document.getElementById("stat-listos")) {
+          kpiHost.innerHTML = "" +
+            "<div class='kpis'>" +
+              "<article class='kpi'><p>Pedidos listos</p><h2 id='stat-listos'>0</h2></article>" +
+              "<article class='kpi'><p>Pendientes confirmar</p><h2 id='stat-pendientes'>0</h2></article>" +
+              "<article class='kpi'><p>CP unicos</p><h2 id='stat-cps'>0</h2></article>" +
+            "</div>";
+        }
+
+        const actionHost = document.getElementById("react-ui-repartidor-actions");
+        if (actionHost && !document.getElementById("btn-refresh")) {
+          actionHost.innerHTML = "" +
+            "<div class='soft-actions'>" +
+              "<button id='btn-scan-qr' class='btn rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200' type='button'>Escanear QR</button>" +
+              "<button id='btn-refresh' class='btn rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200' type='button'>Actualizar</button>" +
+            "</div>";
+        }
+
+        const topActionHost = document.getElementById("react-ui-repartidor-top-actions");
+        if (topActionHost && !document.getElementById("btn-logout")) {
+          topActionHost.innerHTML = "" +
+            "<div class='soft-actions'>" +
+              "<button id='btn-logout' class='btn rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200' type='button'>Salir</button>" +
+            "</div>";
+        }
+      }
+
+      if (window.QCSoftUI && typeof window.QCSoftUI.mountSoftHeaderStrip === "function") {
+        window.QCSoftUI.mountSoftHeaderStrip("react-ui-repartidor-strip", {
+          items: [
+            { tone: "indigo", text: "Repartidor" },
+            { tone: "rose", text: "Confirmacion segura" },
+            { tone: "amber", text: "UI React + Tailwind" }
+          ]
+        });
+
+        if (typeof window.QCSoftUI.mountSoftPanelHeading === "function") {
+          window.QCSoftUI.mountSoftPanelHeading("react-ui-repartidor-orders-heading", {
+            title: "Pedidos asignados",
+            subtitle: "Estado listo para entregar",
+            icon: "package-check",
+            tone: "indigo"
+          });
+          window.QCSoftUI.mountSoftPanelHeading("react-ui-repartidor-route-heading", {
+            title: "Ruta sugerida",
+            subtitle: "Orden por CP",
+            icon: "route",
+            tone: "amber"
+          });
+        }
+
+        if (typeof window.QCSoftUI.mountSoftKpiRow === "function") {
+          window.QCSoftUI.mountSoftKpiRow("react-ui-repartidor-kpis", {
+            items: [
+              { label: "Pedidos listos", valueId: "stat-listos", initialValue: "0" },
+              { label: "Pendientes confirmar", valueId: "stat-pendientes", initialValue: "0" },
+              { label: "CP unicos", valueId: "stat-cps", initialValue: "0" }
+            ]
+          });
+        }
+
+        if (typeof window.QCSoftUI.mountSoftActionButtons === "function") {
+          window.QCSoftUI.mountSoftActionButtons("react-ui-repartidor-actions", {
+            items: [
+              { id: "btn-scan-qr", text: "Escanear QR", tone: "ghost" },
+              { id: "btn-refresh", text: "Actualizar", tone: "ghost" }
+            ]
+          });
+
+          window.QCSoftUI.mountSoftActionButtons("react-ui-repartidor-top-actions", {
+            items: [
+              { id: "btn-logout", text: "Salir", tone: "ghost" }
+            ]
+          });
+        }
+
+        if (typeof window.QCSoftUI.mountSoftEmptyState === "function") {
+          window.QCSoftUI.mountSoftEmptyState("react-ui-repartidor-orders-empty", {
+            text: "Cargando pedidos..."
+          });
+          window.QCSoftUI.mountSoftEmptyState("react-ui-repartidor-route-empty", {
+            text: "La ruta aparecera cuando haya pedidos listos."
+          });
+        }
+      }
+
+      ensureRepartidorFallbackNodes();
+
+      if (typeof initRepartidorPanel === "function") {
+        setTimeout(initRepartidorPanel, 0);
+      }
+    });
+
+    function initRepartidorPanel() {
       let allPedidos = [];
       let refreshTimer = null;
       let isLoadingPedidos = false;
@@ -459,13 +682,19 @@
       const statListos = document.getElementById("stat-listos");
       const statPendientes = document.getElementById("stat-pendientes");
       const statCps = document.getElementById("stat-cps");
-      const btnLogout = document.getElementById("btn-logout");
       const btnScanQr = document.getElementById("btn-scan-qr");
       const btnStopScan = document.getElementById("btn-stop-scan");
 
       const REFRESH_MS = 12000;
       let qrScanner = null;
       let qrScannerRunning = false;
+
+      const UI_BTN_GHOST = "btn rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200";
+      const UI_BTN_PRIMARY = "btn primary rounded-xl bg-indigo-50 text-indigo-600 font-medium hover:bg-indigo-100 transition-colors duration-200";
+      const UI_CHIP = {
+        amber: "chip amber rounded-full bg-amber-50 text-amber-700 border border-amber-100",
+        green: "chip green rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100"
+      };
 
       function esc(value) {
         return String(value == null ? "" : value)
@@ -481,6 +710,10 @@
           .replaceAll("\\", "\\\\")
           .replaceAll("'", "\\'")
           .replaceAll("\n", " ");
+      }
+
+      function emptyState(text) {
+        return "<div class='empty rounded-2xl border border-dashed border-gray-200 bg-white/90 text-gray-500'>" + esc(text) + "</div>";
       }
 
       function hideMessages() {
@@ -622,7 +855,7 @@
 
       function renderPedidos(pedidos) {
         if (!pedidos.length) {
-          ordersContainer.innerHTML = "<div class='empty'>No hay pedidos en estado listo para este repartidor.</div>";
+          ordersContainer.innerHTML = emptyState("No hay pedidos en estado listo para este repartidor.");
           return;
         }
 
@@ -630,10 +863,10 @@
           const inputId = "codigo-" + pedido.id;
           const boxId = "confirm-" + pedido.id;
           return (
-            "<article class='order-card' data-pedido-id='" + esc(pedido.id) + "'>" +
+            "<article class='order-card bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300' data-pedido-id='" + esc(pedido.id) + "'>" +
               "<div class='order-head'>" +
                 "<h4 class='order-id'>Pedido #" + esc(pedido.id) + "</h4>" +
-                "<span class='chip green'>listo</span>" +
+                "<span class='" + UI_CHIP.green + "'>listo</span>" +
               "</div>" +
 
               "<div class='grid'>" +
@@ -646,9 +879,9 @@
               "<div class='products'>" + esc(pedido.productos) + "</div>" +
 
               "<div class='actions'>" +
-                "<button class='btn primary' type='button' onclick='openConfirm(" + Number(pedido.id) + ")'>Confirmar entrega</button>" +
-                "<button class='btn' type='button' onclick='reenviarCodigo(" + Number(pedido.id) + ")'>Reenviar codigo</button>" +
-                "<button class='btn' type='button' onclick='openMaps(\'" + jsEsc(pedido.direccion) + "\')'>Abrir Maps</button>" +
+                "<button class='" + UI_BTN_PRIMARY + "' type='button' onclick='openConfirm(" + Number(pedido.id) + ")'>Confirmar entrega</button>" +
+                "<button class='" + UI_BTN_GHOST + "' type='button' onclick='reenviarCodigo(" + Number(pedido.id) + ")'>Reenviar codigo</button>" +
+                "<button class='" + UI_BTN_GHOST + "' type='button' data-action='maps' data-address='" + esc(pedido.direccion) + "'>Abrir Maps</button>" +
               "</div>" +
 
               "<div class='confirm-box' id='" + boxId + "'>" +
@@ -658,8 +891,8 @@
                   (pedido.metodoPago === "contra_entrega_ficticio"
                     ? "<input id='pay-" + Number(pedido.id) + "' type='text' maxlength='30' autocomplete='off' placeholder='Confirmacion pago (ej. PAY-000123)' />"
                     : "") +
-                  "<button class='btn primary' type='button' onclick='confirmarEntrega(" + Number(pedido.id) + ")'>Enviar</button>" +
-                  "<button class='btn' type='button' onclick='closeConfirm(" + Number(pedido.id) + ")'>Cancelar</button>" +
+                  "<button class='" + UI_BTN_PRIMARY + "' type='button' onclick='confirmarEntrega(" + Number(pedido.id) + ")'>Enviar</button>" +
+                  "<button class='" + UI_BTN_GHOST + "' type='button' onclick='closeConfirm(" + Number(pedido.id) + ")'>Cancelar</button>" +
                 "</div>" +
                 (pedido.metodoPago === "contra_entrega_ficticio"
                   ? "<div class='small-note'>Primero confirma el pago al entregar y luego libera el pedido.</div>"
@@ -672,16 +905,16 @@
 
       function renderRuta(pedidosListos) {
         if (!pedidosListos.length) {
-          routeContainer.innerHTML = "<div class='empty'>Sin pedidos para calcular ruta.</div>";
+          routeContainer.innerHTML = emptyState("Sin pedidos para calcular ruta.");
           return;
         }
 
         const ordenados = [...pedidosListos].sort((a, b) => String(a.cp).localeCompare(String(b.cp)));
         routeContainer.innerHTML = ordenados.map((pedido, idx) => (
-          "<article class='route-card'>" +
+          "<article class='route-card bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300'>" +
             "<div class='route-order'>" + (idx + 1) + "</div>" +
-            "<div class='route-main'><strong>Pedido #" + esc(pedido.id) + "</strong><br>" + esc(pedido.cliente) + "<br>" + esc(pedido.direccion) + "<br><span class='chip amber'>CP " + esc(pedido.cp) + "</span></div>" +
-            "<button class='btn' type='button' onclick='openMaps(\'" + jsEsc(pedido.direccion) + "\')'>Maps</button>" +
+            "<div class='route-main'><strong>Pedido #" + esc(pedido.id) + "</strong><br>" + esc(pedido.cliente) + "<br>" + esc(pedido.direccion) + "<br><span class='" + UI_CHIP.amber + "'>CP " + esc(pedido.cp) + "</span></div>" +
+            "<button class='" + UI_BTN_GHOST + "' type='button' data-action='maps' data-address='" + esc(pedido.direccion) + "'>Maps</button>" +
           "</article>"
         )).join("");
       }
@@ -805,7 +1038,11 @@
 
       function openMaps(direccion) {
         const q = encodeURIComponent(direccion || "");
-        window.open("https://www.google.com/maps/search/?api=1&query=" + q, "_blank", "noopener");
+        const mapsUrl = "https://www.google.com/maps/search/?api=1&query=" + q;
+        const popup = window.open(mapsUrl, "_blank", "noopener");
+        if (!popup) {
+          window.location.href = mapsUrl;
+        }
       }
 
       function parseQrPayload(rawText) {
@@ -916,14 +1153,42 @@
         });
       }
 
-      document.getElementById("btn-refresh").addEventListener("click", () => {
-        loadPedidos(true);
+      ordersContainer.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const mapsBtn = target.closest("[data-action='maps']");
+        if (!mapsBtn) return;
+        const direccion = mapsBtn.getAttribute("data-address") || "";
+        openMaps(direccion);
       });
 
-      if (btnLogout) {
-        btnLogout.addEventListener("click", async () => {
-          btnLogout.disabled = true;
-          btnLogout.textContent = "Saliendo...";
+      routeContainer.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const mapsBtn = target.closest("[data-action='maps']");
+        if (!mapsBtn) return;
+        const direccion = mapsBtn.getAttribute("data-address") || "";
+        openMaps(direccion);
+      });
+
+      const btnRefresh = document.getElementById("btn-refresh");
+      if (btnRefresh) {
+        btnRefresh.addEventListener("click", () => {
+          loadPedidos(true);
+        });
+      }
+
+      if (!window.__qcRepartidorLogoutBound) {
+        document.addEventListener("click", async (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          const logoutBtn = target.closest("#btn-logout");
+          if (!logoutBtn) return;
+          if (logoutBtn.dataset.busy === "1") return;
+
+          logoutBtn.dataset.busy = "1";
+          logoutBtn.setAttribute("disabled", "disabled");
+          logoutBtn.textContent = "Saliendo...";
           try {
             await fetch("/logout", {
               method: "POST",
@@ -935,6 +1200,7 @@
             window.location.href = "/login";
           }
         });
+        window.__qcRepartidorLogoutBound = true;
       }
 
       loadPedidos(true).catch(() => {});
@@ -952,7 +1218,7 @@
           stopQrScanner();
         }
       });
-    })();
+    }
   </script>
 </body>
 </html>
