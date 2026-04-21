@@ -6,7 +6,7 @@ DEFAULT_BAILEYS_BRIDGE_URL = "http://localhost:3001"
 DEFAULT_PUBLIC_BASE_URL = "http://localhost:5000"
 DEFAULT_N8N_WEBHOOK_URL = ""
 DEFAULT_WHATSAPP_PUBLIC_NUMBER = "526567751166"
-DEFAULT_WHATSAPP_PUBLIC_MESSAGE = "Hola Que Chimba, quiero pedir unas empanadas"
+DEFAULT_WHATSAPP_PUBLIC_MESSAGE = "Hola La Malparida Empanada, quiero pedir unas empanadas"
 
 
 def env_str(name: str, default: str = "") -> str:

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Que Chimba | Repartidor</title>
+  <title>La Malparida Empanada | Repartidor</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -521,6 +521,118 @@
       padding: 9px;
     }
 
+    @media (max-width: 900px) {
+      .main {
+        padding: 12px;
+        gap: 14px;
+        grid-template-columns: 1fr;
+      }
+
+      .top {
+        grid-template-columns: 1fr;
+        padding: 14px;
+      }
+
+      .top .chip.blue {
+        grid-column: 1;
+        grid-row: auto;
+      }
+
+      #react-ui-repartidor-top-actions,
+      #react-ui-repartidor-kpis {
+        grid-column: 1;
+        grid-row: auto;
+        justify-self: stretch;
+      }
+
+      .panel {
+        padding: 14px;
+      }
+
+      aside.panel {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .top h1 {
+        font-size: 18px;
+      }
+
+      .actions {
+        grid-template-columns: 1fr;
+      }
+
+      .confirm-row.two-inputs {
+        grid-template-columns: 1fr;
+      }
+
+      .order-card,
+      .route-card {
+        padding: 10px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      html,
+      body {
+        overflow-x: hidden;
+      }
+
+      .main,
+      .top,
+      .panel,
+      .kpis,
+      .orders,
+      .route,
+      .order-card,
+      .route-card,
+      .grid,
+      .actions,
+      .confirm-box,
+      .confirm-row,
+      .confirm-row.two-inputs,
+      .products,
+      .qr-scanner {
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .main {
+        padding: 10px;
+      }
+
+      .kpi h2 {
+        font-size: 24px;
+      }
+
+      .actions,
+      .confirm-row,
+      .confirm-row.two-inputs {
+        grid-template-columns: 1fr;
+      }
+
+      .actions .btn,
+      .confirm-row .btn {
+        width: 100%;
+      }
+
+      .route-card {
+        grid-template-columns: 1fr;
+      }
+
+      .route-order {
+        width: 22px;
+        height: 22px;
+      }
+
+      .qr-reader {
+        max-width: 100%;
+      }
+    }
+
   </style>
 </head>
 <body class="soft-page">
@@ -529,7 +641,7 @@
     <section class="top">
       <div>
         <h1>Panel de Repartidor</h1>
-        <div class="sub">Confirmacion de entregas por codigo y ruta por CP.</div>
+        <div class="sub">Validacion QR de entregas y ruta por CP.</div>
       </div>
       <div class="chip blue">Repartidor: {{ (user.username if user else 'demo') }}</div>
       <div id="react-ui-repartidor-top-actions"></div>
@@ -551,7 +663,7 @@
           <button class="btn" id="btn-stop-scan" type="button">Cerrar</button>
         </div>
         <div id="qr-reader" class="qr-reader"></div>
-        <div class="qr-help">Apunta la camara al QR del pedido para abrir su confirmacion.</div>
+        <div class="qr-help">Apunta la camara al QR del cliente o de cocina para validar la entrega.</div>
       </div>
 
       <div class="orders" id="orders-container">
@@ -695,6 +807,8 @@
         amber: "chip amber rounded-full bg-amber-50 text-amber-700 border border-amber-100",
         green: "chip green rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100"
       };
+      let pendingScanPedidoId = null;
+      let qrScriptLoadingPromise = null;
 
       function esc(value) {
         return String(value == null ? "" : value)
@@ -885,13 +999,15 @@
               "</div>" +
 
               "<div class='confirm-box' id='" + boxId + "'>" +
-                "<label for='" + inputId + "'>Ingresa el codigo del cliente:</label>" +
+                "<label>Escanea el QR para validar la entrega o escribe el codigo de entrega para liberar el pedido.</label>" +
+                "<input id='" + inputId + "' type='text' maxlength='12' autocomplete='off' placeholder='Codigo de entrega' />" +
+                "<div id='qr-state-" + Number(pedido.id) + "' class='small-note'>Aun no hay validacion QR; tambien puedes capturar el codigo manualmente.</div>" +
                 "<div class='confirm-row " + (pedido.metodoPago === "contra_entrega_ficticio" ? "two-inputs" : "") + "'>" +
-                  "<input id='" + inputId + "' type='text' maxlength='12' autocomplete='off' placeholder='Ej: 483920' />" +
                   (pedido.metodoPago === "contra_entrega_ficticio"
                     ? "<input id='pay-" + Number(pedido.id) + "' type='text' maxlength='30' autocomplete='off' placeholder='Confirmacion pago (ej. PAY-000123)' />"
                     : "") +
-                  "<button class='" + UI_BTN_PRIMARY + "' type='button' onclick='confirmarEntrega(" + Number(pedido.id) + ")'>Enviar</button>" +
+                  "<button class='" + UI_BTN_GHOST + "' type='button' onclick='startQrScanner(" + Number(pedido.id) + ")'>Escanear QR</button>" +
+                  "<button class='" + UI_BTN_PRIMARY + "' type='button' onclick='confirmarEntrega(" + Number(pedido.id) + ")'>Liberar pedido</button>" +
                   "<button class='" + UI_BTN_GHOST + "' type='button' onclick='closeConfirm(" + Number(pedido.id) + ")'>Cancelar</button>" +
                 "</div>" +
                 (pedido.metodoPago === "contra_entrega_ficticio"
@@ -919,15 +1035,68 @@
         )).join("");
       }
 
+      function setQrState(pedidoId, message) {
+        const statusNode = document.getElementById("qr-state-" + pedidoId);
+        if (statusNode) {
+          statusNode.textContent = message;
+        }
+      }
+
+      function setScannedCode(pedidoId, codigo) {
+        const input = document.getElementById("codigo-" + pedidoId);
+        if (input) {
+          input.value = String(codigo || "").trim().toUpperCase();
+        }
+      }
+
+      async function ensureQrLibraryReady() {
+        if (typeof Html5Qrcode !== "undefined") {
+          return true;
+        }
+        if (!qrScriptLoadingPromise) {
+          qrScriptLoadingPromise = new Promise((resolve, reject) => {
+            const existing = document.getElementById("html5-qrcode-fallback");
+            if (existing) {
+              existing.addEventListener("load", () => resolve(true), { once: true });
+              existing.addEventListener("error", () => reject(new Error("load_error")), { once: true });
+              return;
+            }
+            const script = document.createElement("script");
+            script.id = "html5-qrcode-fallback";
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js";
+            script.async = true;
+            script.onload = () => resolve(true);
+            script.onerror = () => reject(new Error("load_error"));
+            document.head.appendChild(script);
+          }).catch(() => false);
+        }
+        return Boolean(await qrScriptLoadingPromise);
+      }
+
+      async function fetchCodigoEntregaForPedido(pedidoId) {
+        const res = await fetch("/api/pedidos/" + pedidoId + "/codigo-entrega", {
+          method: "GET",
+          credentials: "same-origin",
+          headers: { "Accept": "application/json" }
+        });
+        const payload = await res.json().catch(() => ({}));
+        const ok = Boolean(payload && (payload.ok === true || payload.success === true));
+        if (!res.ok || !ok) {
+          throw new Error((payload && (payload.error || payload.mensaje)) || "No se pudo obtener el codigo de entrega.");
+        }
+        const data = payload && payload.data ? payload.data : {};
+        return data && data.codigo_entrega ? String(data.codigo_entrega).trim().toUpperCase() : "";
+      }
+
       function openConfirm(pedidoId) {
         document.querySelectorAll(".confirm-box.active").forEach((el) => el.classList.remove("active"));
         const box = document.getElementById("confirm-" + pedidoId);
-        const input = document.getElementById("codigo-" + pedidoId);
         if (box) box.classList.add("active");
-        if (input) {
-          input.value = "";
+        const input = document.getElementById("codigo-" + pedidoId);
+        if (input && !input.value) {
           input.focus();
         }
+        setQrState(pedidoId, "Escanea el QR o captura el codigo de entrega.");
       }
 
       function closeConfirm(pedidoId) {
@@ -944,7 +1113,7 @@
         const pagoInput = document.getElementById("pay-" + pedidoId);
         const numeroConfirmacionPago = pagoInput && pagoInput.value ? pagoInput.value.trim().toUpperCase() : "";
         if (!codigo) {
-          showError("Debes ingresar el codigo del cliente para confirmar la entrega.");
+          showError("Escanea el QR o escribe el codigo de entrega que recibio el cliente para liberar el pedido.");
           return;
         }
         if (metodoPago === "contra_entrega_ficticio" && !numeroConfirmacionPago) {
@@ -1025,9 +1194,12 @@
           }
 
           const data = payload && payload.data ? payload.data : {};
-          const codigo = data && data.codigo_entrega ? String(data.codigo_entrega).trim() : "";
+          const codigo = data && data.codigo_entrega ? String(data.codigo_entrega).trim().toUpperCase() : "";
           if (codigo) {
-            showSuccess("Codigo listo para reenviar: " + codigo);
+            setScannedCode(pedidoId, codigo);
+            openConfirm(pedidoId);
+            setQrState(pedidoId, "Codigo cargado correctamente. Ya puedes liberar el pedido o escanear el QR.");
+            showSuccess("Codigo reenviado al cliente y listo para liberar: " + codigo);
           } else {
             showSuccess("Codigo reenviado al cliente por WhatsApp.");
           }
@@ -1046,6 +1218,24 @@
       }
 
       function parseQrPayload(rawText) {
+        // Formato pipe: QC|pedido:23|codigo:GK24D8
+        if (rawText && rawText.startsWith("QC|")) {
+          try {
+            const parts = rawText.split("|");
+            let pedidoId = null, codigoEntrega = "";
+            for (const part of parts) {
+              const [key, val] = part.split(":");
+              if (key === "pedido") pedidoId = Number(val);
+              if (key === "codigo") codigoEntrega = String(val || "").trim().toUpperCase();
+            }
+            if (pedidoId && Number.isFinite(pedidoId)) {
+              return { pedidoId, codigoEntrega };
+            }
+          } catch (_err) {
+            return null;
+          }
+        }
+        // Formato JSON legacy
         try {
           let parsed = JSON.parse(rawText);
           if (typeof parsed === "string") {
@@ -1062,16 +1252,22 @@
             return null;
           }
 
-          return { pedidoId };
+          const codigoEntrega = String(parsed.codigo_entrega ?? parsed.codigo ?? "").trim().toUpperCase();
+          return { pedidoId, codigoEntrega };
         } catch (_err) {
           return null;
         }
       }
 
-      function openConfirmFromQrText(rawText) {
+      async function openConfirmFromQrText(rawText) {
         const qrData = parseQrPayload(rawText);
         if (!qrData) {
           showError("QR invalido o no compatible con el formato de cocina.");
+          return;
+        }
+
+        if (pendingScanPedidoId && Number(qrData.pedidoId) !== Number(pendingScanPedidoId)) {
+          showError("El QR escaneado no corresponde al pedido que intentas liberar.");
           return;
         }
 
@@ -1081,11 +1277,30 @@
           return;
         }
 
+        let codigo = qrData.codigoEntrega;
+        if (!codigo) {
+          try {
+            codigo = await fetchCodigoEntregaForPedido(target.id);
+          } catch (err) {
+            showError(err && err.message ? err.message : "No se pudo validar el codigo del pedido escaneado.");
+            return;
+          }
+        }
+
+        if (!codigo) {
+          showError("No se encontro codigo de entrega para este pedido.");
+          return;
+        }
+
+        setScannedCode(target.id, codigo);
         openConfirm(target.id);
-        showSuccess("Pedido #" + target.id + " detectado por QR.");
+        setQrState(target.id, "QR validado correctamente para el pedido #" + target.id + ".");
+        pendingScanPedidoId = null;
+        showSuccess("Pedido #" + target.id + " detectado y validado por QR.");
       }
 
       async function stopQrScanner() {
+        pendingScanPedidoId = null;
         if (!qrScanner || !qrScannerRunning) {
           if (scannerPanel) scannerPanel.classList.remove("active");
           return;
@@ -1102,10 +1317,16 @@
         if (scannerPanel) scannerPanel.classList.remove("active");
       }
 
-      async function startQrScanner() {
+      async function startQrScanner(targetPedidoId) {
         hideMessages();
-        if (typeof Html5Qrcode === "undefined") {
-          showError("El escaner QR no esta disponible en este navegador.");
+        if (targetPedidoId != null) {
+          pendingScanPedidoId = Number(targetPedidoId);
+          openConfirm(targetPedidoId);
+        }
+
+        const libraryReady = await ensureQrLibraryReady();
+        if (!libraryReady || typeof Html5Qrcode === "undefined") {
+          showError("El escaner QR no esta disponible en este navegador en este momento.");
           return;
         }
 
@@ -1119,19 +1340,38 @@
 
         if (scannerPanel) scannerPanel.classList.add("active");
         try {
+          let cameraConfig = { facingMode: "environment" };
+          if (typeof Html5Qrcode.getCameras === "function") {
+            const cameras = await Html5Qrcode.getCameras().catch(() => []);
+            if (Array.isArray(cameras) && cameras.length) {
+              const preferred = cameras.find((cam) => /back|rear|environment|trasera/i.test(String(cam.label || ""))) || cameras[0];
+              cameraConfig = { deviceId: { exact: preferred.id } };
+            }
+          }
+
           await qrScanner.start(
-            { facingMode: "environment" },
+            cameraConfig,
             { fps: 10, qrbox: { width: 240, height: 240 } },
             async (decodedText) => {
               await stopQrScanner();
-              openConfirmFromQrText(decodedText);
+              await openConfirmFromQrText(decodedText);
             },
             () => {}
           );
           qrScannerRunning = true;
-        } catch (_err) {
+        } catch (err) {
           if (scannerPanel) scannerPanel.classList.remove("active");
-          showError("No se pudo iniciar camara para escanear QR.");
+          let msg;
+          if (err && err.name === "NotAllowedError") {
+            msg = "Permiso de camara denegado. Habilitalo en la configuracion del navegador para usar el escaner QR.";
+          } else if (err && err.name === "NotFoundError") {
+            msg = "No se detecto una camara disponible para escanear.";
+          } else if (window.location.protocol !== "https:" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+            msg = "La camara requiere HTTPS. Para usar el escaner, accede al sistema via HTTPS o desde localhost. Alternativa: usa el boton 'Reenviar codigo' para que el cliente te diga su codigo y escríbelo manualmente.";
+          } else {
+            msg = "No se pudo iniciar la camara. Usa el campo de codigo manual o el boton 'Reenviar codigo' para validar la entrega.";
+          }
+          showError(msg);
         }
       }
 
@@ -1140,6 +1380,8 @@
       window.confirmarEntrega = confirmarEntrega;
       window.reenviarCodigo = reenviarCodigo;
       window.openMaps = openMaps;
+      window.startQrScanner = startQrScanner;
+      window.stopQrScanner = stopQrScanner;
 
       if (btnScanQr) {
         btnScanQr.addEventListener("click", () => {

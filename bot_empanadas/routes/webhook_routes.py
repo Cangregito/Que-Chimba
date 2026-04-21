@@ -1,4 +1,5 @@
 from flask import request
+import re
 
 
 def register_webhook_routes(app, deps: dict):
@@ -8,8 +9,30 @@ def register_webhook_routes(app, deps: dict):
     procesar_mensaje_whatsapp = deps["procesar_mensaje_whatsapp"]
     messaging_response_cls = deps["messaging_response_cls"]
     send_audio_whatsapp = deps["send_audio_whatsapp"]
+    verify_payment_status = deps.get("verify_payment_status")
+
+    def _mask_identifier(value):
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        digits = "".join(ch for ch in raw if ch.isdigit())
+        if len(digits) >= 4:
+            return f"***{digits[-4:]}"
+        if len(raw) >= 4:
+            return f"***{raw[-4:]}"
+        return "***"
 
     def webhook_whatsapp():
+        expected_token = app.config.get("WHATSAPP_LEGACY_WEBHOOK_TOKEN", "")
+        if expected_token:
+            incoming_token = (
+                request.headers.get("x-webhook-token")
+                or request.args.get("token")
+                or ""
+            ).strip()
+            if incoming_token != expected_token:
+                return error("Token de webhook legacy invalido", 401)
+
         whatsapp_id = normalize_whatsapp_id(request.values.get("From", ""))
         result = procesar_mensaje_whatsapp(
             whatsapp_id=whatsapp_id,
@@ -59,7 +82,7 @@ def register_webhook_routes(app, deps: dict):
 
         app.logger.info(
             "Webhook Baileys recibido: whatsapp_id=%s has_text=%s media_type=%s has_media_url=%s",
-            whatsapp_id or "",
+            _mask_identifier(whatsapp_id),
             bool(str(mensaje or "").strip()),
             media_type or "",
             bool(media_url),
@@ -101,7 +124,7 @@ def register_webhook_routes(app, deps: dict):
 
         app.logger.info(
             "Webhook Baileys respuesta: whatsapp_id=%s tipo=%s has_audio_url=%s has_audio_colombiano=%s",
-            whatsapp_id,
+            _mask_identifier(whatsapp_id),
             output.get("tipo", "texto"),
             bool(output.get("audio_url")),
             bool(audio_colombiano),
@@ -110,3 +133,55 @@ def register_webhook_routes(app, deps: dict):
         return ok(output)
 
     app.add_url_rule("/webhook/baileys", endpoint="webhook_baileys", view_func=webhook_baileys, methods=["POST"])
+
+    def webhook_pago():
+        expected_token = app.config.get("MP_WEBHOOK_TOKEN", "")
+        if expected_token:
+            incoming_token = (
+                request.headers.get("x-webhook-token")
+                or request.headers.get("x-mp-webhook-token")
+                or request.args.get("token")
+                or ""
+            ).strip()
+            if incoming_token != expected_token:
+                return error("Token de webhook de pagos invalido", 401)
+
+        payload = request.get_json(silent=True) or {}
+
+        data_obj = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        payment_id = (
+            request.args.get("data.id")
+            or request.args.get("id")
+            or request.args.get("payment_id")
+            or payload.get("id")
+            or payload.get("payment_id")
+            or data_obj.get("id")
+        )
+        payment_id = str(payment_id or "").strip()
+
+        if not payment_id or not re.fullmatch(r"\d{1,20}", payment_id):
+            return ok({
+                "ack": True,
+                "processed": False,
+                "reason": "payment_id_missing_or_invalid",
+            })
+
+        verification = verify_payment_status(payment_id) if callable(verify_payment_status) else {"error": "payment_verifier_not_configured"}
+        if isinstance(verification, dict) and verification.get("error"):
+            app.logger.warning("Webhook pago no procesado: payment_id=%s error=%s", payment_id, verification.get("error"))
+            return ok({
+                "ack": True,
+                "processed": False,
+                "payment_id": payment_id,
+                "reason": "verification_failed",
+            })
+
+        return ok({
+            "ack": True,
+            "processed": True,
+            "payment_id": payment_id,
+            "status": verification.get("status") if isinstance(verification, dict) else None,
+            "external_reference": verification.get("external_reference") if isinstance(verification, dict) else None,
+        })
+
+    app.add_url_rule("/webhook/pago", endpoint="webhook_pago", view_func=webhook_pago, methods=["POST"])

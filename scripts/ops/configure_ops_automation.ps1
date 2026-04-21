@@ -9,7 +9,12 @@ param(
     [string]$VerifyDay = "SUN",
     [string]$MirrorRoot = "",
     [string]$AlertWhatsAppTo = "",
-    [string]$AlertWebhookUrl = ""
+    [string]$AlertWebhookUrl = "",
+    [switch]$EnableOneDriveMirror,
+    [switch]$RunWhetherUserLoggedOnOrNot,
+    [switch]$RunWithHighest,
+    [string]$TaskRunAsUser = "",
+    [System.Security.SecureString]$TaskRunAsPassword
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,6 +65,10 @@ $backupArgs = @(
     "-AlertOnSuccess"
 )
 
+if ($EnableOneDriveMirror) {
+    $backupArgs += @("-EnableOneDriveMirror")
+}
+
 $verifyArgs = @(
     "-DbHost", $DbHost,
     "-DbPort", $DbPort,
@@ -92,7 +101,29 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[INFO] Registrando tareas con mirror y alertas..." -ForegroundColor Cyan
-& $registerScript -TaskPrefix $TaskPrefix -BackupTime $BackupTime -VerifyTime $VerifyTime -VerifyDay $VerifyDay -BackupArguments $backupArgsText -VerifyArguments $verifyArgsText
+$registerParams = @{
+    TaskPrefix = $TaskPrefix
+    BackupTime = $BackupTime
+    VerifyTime = $VerifyTime
+    VerifyDay = $VerifyDay
+    BackupArguments = $backupArgsText
+    VerifyArguments = $verifyArgsText
+}
+
+if ($RunWhetherUserLoggedOnOrNot) {
+    $registerParams["RunWhetherUserLoggedOnOrNot"] = $true
+}
+if ($RunWithHighest) {
+    $registerParams["RunWithHighest"] = $true
+}
+if (-not [string]::IsNullOrWhiteSpace($TaskRunAsUser)) {
+    $registerParams["RunAsUser"] = $TaskRunAsUser
+}
+if ($TaskRunAsPassword) {
+    $registerParams["RunAsPassword"] = $TaskRunAsPassword
+}
+
+& $registerScript @registerParams
 if ($LASTEXITCODE -ne 0) {
     throw "No se pudieron registrar tareas."
 }
@@ -107,4 +138,7 @@ else {
 }
 if (-not [string]::IsNullOrWhiteSpace($AlertWebhookUrl)) {
     Write-Host ("[INFO] AlertWebhookUrl: " + $AlertWebhookUrl)
+}
+if ($EnableOneDriveMirror) {
+    Write-Host "[INFO] OneDrive mirror habilitado en backup diario."
 }

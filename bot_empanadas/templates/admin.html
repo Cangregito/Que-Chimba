@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Que Chimba | Panel Admin</title>
+  <title>La Malparida Empanada | Panel Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -134,7 +134,7 @@
       align-items: center;
       gap: 8px;
       color: var(--text-2);
-      transition: background var(--t), color var(--t), border-color var(--t);
+      transition: background var(--t), color var(--t), border-color var(--t), box-shadow var(--t), transform var(--t);
       cursor: pointer;
     }
 
@@ -148,6 +148,8 @@
       color: var(--accent);
       border-color: #E0E7FF;
       font-weight: 600;
+      box-shadow: inset 3px 0 0 var(--accent);
+      transform: translateX(1px);
     }
 
     .dot {
@@ -158,10 +160,16 @@
     }
 
     .dot.blue { background: #185FA5; }
+    .dot.indigo { background: #4F46E5; }
     .dot.green { background: #3F7A13; }
     .dot.red { background: #B64A4A; }
     .dot.amber { background: #9A6A22; }
     .dot.darkgreen { background: #27500A; }
+
+    .nav-item.active .dot {
+      transform: scale(1.18);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.16);
+    }
 
     .session {
       margin-top: auto;
@@ -183,6 +191,7 @@
     .main {
       overflow: auto;
       background: var(--bg);
+      min-width: 0;
     }
 
     .main-inner {
@@ -227,6 +236,169 @@
       flex-wrap: wrap;
     }
 
+    .brand-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .brand-note {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--line);
+      color: var(--text-2);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .admin-hero {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
+      gap: 16px;
+      padding: 22px;
+      border: 1px solid rgba(79, 70, 229, 0.14);
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.09), rgba(255, 255, 255, 0.96) 45%, rgba(16, 185, 129, 0.06));
+      box-shadow: var(--shadow-sm);
+    }
+
+    .admin-hero::before {
+      content: "";
+      position: absolute;
+      inset: auto -60px -80px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(79, 70, 229, 0.10), transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-copy {
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(79, 70, 229, 0.14);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .hero-copy h3 {
+      margin: 12px 0 8px;
+      font-size: clamp(22px, 1.3rem + 0.7vw, 30px);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-copy p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--text-2);
+      line-height: 1.6;
+    }
+
+    .hero-highlights {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 10px;
+      align-content: center;
+    }
+
+    .highlight-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--text-2);
+      font-size: 13px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+    }
+
+    .highlight-pill strong {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 30px;
+      height: 30px;
+      padding: 0 8px;
+      border-radius: 10px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .overview-card {
+      border: 1px solid var(--line);
+      border-top-width: 4px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.92));
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .overview-card[data-tone="indigo"] {
+      border-top-color: #4F46E5;
+    }
+
+    .overview-card[data-tone="emerald"] {
+      border-top-color: #059669;
+    }
+
+    .overview-card[data-tone="amber"] {
+      border-top-color: #D97706;
+    }
+
+    .overview-card[data-tone="rose"] {
+      border-top-color: #E11D48;
+    }
+
+    .overview-title {
+      margin: 0 0 6px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .overview-copy {
+      margin: 0;
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: var(--text-2);
+    }
+
+    .overview-meta {
+      margin-top: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
     .section {
       display: none;
       flex-direction: column;
@@ -235,6 +407,26 @@
 
     .section.active {
       display: flex;
+      animation: section-enter 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    @keyframes section-enter {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .nav-item,
+      .section.active {
+        transition: none;
+        animation: none;
+      }
     }
 
     .row {
@@ -334,14 +526,16 @@
     }
 
     .btn.primary {
-      background: var(--accent-bg);
-      color: var(--accent);
-      border-color: #E0E7FF;
-      font-weight: 600;
+      background: linear-gradient(135deg, #4F46E5, #4338CA);
+      color: #FFFFFF;
+      border-color: #4338CA;
+      font-weight: 700;
+      box-shadow: 0 10px 20px rgba(79, 70, 229, 0.18);
     }
 
     .btn.primary:hover {
-      background: #E0E7FF;
+      background: linear-gradient(135deg, #4338CA, #3730A3);
+      color: #FFFFFF;
       opacity: 1;
     }
 
@@ -398,6 +592,18 @@
       max-height: 360px;
       background: var(--surface);
       box-shadow: var(--shadow-sm);
+      scrollbar-width: thin;
+      scrollbar-color: #CBD5E1 transparent;
+    }
+
+    .table-wrap::-webkit-scrollbar {
+      height: 10px;
+      width: 10px;
+    }
+
+    .table-wrap::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 999px;
     }
 
     .sistema-table-wrap {
@@ -433,6 +639,10 @@
 
     tbody tr {
       transition: background var(--t);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(248, 250, 252, 0.55);
     }
 
     tbody tr:hover {
@@ -638,6 +848,14 @@
       grid-template-columns: repeat(3, minmax(180px, 1fr));
     }
 
+    .form-grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+    }
+
+    .form-grid.cols-1 {
+      grid-template-columns: 1fr;
+    }
+
     .field {
       display: flex;
       flex-direction: column;
@@ -654,9 +872,11 @@
     .field textarea {
       border: 0.5px solid var(--line);
       border-radius: var(--r-sm);
-      background: var(--bg);
-      padding: 8px;
+      background: #FFFFFF;
+      padding: 10px 12px;
       outline: none;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+      transition: border-color var(--t), box-shadow var(--t), transform var(--t);
     }
 
     .field textarea {
@@ -790,6 +1010,205 @@
       border-color: #E3C3C3;
     }
 
+    .invoice-workspace {
+      display: grid;
+      gap: 14px;
+    }
+
+    .invoice-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .invoice-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .invoice-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .invoice-summary-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 247, 251, 0.94));
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .invoice-summary-card .kpi-label {
+      margin: 0;
+    }
+
+    .invoice-status-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .invoice-doc-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .doc-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+
+    .doc-pill.ready {
+      background: var(--green-bg);
+      color: var(--green-fg);
+      border-color: rgba(4, 120, 87, 0.18);
+    }
+
+    .doc-pill.missing {
+      background: var(--red-bg);
+      color: var(--red-fg);
+      border-color: rgba(190, 24, 93, 0.14);
+    }
+
+    .invoice-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .invoice-preview {
+      position: sticky;
+      top: 18px;
+      border: 1px solid rgba(79, 70, 229, 0.12);
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(246, 248, 252, 0.96));
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .invoice-preview-header {
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(255, 255, 255, 0.96));
+    }
+
+    .invoice-preview-body {
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .invoice-preview-empty {
+      padding: 26px 22px;
+      color: var(--text-2);
+      line-height: 1.6;
+    }
+
+    .invoice-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .invoice-detail-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.88);
+    }
+
+    .invoice-detail-item strong {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-3);
+      margin-bottom: 4px;
+    }
+
+    .invoice-detail-item span {
+      font-size: 13px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .invoice-doc-editor {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(248, 250, 252, 0.95);
+    }
+
+    .invoice-preview-frame {
+      width: 100%;
+      min-height: 300px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+    }
+
+    .xml-preview {
+      margin: 0;
+      padding: 12px;
+      max-height: 220px;
+      overflow: auto;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #0f172a;
+      color: #dbeafe;
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .invoice-mini-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .invoice-mini-list li {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.88);
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-2);
+    }
+
+    .invoice-mini-list strong {
+      color: var(--text);
+    }
+
+    .invoice-hint {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-2);
+      margin-top: 2px;
+    }
+
+    .invoice-hint.error {
+      color: var(--red-fg);
+      font-weight: 600;
+    }
+
     @media (max-width: 1150px) {
       .row.kpi-4 {
         grid-template-columns: repeat(2, minmax(160px, 1fr));
@@ -801,6 +1220,43 @@
 
       .form-grid.cols-3 {
         grid-template-columns: 1fr 1fr;
+      }
+
+      .invoice-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .invoice-preview {
+        position: static;
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .app {
+        display: block !important;
+        grid-template-columns: 1fr !important;
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .sidebar {
+        position: static !important;
+        height: auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        border-right: none !important;
+        border-bottom: 0.5px solid var(--line) !important;
+      }
+
+      .main {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+      }
+
+      .main-inner {
+        width: 100%;
+        max-width: 100%;
       }
     }
 
@@ -828,6 +1284,11 @@
 
       .form-grid,
       .form-grid.cols-3 {
+        grid-template-columns: 1fr;
+      }
+
+      .invoice-summary-grid,
+      .invoice-detail-grid {
         grid-template-columns: 1fr;
       }
 
@@ -899,18 +1360,158 @@
       line-height: 1.2;
     }
 
+    @media (max-width: 900px) {
+      .main-inner {
+        padding: 14px;
+        gap: 14px;
+      }
+
+      .topbar {
+        position: static;
+        padding: 14px;
+      }
+
+      .topbar-actions {
+        width: 100%;
+      }
+
+      .topbar-actions .btn {
+        flex: 1 1 100%;
+      }
+
+      .admin-hero {
+        grid-template-columns: 1fr;
+        padding: 16px;
+      }
+
+      .hero-highlights {
+        grid-template-columns: 1fr;
+      }
+
+      .nav {
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        gap: 8px;
+        scrollbar-width: thin;
+      }
+
+      .nav-item {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      table {
+        min-width: 640px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .main-inner {
+        padding: 10px;
+      }
+
+      .topbar h2 {
+        font-size: 18px;
+      }
+
+      .session {
+        font-size: 11px;
+      }
+
+      table {
+        min-width: 560px;
+      }
+
+      .invoice-actions {
+        width: 100%;
+      }
+
+      .invoice-actions .btn {
+        flex: 1 1 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      html,
+      body {
+        overflow-x: hidden;
+      }
+
+      .main,
+      .main-inner,
+      .section,
+      .row,
+      .card,
+      .topbar,
+      .table-wrap,
+      .chart-wrap,
+      .panel,
+      .form-grid {
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .topbar-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .topbar-actions .btn {
+        width: 100%;
+      }
+
+      .table-wrap {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      table {
+        min-width: 520px;
+      }
+
+      canvas,
+      svg,
+      img {
+        max-width: 100% !important;
+        height: auto !important;
+      }
+
+      #section-sistema td {
+        padding-left: 46%;
+      }
+
+      #section-sistema td::before {
+        width: 42%;
+      }
+    }
+
   </style>
 </head>
 <body class="soft-page">
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
-        <h1>Que Chimba</h1>
-        <p>Panel administrativo</p>
+        <div class="brand-row">
+          <div>
+            <h1>La Malparida Empanada</h1>
+            <p>Centro de control admin</p>
+          </div>
+          <span class="badge blue">Pro</span>
+        </div>
+        <div class="brand-note">Ventas, auditoría, inventario y soporte en una sola experiencia profesional.</div>
       </div>
 
       <nav class="nav" id="sidebar-nav">
         <button class="nav-item active" data-section="ventas" type="button"><span class="dot blue"></span>Ventas</button>
+        <button class="nav-item" data-section="finanzas" type="button"><span class="dot indigo"></span>Finanzas</button>
         <button class="nav-item" data-section="operacion" type="button"><span class="dot green"></span>Operacion DB</button>
         <button class="nav-item" data-section="sistema" type="button"><span class="dot amber"></span>Sistema</button>
         <button class="nav-item" data-section="seguridad" type="button"><span class="dot red"></span>Seguridad</button>
@@ -940,7 +1541,38 @@
           </div>
         </header>
 
+        <section class="admin-hero" id="admin-hero">
+          <div class="hero-copy">
+            <span class="hero-eyebrow" id="hero-eyebrow">Panel Ventas</span>
+            <h3 id="hero-title">Centro comercial en tiempo real</h3>
+            <p id="hero-description">Supervisa ingresos, crecimiento, tickets y salud operativa con una interfaz más ejecutiva y clara.</p>
+          </div>
+          <div class="hero-highlights" id="hero-highlights">
+            <span class="highlight-pill"><strong>01</strong> KPIs ejecutivos</span>
+            <span class="highlight-pill"><strong>02</strong> Filtros inteligentes</span>
+            <span class="highlight-pill"><strong>03</strong> Acciones rápidas</span>
+          </div>
+        </section>
+
         <section class="section active" id="section-ventas">
+          <div class="overview-grid">
+            <article class="overview-card" data-tone="indigo">
+              <p class="overview-title">Rendimiento comercial</p>
+              <p class="overview-copy">Visualiza crecimiento diario, mensual y anual con foco en lectura ejecutiva.</p>
+              <div class="overview-meta">ventas y tendencias</div>
+            </article>
+            <article class="overview-card" data-tone="emerald">
+              <p class="overview-title">Ticket y utilidad</p>
+              <p class="overview-copy">Cruza rapidez, rentabilidad y cierre para evaluar la salud del negocio.</p>
+              <div class="overview-meta">ticket y margen</div>
+            </article>
+            <article class="overview-card" data-tone="amber">
+              <p class="overview-title">Decisión rápida</p>
+              <p class="overview-copy">Exporta reportes, revisa clientes top y detecta desvíos financieros en segundos.</p>
+              <div class="overview-meta">acciones premium</div>
+            </article>
+          </div>
+
           <div id="react-ui-admin-kpis-primary"></div>
 
           <article class="card">
@@ -1038,6 +1670,204 @@
             </div>
           </article>
 
+          <article class="card" id="card-finanzas">
+            <div id="react-ui-admin-head-finanzas"></div>
+            <div class="form-grid cols-3" style="margin-bottom:10px;">
+              <div class="field"><label for="f-finanzas-fecha">Fecha de corte</label><input id="f-finanzas-fecha" type="date" /></div>
+              <div class="field" style="align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-finanzas-cargar" type="button">Actualizar auditoría</button>
+                <button class="btn secondary" id="btn-finanzas-hoy" type="button">Hoy</button>
+              </div>
+            </div>
+
+            <div class="row kpi-4" style="margin-bottom:10px;">
+              <article class="flat card"><p class="kpi-label">Alertas de costo</p><div class="kpi-number" id="kpi-fin-cost-alertas">0</div></article>
+              <article class="flat card"><p class="kpi-label">Tarjeta y digital conciliado</p><div class="kpi-number" id="kpi-fin-cobranza">$0.00</div></article>
+              <article class="flat card"><p class="kpi-label">Monto por validar</p><div class="kpi-number" id="kpi-fin-pendiente">$0.00</div></article>
+              <article class="flat card"><p class="kpi-label">Efectivo conciliado</p><div class="kpi-number" id="kpi-fin-efectivo">$0.00</div></article>
+            </div>
+
+            <article class="flat card" style="margin-bottom:10px; border-left: 4px solid var(--amber-fg);">
+              <div class="small" style="margin-bottom:8px; font-weight:700;">Cortes de caja deshabilitados</div>
+              <div class="subtle">El módulo de cortes fue retirado completamente del panel administrativo.</div>
+            </article>
+
+            <article class="flat card" style="margin-bottom:10px;">
+              <div class="small" style="margin-bottom:8px; font-weight:700;">Nueva factura operativa</div>
+              <div class="form-grid cols-4">
+                <div class="field"><label for="f-fact-pedido">Pedido</label><input id="f-fact-pedido" type="number" min="1" placeholder="Folio del pedido" /></div>
+                <div class="field"><label for="f-fact-folio">Folio factura</label><input id="f-fact-folio" placeholder="FAC-20260414-001" /></div>
+                <div class="field"><label for="f-fact-status">Estado</label><select id="f-fact-status"><option value="emitida">Emitida</option><option value="entregada">Entregada</option></select></div>
+                <div class="field"><label for="f-fact-notas">Notas</label><input id="f-fact-notas" placeholder="Correo o detalle de entrega" /></div>
+                <div class="field" style="align-self:end; display:flex; gap:8px;">
+                  <button class="btn primary" id="btn-factura-guardar" type="button">Registrar factura</button>
+                </div>
+                <div class="field" style="grid-column: 1 / -1; margin-top:-4px;">
+                  <div class="subtle" id="invoice-register-help">Tip: si eliges estado "Entregada", el sistema intentará enviar documentos al cliente por WhatsApp.</div>
+                </div>
+              </div>
+            </article>
+
+            <article class="flat card invoice-workspace" style="margin-bottom:10px;">
+              <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+                <div>
+                  <div class="small" style="margin-bottom:6px; font-weight:700;">Centro de facturación</div>
+                  <div class="subtle">Consulta todas las facturas operativas, detecta pendientes por enviar y controla PDF/XML con previsualización antes del despacho.</div>
+                </div>
+                <div class="invoice-actions">
+                  <button class="btn" id="btn-invoice-refresh" type="button">Actualizar panel</button>
+                  <button class="btn secondary" id="btn-invoice-filter-reset" type="button">Limpiar filtros</button>
+                </div>
+              </div>
+
+              <div class="form-grid cols-4">
+                <div class="field"><label for="f-invoice-search">Buscar</label><input id="f-invoice-search" placeholder="pedido, folio, cliente o WhatsApp" /></div>
+                <div class="field"><label for="f-invoice-state">Estado factura</label><select id="f-invoice-state"><option value="">Todos</option><option value="emitida">Emitidas</option><option value="entregada">Entregadas</option></select></div>
+                <div class="field"><label for="f-invoice-send-state">Filtro operativo</label><select id="f-invoice-send-state"><option value="">Todos</option><option value="por_enviar">Listas para enviar</option><option value="sin_documentos">Sin documentos completos</option><option value="enviado">Enviadas</option><option value="error">Con error de envío</option></select></div>
+                <div class="field"><label>&nbsp;</label><div class="subtle">Vista para producción: seguimiento, preview y envío desde un solo lugar.</div></div>
+              </div>
+
+              <div class="invoice-summary-grid">
+                <article class="invoice-summary-card"><p class="kpi-label">Facturas visibles</p><div class="kpi-number" id="kpi-invoice-total">0</div></article>
+                <article class="invoice-summary-card"><p class="kpi-label">Listas por enviar</p><div class="kpi-number" id="kpi-invoice-ready">0</div></article>
+                <article class="invoice-summary-card"><p class="kpi-label">Enviadas</p><div class="kpi-number" id="kpi-invoice-sent">0</div></article>
+                <article class="invoice-summary-card"><p class="kpi-label">Con incidencia</p><div class="kpi-number" id="kpi-invoice-issues">0</div></article>
+              </div>
+
+              <div class="invoice-shell">
+                <div class="invoice-stack">
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Factura</th>
+                          <th>Cliente</th>
+                          <th>Estado</th>
+                          <th>Documentos</th>
+                          <th>Último envío</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tbody-fin-facturas">
+                        <tr><td colspan="6" class="muted">Cargando panel de facturación...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <aside class="invoice-preview">
+                  <div class="invoice-preview-header">
+                    <div class="small" style="font-weight:700; margin-bottom:4px;">Previsualización</div>
+                    <div class="subtle" id="invoice-preview-subtitle">Selecciona una factura para ver documentos, historial y opciones de envío.</div>
+                  </div>
+                  <div class="invoice-preview-empty" id="invoice-preview-empty">
+                    Elige una factura desde la tabla para revisar su estado, verificar PDF/XML y enviarla con trazabilidad operativa.
+                  </div>
+                  <div class="invoice-preview-body" id="invoice-preview-content" style="display:none;">
+                    <div>
+                      <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+                        <div>
+                          <h4 id="invoice-preview-title" style="margin:0 0 6px; font-size:18px; letter-spacing:-0.02em;">Factura</h4>
+                          <div class="invoice-status-stack" id="invoice-preview-status"></div>
+                        </div>
+                        <div class="invoice-actions">
+                          <button class="btn secondary" id="invoice-preview-doc-save" type="button">Guardar documentos</button>
+                          <button class="btn primary" id="invoice-preview-send" type="button">Enviar al cliente</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="invoice-detail-grid">
+                      <div class="invoice-detail-item"><strong>WhatsApp</strong><span id="invoice-preview-whatsapp">-</span></div>
+                      <div class="invoice-detail-item"><strong>Email</strong><span id="invoice-preview-email">-</span></div>
+                      <div class="invoice-detail-item"><strong>Total</strong><span id="invoice-preview-total">$0.00</span></div>
+                      <div class="invoice-detail-item"><strong>Último envío</strong><span id="invoice-preview-send-status">-</span></div>
+                      <div class="invoice-detail-item"><strong>Emitida</strong><span id="invoice-preview-issued-at">-</span></div>
+                      <div class="invoice-detail-item"><strong>Actualizada</strong><span id="invoice-preview-updated-at">-</span></div>
+                    </div>
+
+                    <div class="invoice-doc-editor">
+                      <div class="field"><label for="invoice-preview-pdf-path">Ruta PDF</label><input id="invoice-preview-pdf-path" placeholder="documents/factura_FOLIO.pdf" /></div>
+                      <div class="field"><label for="invoice-preview-xml-path">Ruta XML</label><input id="invoice-preview-xml-path" placeholder="documents/factura_FOLIO.xml" /></div>
+                      <div class="invoice-actions">
+                        <button class="btn" id="invoice-preview-pdf-open" type="button">Abrir PDF</button>
+                        <button class="btn" id="invoice-preview-xml-open" type="button">Abrir XML</button>
+                      </div>
+                      <div class="invoice-hint" id="invoice-doc-validation">Usa rutas válidas a archivos .pdf y .xml. Ejemplo: documents/factura_FAC-20260414-001.pdf</div>
+                    </div>
+
+                    <div>
+                      <div class="small" style="margin-bottom:6px; font-weight:700;">Preview PDF</div>
+                      <iframe class="invoice-preview-frame" id="invoice-preview-pdf-frame" title="Previsualización PDF"></iframe>
+                    </div>
+
+                    <div>
+                      <div class="small" style="margin-bottom:6px; font-weight:700;">Preview XML</div>
+                      <pre class="xml-preview" id="invoice-preview-xml-text">Sin XML cargado.</pre>
+                    </div>
+
+                    <div>
+                      <div class="small" style="margin-bottom:6px; font-weight:700;">Items del pedido</div>
+                      <ul class="invoice-mini-list" id="invoice-preview-items"></ul>
+                    </div>
+
+                    <div>
+                      <div class="small" style="margin-bottom:6px; font-weight:700;">Historial</div>
+                      <ul class="invoice-mini-list" id="invoice-preview-history"></ul>
+                    </div>
+
+                    <div class="subtle" id="invoice-preview-send-error"></div>
+                  </div>
+                </aside>
+              </div>
+            </article>
+
+            <div class="row grid-2">
+              <article class="flat card">
+                <div class="small" style="margin-bottom:6px;">Costos de productos vs adquisición real</div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Precio</th>
+                        <th>Costo actual</th>
+                        <th>Costo promedio</th>
+                        <th>Desviación</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-fin-costos">
+                      <tr><td colspan="6" class="muted">Cargando auditoría de costos...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <article class="flat card">
+                <div class="small" style="margin-bottom:6px;">Facturación y métodos de pago</div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Método</th>
+                        <th>Pedidos</th>
+                        <th>Ventas</th>
+                        <th>Validado</th>
+                        <th>Por validar</th>
+                        <th>Facturas</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-fin-pagos">
+                      <tr><td colspan="6" class="muted">Cargando validación de pagos...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+
+          </article>
+
           <article class="card">
             <div id="react-ui-admin-head-top-clientes"></div>
             <div class="form-grid cols-3" style="margin-bottom:10px;">
@@ -1065,6 +1895,24 @@
         </section>
 
         <section class="section" id="section-operacion">
+          <div class="overview-grid">
+            <article class="overview-card" data-tone="emerald">
+              <p class="overview-title">Flujo operativo</p>
+              <p class="overview-copy">Revisa actividad actual, pedidos en curso y capacidad operativa sin salir del panel.</p>
+              <div class="overview-meta">control diario</div>
+            </article>
+            <article class="overview-card" data-tone="indigo">
+              <p class="overview-title">Rentabilidad fina</p>
+              <p class="overview-copy">Detecta productos con mejor margen y oportunidades de corrección de costos.</p>
+              <div class="overview-meta">margen y costos</div>
+            </article>
+            <article class="overview-card" data-tone="amber">
+              <p class="overview-title">Compras recientes</p>
+              <p class="overview-copy">Conecta abastecimiento y operación para evitar cuellos de botella.</p>
+              <div class="overview-meta">compras y reposición</div>
+            </article>
+          </div>
+
           <div class="row kpi-4">
             <article class="flat card">
               <p class="kpi-label">Clientes registrados</p>
@@ -1096,6 +1944,8 @@
                   <option value="incompleto">Incompleta</option>
                   <option value="sin_costos">Sin costos</option>
                   <option value="sin_receta">Sin receta</option>
+                  <option value="margen_bajo">Margen bajo</option>
+                  <option value="sin_utilidad">Sin utilidad</option>
                 </select>
               </div>
               <div class="field" style="align-self:end; display:flex; gap:8px;">
@@ -1112,17 +1962,18 @@
                     <th>Variante</th>
                     <th>Precio</th>
                     <th>Costo</th>
+                    <th>Utilidad</th>
                     <th>Margen %</th>
                     <th>Comp.</th>
                     <th>Sin costo</th>
-                    <th>Calidad receta</th>
+                    <th>Salud</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-rentabilidad"></tbody>
               </table>
             </div>
             <div class="small" style="margin-top:8px;">
-              Completa: todos los insumos activos de la receta tienen costo. Incompleta: faltan costos en algunos insumos. Sin costos: hay receta activa, pero ningun insumo tiene costo cargado.
+              Completa: todos los insumos activos de la receta tienen costo. Incompleta: faltan costos en algunos insumos. Sin costos: hay receta activa, pero ningun insumo tiene costo cargado. Sin utilidad: el costo ya supera o empata el precio de venta.
             </div>
 
             <div class="table-wrap" style="margin-top:10px; max-height:260px;" id="rent-diagnostico-wrap">
@@ -1211,6 +2062,24 @@
         </section>
 
         <section class="section" id="section-sistema">
+          <div class="overview-grid">
+            <article class="overview-card" data-tone="rose">
+              <p class="overview-title">Salud técnica</p>
+              <p class="overview-copy">Identifica errores, warnings y alertas antes de que afecten la operación diaria.</p>
+              <div class="overview-meta">observabilidad</div>
+            </article>
+            <article class="overview-card" data-tone="amber">
+              <p class="overview-title">Continuidad y backups</p>
+              <p class="overview-copy">Mantén visibilidad de respaldos, tamaño y ventanas de ejecución.</p>
+              <div class="overview-meta">respaldo seguro</div>
+            </article>
+            <article class="overview-card" data-tone="indigo">
+              <p class="overview-title">Resolución guiada</p>
+              <p class="overview-copy">Prioriza eventos abiertos y acelera la remediación desde una sola vista.</p>
+              <div class="overview-meta">pendientes críticos</div>
+            </article>
+          </div>
+
           <div class="row kpi-4">
             <article class="flat card">
               <p class="kpi-label">Errores 24h</p>
@@ -1346,6 +2215,24 @@
         </section>
 
         <section class="section" id="section-seguridad">
+          <div class="overview-grid">
+            <article class="overview-card" data-tone="rose">
+              <p class="overview-title">Gestión de usuarios</p>
+              <p class="overview-copy">Da de alta, actualiza roles y controla estados con una experiencia más limpia.</p>
+              <div class="overview-meta">roles y accesos</div>
+            </article>
+            <article class="overview-card" data-tone="amber">
+              <p class="overview-title">Bitácora de seguridad</p>
+              <p class="overview-copy">Filtra eventos, exporta auditoría y detecta intentos anómalos más rápido.</p>
+              <div class="overview-meta">trazabilidad</div>
+            </article>
+            <article class="overview-card" data-tone="indigo">
+              <p class="overview-title">Cumplimiento operativo</p>
+              <p class="overview-copy">Cruza evidencia de negocio y accesos para tener mejor control administrativo.</p>
+              <div class="overview-meta">auditoría integral</div>
+            </article>
+          </div>
+
           <article class="card">
             <div class="card-head"><h3>Alta de usuario</h3></div>
             <form id="form-alta-usuario" class="form-grid cols-3">
@@ -1367,7 +2254,7 @@
               </div>
               <div class="field">
                 <label for="usuario-email">Email</label>
-                <input id="usuario-email" name="email" placeholder="admin@quechimba.local" />
+                    <input id="usuario-email" name="email" placeholder="admin@lamalparida.local" />
               </div>
               <div class="field">
                 <label for="usuario-password">Contrasena temporal</label>
@@ -1384,8 +2271,20 @@
           </article>
 
           <article class="card">
-            <div class="card-head"><h3>Usuarios del sistema</h3></div>
-            <div class="form-grid cols-3" style="margin-bottom:10px;">
+            <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
+              <h3>Usuarios del sistema</h3>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <span style="font-size:13px; color: var(--text-2);">
+                  <strong id="lbl-usr-total">0</strong> usuarios
+                </span>
+              </div>
+            </div>
+            
+            <div class="form-grid cols-4" style="margin-bottom:10px;">
+              <div class="field">
+                <label for="f-usr-search">Buscar por nombre/username</label>
+                <input id="f-usr-search" placeholder="ej. admin, Juan Pérez" />
+              </div>
               <div class="field">
                 <label for="f-usr-rol">Filtrar por rol</label>
                 <select id="f-usr-rol">
@@ -1396,19 +2295,47 @@
                 </select>
               </div>
               <div class="field">
-                <label for="f-usr-area">Filtrar por área</label>
-                <input id="f-usr-area" placeholder="juárez-centro o 32600" />
+                <label for="f-usr-estado">Estado</label>
+                <select id="f-usr-estado">
+                  <option value="">Todos</option>
+                  <option value="activo">Activos</option>
+                  <option value="inactivo">Inactivos</option>
+                </select>
               </div>
-              <div class="field" style="align-self:end; display:flex; gap:8px;">
-                <button class="btn" id="btn-usr-filtrar" type="button">Aplicar</button>
+              <div class="field">
+                <label for="f-usr-area">Área de entrega</label>
+                <input id="f-usr-area" placeholder="ej. juárez-centro" />
+              </div>
+              <div class="field" style="grid-column: span 4; align-self:end; display:flex; gap:8px;">
+                <button class="btn" id="btn-usr-filtrar" type="button">Aplicar filtros</button>
                 <button class="btn" id="btn-usr-limpiar" type="button">Limpiar</button>
               </div>
             </div>
+
+            <div id="div-usr-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 15px;">
+              <div style="background: var(--blue-bg); border: 1px solid #DBEAFE; border-radius: var(--r-sm); padding: 12px; text-align: center;">
+                <div style="font-size: 20px; font-weight: 600; color: var(--blue-fg);" id="stat-admin">0</div>
+                <div style="font-size: 12px; color: var(--text-2); margin-top: 4px;">Administradores</div>
+              </div>
+              <div style="background: var(--amber-bg); border: 1px solid #FCD34D; border-radius: var(--r-sm); padding: 12px; text-align: center;">
+                <div style="font-size: 20px; font-weight: 600; color: var(--amber-fg);" id="stat-cocina">0</div>
+                <div style="font-size: 12px; color: var(--text-2); margin-top: 4px;">Cocina</div>
+              </div>
+              <div style="background: var(--green-bg); border: 1px solid #6EE7B7; border-radius: var(--r-sm); padding: 12px; text-align: center;">
+                <div style="font-size: 20px; font-weight: 600; color: var(--green-fg);" id="stat-repartidor">0</div>
+                <div style="font-size: 12px; color: var(--text-2); margin-top: 4px;">Repartidores</div>
+              </div>
+              <div style="background: var(--red-bg); border: 1px solid #FBCFE8; border-radius: var(--r-sm); padding: 12px; text-align: center;">
+                <div style="font-size: 20px; font-weight: 600; color: var(--red-fg);" id="stat-inactivos">0</div>
+                <div style="font-size: 12px; color: var(--text-2); margin-top: 4px;">Inactivos</div>
+              </div>
+            </div>
+            
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Nombre</th>
+                    <th>Nombre / Usuario</th>
                     <th>Rol</th>
                     <th>Área</th>
                     <th>Estado</th>
@@ -1420,6 +2347,104 @@
               </table>
             </div>
           </article>
+
+          <!-- MODAL: Editar usuario -->
+          <div id="modal-editar-usuario" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; padding:20px; align-items:center; justify-content:center;">
+            <div style="background:white; border-radius:var(--r-lg); box-shadow: 0 20px 50px rgba(15,23,42,0.15); max-width:600px; width:100%; max-height:90vh; overflow:auto;">
+              <div style="padding: 24px; border-bottom: 1px solid var(--line); display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:18px; font-weight:600;">Editar usuario</h3>
+                <button type="button" onclick="closeModal('modal-editar-usuario')" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-2);">&times;</button>
+              </div>
+              <div style="padding: 24px;">
+                <form id="form-editar-usuario" class="form-grid cols-2">
+                  <input id="edt-usr-id" type="hidden" />
+                  <div class="field">
+                    <label for="edt-usr-nombre">Nombre completo</label>
+                    <input id="edt-usr-nombre" name="nombre" required />
+                  </div>
+                  <div class="field">
+                    <label for="edt-usr-username">Usuario (username)</label>
+                    <input id="edt-usr-username" name="username" disabled style="background: var(--line); cursor: not-allowed;" />
+                  </div>
+                  <div class="field">
+                    <label for="edt-usr-rol">Rol</label>
+                    <select id="edt-usr-rol" name="rol" required>
+                      <option value="admin">admin</option>
+                      <option value="cocina">cocina</option>
+                      <option value="repartidor">repartidor</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="edt-usr-email">Email</label>
+                    <input id="edt-usr-email" name="email" type="email" />
+                  </div>
+                  <div class="field">
+                    <label for="edt-usr-telefono">Teléfono</label>
+                    <input id="edt-usr-telefono" name="telefono" placeholder="5216561234567" />
+                  </div>
+                  <div class="field" id="field-edt-area" style="display:none;">
+                    <label for="edt-usr-area">Área de entrega</label>
+                    <input id="edt-usr-area" name="area_entrega" placeholder="ej. juárez-centro" />
+                  </div>
+                  <div class="field" style="grid-column: span 2; margin-top: 10px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                      <input id="edt-usr-activo" name="activo" type="checkbox" />
+                      <span>Usuario activo</span>
+                    </label>
+                  </div>
+                </form>
+              </div>
+              <div style="padding: 16px 24px; border-top: 1px solid var(--line); display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn" onclick="closeModal('modal-editar-usuario')">Cancelar</button>
+                <button type="button" class="btn primary" id="btn-edt-guardar">Guardar cambios</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL: Cambiar contraseña -->
+          <div id="modal-cambiar-pass" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; padding:20px; align-items:center; justify-content:center;">
+            <div style="background:white; border-radius:var(--r-lg); box-shadow: 0 20px 50px rgba(15,23,42,0.15); max-width:450px; width:100%;">
+              <div style="padding: 24px; border-bottom: 1px solid var(--line); display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <h3 style="margin:0; font-size:18px; font-weight:600;">Cambiar contraseña</h3>
+                  <p style="margin:4px 0 0; font-size:13px; color:var(--text-2);" id="lbl-pass-usuario">Usuario: -</p>
+                </div>
+                <button type="button" onclick="closeModal('modal-cambiar-pass')" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-2);">&times;</button>
+              </div>
+              <div style="padding: 24px;">
+                <form id="form-cambiar-pass" class="form-grid cols-1">
+                  <input id="pass-usr-id" type="hidden" />
+                  <div class="field">
+                    <label for="pass-nueva">Nueva contraseña temporal</label>
+                    <input id="pass-nueva" name="password" type="password" minlength="8" required placeholder="Mínimo 8 caracteres" />
+                    <span style="font-size:12px; color:var(--text-3); margin-top:4px; display:block;">Se enviará esta contraseña al usuario para que la cambie en su primer login</span>
+                  </div>
+                  <div class="field">
+                    <label for="pass-confirmar">Confirmar contraseña</label>
+                    <input id="pass-confirmar" name="confirmar" type="password" minlength="8" required placeholder="Debe ser igual a la anterior" />
+                  </div>
+                </form>
+              </div>
+              <div style="padding: 16px 24px; border-top: 1px solid var(--line); display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn" onclick="closeModal('modal-cambiar-pass')">Cancelar</button>
+                <button type="button" class="btn primary" id="btn-pass-guardar">Cambiar contraseña</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL: Confirmar desactivacion/activacion -->
+          <div id="modal-confirmar-estado" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; padding:20px; align-items:center; justify-content:center;">
+            <div style="background:white; border-radius:var(--r-lg); box-shadow: 0 20px 50px rgba(15,23,42,0.15); max-width:400px; width:100%;">
+              <div style="padding: 24px; border-bottom: 1px solid var(--line);">
+                <h3 id="lbl-confirm-titulo" style="margin:0 0 8px; font-size:18px; font-weight:600;">Confirmar acción</h3>
+                <p id="lbl-confirm-msg" style="margin:0; font-size:14px; color:var(--text-2);">¿Está seguro de esta acción?</p>
+              </div>
+              <div style="padding: 16px 24px; border-top: 1px solid var(--line); display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn" id="btn-confirm-cancel">Cancelar</button>
+                <button type="button" class="btn primary" id="btn-confirm-ok" style="background:var(--red-fg);">Confirmar</button>
+              </div>
+            </div>
+          </div>
 
           <article class="card">
             <div class="card-head"><h3>Bitacora de seguridad</h3></div>
@@ -1541,6 +2566,24 @@
         </section>
 
         <section class="section" id="section-campanas">
+          <div class="overview-grid">
+            <article class="overview-card" data-tone="amber">
+              <p class="overview-title">Segmentación inteligente</p>
+              <p class="overview-copy">Selecciona audiencias de alto valor con mejor contexto visual antes de cada envío.</p>
+              <div class="overview-meta">audiencias</div>
+            </article>
+            <article class="overview-card" data-tone="indigo">
+              <p class="overview-title">Mensajería cuidada</p>
+              <p class="overview-copy">Redacta campañas con mejor jerarquía, control de longitud y estado del envío.</p>
+              <div class="overview-meta">copy y envío</div>
+            </article>
+            <article class="overview-card" data-tone="emerald">
+              <p class="overview-title">Historial comercial</p>
+              <p class="overview-copy">Consulta campañas previas y conserva consistencia en la comunicación.</p>
+              <div class="overview-meta">seguimiento</div>
+            </article>
+          </div>
+
           <article class="card">
             <div class="card-head"><h3>Nueva campaña</h3></div>
             <div class="field" style="margin-bottom:10px;">
@@ -1597,6 +2640,24 @@
         </section>
 
         <section class="section" id="section-inventario">
+          <div class="overview-grid">
+            <article class="overview-card" data-tone="emerald">
+              <p class="overview-title">Stock en vivo</p>
+              <p class="overview-copy">Revisa insumos críticos, mínimos y sobrestock con lectura inmediata.</p>
+              <div class="overview-meta">abasto y control</div>
+            </article>
+            <article class="overview-card" data-tone="amber">
+              <p class="overview-title">Recetas y costos</p>
+              <p class="overview-copy">Asegura que cada producto tenga composición y costo correctamente definidos.</p>
+              <div class="overview-meta">consistencia</div>
+            </article>
+            <article class="overview-card" data-tone="indigo">
+              <p class="overview-title">Movimientos trazables</p>
+              <p class="overview-copy">Monitorea compras, ajustes y consumos con una estética más operativa.</p>
+              <div class="overview-meta">auditoría inventario</div>
+            </article>
+          </div>
+
           <div id="alerta-sin-receta"></div>
 
           <div class="row grid-2">
@@ -1611,6 +2672,7 @@
                   </select>
                 </div>
                 <div class="field"><label for="producto-precio">Precio</label><input id="producto-precio" type="number" min="0" step="0.01" required /></div>
+                <div class="field"><label for="producto-costo">Costo referencia</label><input id="producto-costo" type="number" min="0" step="0.01" /></div>
                 <div class="field"><label for="producto-activo">Activo</label>
                   <select id="producto-activo"><option value="1">si</option><option value="0">no</option></select>
                 </div>
@@ -1656,6 +2718,7 @@
                     <th>Producto</th>
                     <th>Variante</th>
                     <th>Precio</th>
+                    <th>Costo</th>
                     <th>Estado</th>
                     <th>Receta</th>
                     <th>Acciones</th>
@@ -1816,6 +2879,24 @@
         </section>
 
         <section class="section" id="section-parser">
+          <div class="overview-grid">
+            <article class="overview-card" data-tone="indigo">
+              <p class="overview-title">Simulación controlada</p>
+              <p class="overview-copy">Prueba frases y valida la interpretación del bot en un entorno seguro.</p>
+              <div class="overview-meta">testing IA</div>
+            </article>
+            <article class="overview-card" data-tone="amber">
+              <p class="overview-title">Curación de reglas</p>
+              <p class="overview-copy">Corrige ambigüedades y consolida mejores respuestas con prioridad y contexto.</p>
+              <div class="overview-meta">reglas y precisión</div>
+            </article>
+            <article class="overview-card" data-tone="emerald">
+              <p class="overview-title">Mejora continua</p>
+              <p class="overview-copy">Detecta observaciones, baja confianza y oportunidades de aprendizaje del parser.</p>
+              <div class="overview-meta">calidad del modelo</div>
+            </article>
+          </div>
+
           <div class="row grid-2">
             <article class="card">
               <div class="card-head">
@@ -1969,6 +3050,24 @@
         </section>
 
         <section class="section" id="section-soporte">
+          <div class="overview-grid">
+            <article class="overview-card" data-tone="rose">
+              <p class="overview-title">Atención al cliente</p>
+              <p class="overview-copy">Centraliza tickets y facilita respuestas con una vista más amable para operación.</p>
+              <div class="overview-meta">mesa de ayuda</div>
+            </article>
+            <article class="overview-card" data-tone="amber">
+              <p class="overview-title">Estados y seguimiento</p>
+              <p class="overview-copy">Mueve tickets por etapa y deja evidencia clara de resolución.</p>
+              <div class="overview-meta">sla y flujo</div>
+            </article>
+            <article class="overview-card" data-tone="indigo">
+              <p class="overview-title">Notificaciones</p>
+              <p class="overview-copy">Mantén informado al cliente al cerrar o resolver incidencias importantes.</p>
+              <div class="overview-meta">comunicación</div>
+            </article>
+          </div>
+
           <header class="topbar" style="margin-bottom: 12px;">
             <div>
               <h2>Gestión de Tickets</h2>
@@ -2044,12 +3143,14 @@
       const state = {
         loaded: {
           ventas: false,
+          finanzas: false,
           operacion: false,
           sistema: false,
           seguridad: false,
           campanas: false,
           inventario: false,
-          parser: false
+          parser: false,
+          soporte: false
         },
         current: "ventas",
         timers: {
@@ -2073,7 +3174,12 @@
           campanas: [],
           productosAdmin: [],
           movimientos: [],
-          reporteVentas: []
+          reporteVentas: [],
+          finanzasCostos: [],
+          finanzasPagos: [],
+          finanzasFacturas: [],
+          finanzasFacturasResumen: {},
+          invoicePreview: null
         },
         pages: {
           pedidos: { page: 1, hasMore: false },
@@ -2088,37 +3194,93 @@
       const sectionMeta = {
         ventas: {
           title: "Ventas",
-          subtitle: "Vista en tiempo real de ventas y clientes."
+          subtitle: "Vista ejecutiva de ventas, finanzas y clientes.",
+          tone: "indigo",
+          heroTitle: "Centro comercial en tiempo real",
+          heroDescription: "Consolida ingresos, crecimiento, tickets y rentabilidad en una experiencia más clara, premium y accionable.",
+          badges: ["KPIs del día", "Reportes exportables", "Rentabilidad y SLA"]
+        },
+        finanzas: {
+          title: "Finanzas",
+          subtitle: "Auditoría financiera y facturación operativa.",
+          tone: "indigo",
+          heroTitle: "Control financiero operativo",
+          heroDescription: "Revisa auditoría de costos/pagos y controla facturas desde un flujo claro para operación diaria.",
+          badges: ["Auditoría", "Costos", "Facturación"]
         },
         operacion: {
           title: "Operacion DB",
-          subtitle: "Rentabilidad, pedidos activos y auditoria operativa."
+          subtitle: "Rentabilidad, pedidos activos y auditoría operativa.",
+          tone: "emerald",
+          heroTitle: "Operación diaria con foco en eficiencia",
+          heroDescription: "Supervisa flujo de pedidos, compras y márgenes desde una vista diseñada para decisiones rápidas.",
+          badges: ["Flujo operativo", "Pedidos activos", "Costos y compras"]
         },
         sistema: {
           title: "Sistema",
-          subtitle: "Monitoreo de eventos, errores y componentes internos."
+          subtitle: "Monitoreo técnico, backups y continuidad del servicio.",
+          tone: "amber",
+          heroTitle: "Observabilidad y continuidad del servicio",
+          heroDescription: "Detecta eventos críticos, valida respaldos y reduce tiempos de reacción con un panel más legible.",
+          badges: ["Logs críticos", "Backups", "Pendientes"]
         },
         seguridad: {
           title: "Seguridad",
-          subtitle: "Usuarios, accesos y bitacoras de auditoria."
+          subtitle: "Usuarios, accesos y bitácoras con mejor control administrativo.",
+          tone: "rose",
+          heroTitle: "Gobierno de accesos y auditoría",
+          heroDescription: "Gestiona roles, estados y trazabilidad con una interfaz más profesional y confiable.",
+          badges: ["Usuarios", "Accesos", "Cumplimiento"]
         },
         campanas: {
           title: "Campañas",
-          subtitle: "Segmentacion y envios por WhatsApp."
+          subtitle: "Segmentación y envíos de WhatsApp con mejor visibilidad.",
+          tone: "amber",
+          heroTitle: "Marketing conversacional más ordenado",
+          heroDescription: "Crea campañas, elige segmentos y consulta el historial desde una experiencia más comercial.",
+          badges: ["Segmentos", "Copys", "Historial"]
         },
         inventario: {
           title: "Inventario",
-          subtitle: "Productos, insumos, recetas y compras."
+          subtitle: "Productos, insumos, recetas y compras en una sola vista.",
+          tone: "emerald",
+          heroTitle: "Control de stock y costos más profesional",
+          heroDescription: "Sigue existencias, recetas y movimientos con mejor jerarquía visual y lectura rápida.",
+          badges: ["Stock en vivo", "Recetas", "Movimientos"]
         },
         parser: {
           title: "Parser IA",
-          subtitle: "Observa frases problematicas, crea reglas curadas y simula pedidos en tiempo real."
+          subtitle: "Frases problemáticas, reglas curadas y simulación en tiempo real.",
+          tone: "indigo",
+          heroTitle: "Entrenamiento y monitoreo del parser",
+          heroDescription: "Depura interpretaciones, crea reglas y reduce ambigüedad con una experiencia enfocada en calidad.",
+          badges: ["Simulación", "Reglas IA", "Low confidence"]
         },
         soporte: {
           title: "Soporte",
-          subtitle: "Gestión de tickets técnicos y notificaciones a clientes."
+          subtitle: "Tickets técnicos y comunicación con clientes en tiempo real.",
+          tone: "rose",
+          heroTitle: "Mesa de ayuda con mejor seguimiento",
+          heroDescription: "Gestiona tickets, estados y notificaciones con una vista más ejecutiva y ordenada.",
+          badges: ["Tickets", "Estados", "Notificaciones"]
         }
       };
+
+      function renderExecutiveChrome(sectionName) {
+        const meta = sectionMeta[sectionName] || sectionMeta.ventas;
+        if (qs("hero-eyebrow")) qs("hero-eyebrow").textContent = "Panel " + meta.title;
+        if (qs("hero-title")) qs("hero-title").textContent = meta.heroTitle || meta.title;
+        if (qs("hero-description")) qs("hero-description").textContent = meta.heroDescription || meta.subtitle || "";
+
+        const highlightHost = qs("hero-highlights");
+        if (highlightHost) {
+          const chips = Array.isArray(meta.badges) ? meta.badges : [];
+          highlightHost.innerHTML = chips.map((label, index) => (
+            "<span class='highlight-pill'><strong>0" + (index + 1) + "</strong>" + html(label) + "</span>"
+          )).join("");
+        }
+
+      }
 
       function qs(id) {
         return document.getElementById(id);
@@ -2322,9 +3484,13 @@
       }
 
       function qualityBadge(value) {
-        if (value === "completo") return "<span class='badge green'>Completa</span>";
-        if (value === "sin_costos") return "<span class='badge amber'>Sin costos</span>";
-        if (value === "incompleto") return "<span class='badge amber'>Incompleta</span>";
+        const key = String(value || "").trim().toLowerCase();
+        if (key === "completo") return "<span class='badge green'>Completa</span>";
+        if (key === "rentable") return "<span class='badge green'>Rentable</span>";
+        if (key === "sin_costos") return "<span class='badge amber'>Sin costos</span>";
+        if (key === "incompleto") return "<span class='badge amber'>Incompleta</span>";
+        if (key === "margen_bajo") return "<span class='badge amber'>Margen bajo</span>";
+        if (key === "sin_utilidad") return "<span class='badge red'>Sin utilidad</span>";
         return "<span class='badge red'>Sin receta</span>";
       }
 
@@ -2704,6 +3870,473 @@
         window.location.href = "/api/admin/reporte-ventas-profesional.xlsx?" + params.toString();
       }
 
+      function todayInputValue() {
+        const now = new Date();
+        const local = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+        return local.toISOString().slice(0, 10);
+      }
+
+      function metodoPagoLabel(value) {
+        const key = String(value || "sin_definir").trim().toLowerCase();
+        const map = {
+          efectivo: "Efectivo",
+          mercadopago: "MercadoPago",
+          transferencia: "Transferencia",
+          digital: "Tarjeta / digital",
+          contra_entrega: "Contra entrega",
+          sin_definir: "Sin definir"
+        };
+        return map[key] || key;
+      }
+
+      function badgeFinanzasAlerta(value) {
+        const key = String(value || "ok").trim().toLowerCase();
+        const map = {
+          ok: { cls: "green", text: "OK" },
+          desviacion_alta: { cls: "amber", text: "Desviación alta" },
+          margen_riesgo: { cls: "amber", text: "Margen en riesgo" },
+          sin_receta: { cls: "red", text: "Sin receta" },
+          sin_utilidad: { cls: "red", text: "Sin utilidad" },
+          faltan_costos: { cls: "red", text: "Faltan costos" }
+        };
+        const meta = map[key] || { cls: "blue", text: key || "N/D" };
+        return "<span class='badge " + meta.cls + "'>" + meta.text + "</span>";
+      }
+
+
+      function renderFinancialCostAudit() {
+        const tb = qs("tbody-fin-costos");
+        if (!tb) return;
+        const list = Array.isArray(state.tableCache.finanzasCostos) ? state.tableCache.finanzasCostos : [];
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin datos de auditoría de costos para la fecha seleccionada.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((r) => {
+          const nombre = [r.nombre || "-", r.variante || ""].filter(Boolean).join(" · ");
+          const delta = Number(r.desviacion_pct || 0);
+          const deltaTxt = (delta > 0 ? "+" : "") + delta.toFixed(2) + "%";
+          return (
+            "<tr>" +
+              "<td>" + html(nombre) + "</td>" +
+              "<td>" + mxn(r.precio_venta || 0) + "</td>" +
+              "<td>" + mxn(r.costo_receta_actual || 0) + "</td>" +
+              "<td>" + mxn(r.costo_receta_promedio || 0) + "</td>" +
+              "<td>" + html(deltaTxt) + "</td>" +
+              "<td>" + badgeFinanzasAlerta(r.alerta) + "</td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
+      function renderFinancialPaymentAudit() {
+        const tb = qs("tbody-fin-pagos");
+        if (!tb) return;
+        const list = Array.isArray(state.tableCache.finanzasPagos) ? state.tableCache.finanzasPagos : [];
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin datos de pago para la fecha seleccionada.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((r) => {
+          const invalidos = Number(r.metodos_invalidos || 0);
+          const metodoTxt = metodoPagoLabel(r.metodo_pago || "sin_definir");
+          const metodoView = invalidos > 0
+            ? metodoTxt + " <span class='badge red'>" + invalidos + " inválido(s)</span>"
+            : metodoTxt;
+          return (
+            "<tr>" +
+              "<td>" + metodoView + "</td>" +
+              "<td>" + num(r.pedidos || 0) + "</td>" +
+              "<td>" + mxn(r.ventas || 0) + "</td>" +
+              "<td>" + mxn(r.monto_validado || 0) + "</td>" +
+              "<td>" + mxn(r.por_validar || 0) + "</td>" +
+              "<td>" + num(r.facturas_solicitadas || 0) + "</td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
+      function invoiceStatusMeta(value) {
+        const key = String(value || "emitida").trim().toLowerCase();
+        const map = {
+          emitida: { cls: "blue", text: "Emitida" },
+          entregada: { cls: "green", text: "Entregada" },
+          pendiente_preparacion: { cls: "amber", text: "Pendiente de preparar" }
+        };
+        return map[key] || { cls: "amber", text: key || "N/D" };
+      }
+
+      function invoiceSendMeta(value, item) {
+        const key = String(value || "pendiente").trim().toLowerCase();
+        if (!item || !item.documentos || !item.documentos.listos) {
+          return { cls: "amber", text: "Sin documentos" };
+        }
+        if (!item.can_send) {
+          return { cls: "amber", text: "Sin destino" };
+        }
+        const map = {
+          pendiente: { cls: "blue", text: "Por enviar" },
+          enviado: { cls: "green", text: "Enviado" },
+          error: { cls: "red", text: "Con error" }
+        };
+        return map[key] || { cls: "amber", text: key || "Pendiente" };
+      }
+
+      function invoiceDocumentPill(doc, label) {
+        const ready = !!(doc && doc.ready);
+        return "<span class='doc-pill " + (ready ? "ready" : "missing") + "'>" + label + ": " + (ready ? "Listo" : "Falta") + "</span>";
+      }
+
+      function _looksLikeInvoiceDocumentPath(path, ext) {
+        const p = String(path || "").trim().toLowerCase();
+        if (!p) return false;
+        return p.endsWith("." + String(ext || "").toLowerCase());
+      }
+
+      function _setInvoiceDocValidationMessage(message, isError) {
+        const hint = qs("invoice-doc-validation");
+        if (!hint) return;
+        hint.textContent = String(message || "");
+        hint.classList.toggle("error", !!isError);
+      }
+
+      function renderInvoiceWorkspaceSummary() {
+        const summary = state.tableCache.finanzasFacturasResumen || {};
+        if (qs("kpi-invoice-total")) qs("kpi-invoice-total").textContent = num(summary.total || 0);
+        if (qs("kpi-invoice-ready")) qs("kpi-invoice-ready").textContent = num(summary.listas_para_envio || 0);
+        if (qs("kpi-invoice-sent")) qs("kpi-invoice-sent").textContent = num(summary.enviadas || 0);
+        if (qs("kpi-invoice-issues")) qs("kpi-invoice-issues").textContent = num((summary.con_error || 0) + (summary.sin_documentos || 0));
+      }
+
+      function renderInvoiceWorkspace() {
+        const tb = qs("tbody-fin-facturas");
+        if (!tb) return;
+        const list = Array.isArray(state.tableCache.finanzasFacturas) ? state.tableCache.finanzasFacturas : [];
+        const selectedId = state.tableCache.invoicePreview && state.tableCache.invoicePreview.pedido_id;
+
+        renderInvoiceWorkspaceSummary();
+
+        if (!list.length) {
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>No hay facturas para los filtros seleccionados.</td></tr>";
+          return;
+        }
+
+        tb.innerHTML = list.map((row) => {
+          const status = invoiceStatusMeta(row.estado);
+          const send = invoiceSendMeta(row.ultimo_envio_estado, row);
+          const selectedClass = Number(selectedId || 0) === Number(row.pedido_id || 0) ? " style='background:rgba(79,70,229,0.04);'" : "";
+          const canSend = !!row.can_send && String(row.ultimo_envio_estado || "").toLowerCase() !== "enviado";
+          return (
+            "<tr" + selectedClass + ">" +
+              "<td><strong>" + html(row.folio_factura || "-") + "</strong><br><span class='subtle'>Pedido #" + num(row.pedido_id || 0) + " · " + html(dayOnly(row.emitida_en)) + "</span></td>" +
+              "<td>" + html(row.cliente || row.cliente_nombre || "Cliente") + "<br><span class='subtle'>" + html(row.whatsapp_id || row.destino_whatsapp || "Sin WhatsApp") + "</span></td>" +
+              "<td><div class='invoice-status-stack'><span class='badge " + status.cls + "'>" + status.text + "</span><span class='badge " + send.cls + "'>" + send.text + "</span></div></td>" +
+              "<td><div class='invoice-doc-stack'>" + invoiceDocumentPill(row.documentos && row.documentos.pdf, "PDF") + invoiceDocumentPill(row.documentos && row.documentos.xml, "XML") + "</div></td>" +
+              "<td><strong>" + html(send.text) + "</strong><br><span class='subtle'>" + html(row.ultimo_envio_en ? dateTime(row.ultimo_envio_en) : "Sin registro") + "</span></td>" +
+              "<td><div class='invoice-actions'><button class='btn secondary btn-invoice-preview' type='button' data-pedido-id='" + Number(row.pedido_id || 0) + "'>Ver</button><button class='btn primary btn-invoice-send' type='button' data-pedido-id='" + Number(row.pedido_id || 0) + "'" + (canSend ? "" : " disabled") + ">Enviar</button></div></td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
+      function renderInvoicePreview() {
+        const empty = qs("invoice-preview-empty");
+        const content = qs("invoice-preview-content");
+        const preview = state.tableCache.invoicePreview;
+        if (!preview) {
+          if (empty) empty.style.display = "block";
+          if (content) content.style.display = "none";
+          return;
+        }
+
+        if (empty) empty.style.display = "none";
+        if (content) content.style.display = "grid";
+
+        const invoiceStatus = invoiceStatusMeta(preview.estado);
+        const sendStatus = invoiceSendMeta(preview.ultimo_envio_estado, preview);
+        if (qs("invoice-preview-title")) qs("invoice-preview-title").textContent = String(preview.folio_factura || "Factura");
+        if (qs("invoice-preview-subtitle")) qs("invoice-preview-subtitle").textContent = String(preview.cliente || preview.cliente_nombre || "Cliente") + " · Pedido #" + String(preview.pedido_id || "-");
+        if (qs("invoice-preview-status")) {
+          qs("invoice-preview-status").innerHTML = "<span class='badge " + invoiceStatus.cls + "'>" + invoiceStatus.text + "</span><span class='badge " + sendStatus.cls + "'>" + sendStatus.text + "</span>";
+        }
+        if (qs("invoice-preview-whatsapp")) qs("invoice-preview-whatsapp").textContent = preview.whatsapp_id || preview.destino_whatsapp || "No disponible";
+        if (qs("invoice-preview-email")) qs("invoice-preview-email").textContent = preview.email_destino || preview.email || "No disponible";
+        if (qs("invoice-preview-total")) qs("invoice-preview-total").textContent = mxn(preview.total || 0);
+        if (qs("invoice-preview-issued-at")) qs("invoice-preview-issued-at").textContent = dateTime(preview.emitida_en);
+        if (qs("invoice-preview-updated-at")) qs("invoice-preview-updated-at").textContent = dateTime(preview.actualizado_en);
+        if (qs("invoice-preview-send-status")) qs("invoice-preview-send-status").textContent = preview.ultimo_envio_en ? (sendStatus.text + " · " + dateTime(preview.ultimo_envio_en)) : sendStatus.text;
+        if (qs("invoice-preview-send-error")) qs("invoice-preview-send-error").textContent = preview.ultimo_envio_error || "";
+
+        const pdfDoc = (preview.documentos && preview.documentos.pdf) || {};
+        const xmlDoc = (preview.documentos && preview.documentos.xml) || {};
+        if (qs("invoice-preview-pdf-path")) qs("invoice-preview-pdf-path").value = pdfDoc.path || "";
+        if (qs("invoice-preview-xml-path")) qs("invoice-preview-xml-path").value = xmlDoc.path || "";
+
+        const pdfUrl = pdfDoc.url || "";
+        const xmlUrl = xmlDoc.url || "";
+        if (qs("invoice-preview-pdf-frame")) qs("invoice-preview-pdf-frame").src = pdfUrl || "about:blank";
+        if (qs("invoice-preview-xml-text")) qs("invoice-preview-xml-text").textContent = xmlDoc.preview_excerpt || "Sin XML cargado.";
+
+        const items = Array.isArray(preview.items) ? preview.items : [];
+        if (qs("invoice-preview-items")) {
+          qs("invoice-preview-items").innerHTML = items.length
+            ? items.map((item) => "<li><strong>" + html(item.producto_nombre || item.producto || "Producto") + "</strong><br>" + num(item.cantidad || 0) + " x " + mxn(item.precio_unitario || 0) + " · Subtotal " + mxn(item.subtotal || 0) + "</li>").join("")
+            : "<li>Sin items disponibles para este pedido.</li>";
+        }
+
+        const history = Array.isArray(preview.historial) ? preview.historial : [];
+        if (qs("invoice-preview-history")) {
+          qs("invoice-preview-history").innerHTML = history.length
+            ? history.map((row) => "<li><strong>" + html(row.evento_tipo || "evento") + "</strong><br>" + html(row.actor_username || "sistema") + " · " + html(dateTime(row.creado_en)) + "</li>").join("")
+            : "<li>Sin historial registrado.</li>";
+        }
+
+        if (qs("invoice-preview-pdf-open")) {
+          qs("invoice-preview-pdf-open").disabled = !pdfUrl;
+          qs("invoice-preview-pdf-open").onclick = () => {
+            if (pdfUrl) window.open(pdfUrl, "_blank", "noopener");
+          };
+        }
+        if (qs("invoice-preview-xml-open")) {
+          qs("invoice-preview-xml-open").disabled = !xmlUrl;
+          qs("invoice-preview-xml-open").onclick = () => {
+            if (xmlUrl) window.open(xmlUrl, "_blank", "noopener");
+          };
+        }
+        if (qs("invoice-preview-send")) {
+          qs("invoice-preview-send").disabled = !preview.can_send || String(preview.ultimo_envio_estado || "").toLowerCase() === "enviado";
+        }
+      }
+
+      function resetInvoicePreview() {
+        state.tableCache.invoicePreview = null;
+        renderInvoicePreview();
+      }
+
+      async function loadInvoicePreview(pedidoId) {
+        if (!pedidoId) return;
+        try {
+          const payload = await api("/api/admin/finanzas/facturas/" + Number(pedidoId) + "/preview");
+          state.tableCache.invoicePreview = payload;
+          renderInvoicePreview();
+          renderInvoiceWorkspace();
+        } catch (err) {
+          toast(String(err || "No se pudo cargar la previsualización."), "error");
+        }
+      }
+
+      async function loadInvoiceWorkspace(selectedPedidoId) {
+        const tb = qs("tbody-fin-facturas");
+        if (tb) tb.innerHTML = "<tr><td colspan='6' class='muted'>Cargando panel de facturación...</td></tr>";
+
+        const params = new URLSearchParams();
+        const q = ((qs("f-invoice-search") && qs("f-invoice-search").value) || "").trim();
+        const estado = (qs("f-invoice-state") && qs("f-invoice-state").value) || "";
+        const envio = (qs("f-invoice-send-state") && qs("f-invoice-send-state").value) || "";
+        if (q) params.set("q", q);
+        if (estado) params.set("estado", estado);
+        if (envio) params.set("envio", envio);
+        params.set("limit", "200");
+
+        try {
+          const payload = await api("/api/admin/finanzas/facturas?" + params.toString());
+          state.tableCache.finanzasFacturas = Array.isArray(payload.rows) ? payload.rows : [];
+          state.tableCache.finanzasFacturasResumen = payload.summary || {};
+          renderInvoiceWorkspace();
+
+          const desiredId = selectedPedidoId || (state.tableCache.invoicePreview && state.tableCache.invoicePreview.pedido_id);
+          if (desiredId && state.tableCache.finanzasFacturas.some((row) => Number(row.pedido_id || 0) === Number(desiredId))) {
+            await loadInvoicePreview(desiredId);
+          } else {
+            resetInvoicePreview();
+          }
+        } catch (err) {
+          if (tb) tb.innerHTML = "<tr><td colspan='6' class='muted'>No se pudo cargar el módulo de facturación.</td></tr>";
+          toast(String(err || "No se pudo cargar facturación."), "error");
+        }
+      }
+
+      async function saveInvoiceDocuments() {
+        const preview = state.tableCache.invoicePreview;
+        if (!preview || !preview.pedido_id) return;
+        const btn = qs("invoice-preview-doc-save");
+        const pdfPath = (((qs("invoice-preview-pdf-path") && qs("invoice-preview-pdf-path").value) || "").trim());
+        const xmlPath = (((qs("invoice-preview-xml-path") && qs("invoice-preview-xml-path").value) || "").trim());
+
+        if (pdfPath && !_looksLikeInvoiceDocumentPath(pdfPath, "pdf")) {
+          _setInvoiceDocValidationMessage("La ruta PDF debe terminar en .pdf", true);
+          toast("La ruta PDF no parece válida.", "error");
+          return;
+        }
+        if (xmlPath && !_looksLikeInvoiceDocumentPath(xmlPath, "xml")) {
+          _setInvoiceDocValidationMessage("La ruta XML debe terminar en .xml", true);
+          toast("La ruta XML no parece válida.", "error");
+          return;
+        }
+
+        _setInvoiceDocValidationMessage("Rutas válidas. Guardando documentos...", false);
+        if (btn) {
+          btn.disabled = true;
+          btn.dataset.prevText = btn.textContent || "";
+          btn.textContent = "Guardando...";
+        }
+        try {
+          const payload = await api("/api/admin/finanzas/facturas/" + Number(preview.pedido_id) + "/documentos", {
+            method: "PATCH",
+            body: {
+              pdf_ruta: pdfPath,
+              xml_ruta: xmlPath
+            }
+          });
+          state.tableCache.invoicePreview = payload;
+          renderInvoicePreview();
+          await loadInvoiceWorkspace(preview.pedido_id);
+          _setInvoiceDocValidationMessage("Documentos actualizados correctamente.", false);
+          toast("Documentos actualizados.", "success");
+        } catch (err) {
+          _setInvoiceDocValidationMessage("No se pudieron guardar los documentos. Revisa rutas y vuelve a intentar.", true);
+          toast(String(err || "No se pudieron guardar los documentos. Revisa rutas PDF/XML."), "error");
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn.dataset.prevText || "Guardar documentos";
+          }
+        }
+      }
+
+      async function sendInvoiceFromPreview(pedidoId) {
+        const targetId = Number(pedidoId || (state.tableCache.invoicePreview && state.tableCache.invoicePreview.pedido_id) || 0);
+        if (!targetId) return;
+        if (!window.confirm("Se enviarán PDF y XML al cliente por WhatsApp. ¿Deseas continuar?")) {
+          return;
+        }
+        const sendPreviewBtn = qs("invoice-preview-send");
+        let tableSendBtn = null;
+        if (pedidoId) {
+          tableSendBtn = document.querySelector(".btn-invoice-send[data-pedido-id='" + Number(targetId) + "']");
+        }
+        [sendPreviewBtn, tableSendBtn].forEach((btn) => {
+          if (!btn) return;
+          btn.disabled = true;
+          btn.dataset.prevText = btn.textContent || "";
+          btn.textContent = "Enviando...";
+        });
+        try {
+          const payload = await api("/api/admin/finanzas/facturas/" + targetId + "/send", {
+            method: "POST"
+          });
+          state.tableCache.invoicePreview = payload;
+          renderInvoicePreview();
+          await loadFinanceWorkspace(targetId);
+          toast("Factura enviada al cliente.", "success");
+        } catch (err) {
+          toast(String(err || "No se pudo enviar la factura. Verifica PDF/XML y destino WhatsApp."), "error");
+        } finally {
+          [sendPreviewBtn, tableSendBtn].forEach((btn) => {
+            if (!btn) return;
+            btn.disabled = false;
+            btn.textContent = btn.dataset.prevText || "Enviar";
+          });
+        }
+      }
+
+      async function loadFinanceWorkspace(selectedPedidoId) {
+        await Promise.allSettled([
+          loadFinancialAudit(),
+          loadInvoiceWorkspace(selectedPedidoId)
+        ]);
+      }
+
+
+      async function saveInvoiceDelivery() {
+        const registerBtn = qs("btn-factura-guardar");
+        const pedidoId = Number((qs("f-fact-pedido") && qs("f-fact-pedido").value) || 0);
+        const folio = ((qs("f-fact-folio") && qs("f-fact-folio").value) || "").trim();
+        const status = (qs("f-fact-status") && qs("f-fact-status").value) || "emitida";
+        const notas = ((qs("f-fact-notas") && qs("f-fact-notas").value) || "").trim();
+
+        if (!pedidoId || !folio) {
+          toast("Captura pedido y folio de factura.", "error");
+          return;
+        }
+
+        if (String(status) === "entregada") {
+          const okConfirm = window.confirm("Registrar como entregada puede intentar envío al cliente por WhatsApp. ¿Deseas continuar?");
+          if (!okConfirm) return;
+        }
+
+        if (registerBtn) {
+          registerBtn.disabled = true;
+          registerBtn.dataset.prevText = registerBtn.textContent || "";
+          registerBtn.textContent = "Registrando...";
+        }
+
+        try {
+          const res = await api("/api/admin/finanzas/factura", {
+            method: "POST",
+            body: {
+              pedido_id: pedidoId,
+              folio_factura: folio,
+              status,
+              notas
+            }
+          });
+          toast("Factura registrada: " + String(res.status || status) + ".", "success");
+          await loadFinanceWorkspace(pedidoId);
+          await loadInvoicePreview(pedidoId);
+        } catch (err) {
+          toast(String(err || "No se pudo registrar la factura. Revisa pedido, folio y estado."), "error");
+        } finally {
+          if (registerBtn) {
+            registerBtn.disabled = false;
+            registerBtn.textContent = registerBtn.dataset.prevText || "Registrar factura";
+          }
+        }
+      }
+
+      async function loadFinancialAudit() {
+        const tbCostos = qs("tbody-fin-costos");
+        const tbPagos = qs("tbody-fin-pagos");
+        if (!tbCostos || !tbPagos) return;
+
+        showTableLoading("tbody-fin-costos", 6);
+        showTableLoading("tbody-fin-pagos", 6);
+
+        const fechaInput = qs("f-finanzas-fecha");
+        if (fechaInput && !fechaInput.value) {
+          fechaInput.value = todayInputValue();
+        }
+
+        const params = new URLSearchParams();
+        if (fechaInput && fechaInput.value) params.set("fecha", fechaInput.value);
+        params.set("limit", "80");
+
+        try {
+          const payload = await api("/api/admin/finanzas/auditoria?" + params.toString());
+          const costos = (payload && payload.costos) || {};
+          const pagos = (payload && payload.facturacion_pagos) || {};
+
+          state.tableCache.finanzasCostos = Array.isArray(costos.rows) ? costos.rows : [];
+          state.tableCache.finanzasPagos = Array.isArray(pagos.rows) ? pagos.rows : [];
+
+          const costoRes = (costos && costos.resumen) || {};
+          const pagoRes = (pagos && pagos.resumen) || {};
+
+          if (qs("kpi-fin-cost-alertas")) qs("kpi-fin-cost-alertas").textContent = num(Number(costoRes.productos_con_alerta || 0));
+          if (qs("kpi-fin-cobranza")) qs("kpi-fin-cobranza").textContent = mxn(Number(pagoRes.tarjeta_digital_conciliado || pagoRes.monto_validado || 0));
+          if (qs("kpi-fin-pendiente")) qs("kpi-fin-pendiente").textContent = mxn(Number(pagoRes.monto_pendiente || 0));
+          if (qs("kpi-fin-efectivo")) qs("kpi-fin-efectivo").textContent = mxn(Number(pagoRes.efectivo_conciliado || 0));
+
+          renderFinancialCostAudit();
+          renderFinancialPaymentAudit();
+        } catch (_e) {
+          tbCostos.innerHTML = "<tr><td colspan='6' class='muted'>No se pudo cargar la auditoría de costos.</td></tr>";
+          tbPagos.innerHTML = "<tr><td colspan='6' class='muted'>No se pudo validar facturación y pagos.</td></tr>";
+        }
+      }
+
       async function loadReporteVentasProfesional() {
         const tb = qs("tbody-reporte-ventas-profesional");
         if (!tb) return;
@@ -2927,14 +4560,16 @@
         const calidad = String((qs("f-rent-calidad") && qs("f-rent-calidad").value) || "").trim().toLowerCase();
         const source = Array.isArray(state.tableCache.rentabilidad) ? state.tableCache.rentabilidad : [];
         const list = source.filter((r) => {
-          if (calidad && String(r.calidad_costo || "").toLowerCase() !== calidad) return false;
+          const calidadCosto = String(r.calidad_costo || "").toLowerCase();
+          const salud = String(r.salud_rentabilidad || "").toLowerCase();
+          if (calidad && calidadCosto !== calidad && salud !== calidad) return false;
           if (!q) return true;
           const blob = normalizeText([r && r.nombre, r && r.variante].filter(Boolean).join(" "));
           return blob.includes(q);
         });
 
         if (!list.length) {
-          tb.innerHTML = "<tr><td colspan='8' class='muted'>Sin datos para el filtro actual.</td></tr>";
+          tb.innerHTML = "<tr><td colspan='9' class='muted'>Sin datos para el filtro actual.</td></tr>";
           return;
         }
 
@@ -2945,24 +4580,25 @@
               "<td>" + html(r.variante || "-") + "</td>" +
               "<td>" + mxn(r.precio_venta) + "</td>" +
               "<td>" + mxn(r.costo_estimado_unitario) + "</td>" +
+              "<td>" + mxn(r.utilidad_unitaria || r.margen_unitario || 0) + "</td>" +
               "<td>" + Number(r.margen_pct || 0).toFixed(2) + "%</td>" +
               "<td>" + num(r.componentes_activos || 0) + "</td>" +
               "<td>" + num(r.componentes_sin_costo || 0) + "</td>" +
-              "<td>" + qualityBadge(r.calidad_costo) + "</td>" +
+              "<td>" + qualityBadge(r.salud_rentabilidad || r.calidad_costo) + "</td>" +
             "</tr>"
           );
         }).join("");
       }
 
       async function loadRentabilidad() {
-        showTableLoading("tbody-rentabilidad", 8);
+        showTableLoading("tbody-rentabilidad", 9);
         try {
           const rows = await api("/api/admin/rentabilidad-productos?limit=50");
           state.tableCache.rentabilidad = Array.isArray(rows) ? rows : [];
           renderRentabilidad();
         } catch (_e) {
           const tb = qs("tbody-rentabilidad");
-          tb.innerHTML = "<tr><td colspan='8' class='muted'>No se pudo cargar rentabilidad.</td></tr>";
+          tb.innerHTML = "<tr><td colspan='9' class='muted'>No se pudo cargar rentabilidad.</td></tr>";
         }
       }
 
@@ -3164,26 +4800,133 @@
         }
       }
 
+      // Funciones para modales
+      function openModal(modalId) {
+        const modal = qs(modalId);
+        if (modal) modal.style.display = "flex";
+      }
+
+      function closeModal(modalId) {
+        const modal = qs(modalId);
+        if (modal) modal.style.display = "none";
+      }
+
+      // Editar usuario - abrir modal
+      function openEditarUsuario(usuario) {
+        qs("edt-usr-id").value = String(usuario.usuario_id || "");
+        qs("edt-usr-nombre").value = usuario.nombre_mostrar || "";
+        qs("edt-usr-username").value = usuario.username || "";
+        qs("edt-usr-rol").value = usuario.rol || "admin";
+        qs("edt-usr-email").value = usuario.email || "";
+        qs("edt-usr-telefono").value = usuario.telefono || "";
+        qs("edt-usr-area").value = usuario.area_entrega || "";
+        qs("edt-usr-activo").checked = usuario.activo === true;
+        
+        // Mostrar/ocultar campo de área según el rol
+        const fieldArea = qs("field-edt-area");
+        if (fieldArea) {
+          fieldArea.style.display = usuario.rol === "repartidor" ? "block" : "none";
+        }
+        
+        // Evento para cambiar rol
+        qs("edt-usr-rol").onchange = (e) => {
+          if (fieldArea) {
+            fieldArea.style.display = e.target.value === "repartidor" ? "block" : "none";
+          }
+        };
+        
+        openModal("modal-editar-usuario");
+      }
+
+      // Cambiar contraseña - abrir modal
+      function openCambiarPass(usuario) {
+        qs("pass-usr-id").value = String(usuario.usuario_id || "");
+        qs("lbl-pass-usuario").textContent = "Usuario: " + String(usuario.username || "-");
+        qs("pass-nueva").value = "";
+        qs("pass-confirmar").value = "";
+        openModal("modal-cambiar-pass");
+      }
+
+      // Confirmar estado - abrir modal
+      function openConfirmarEstado(usuario, novoEstado) {
+        const titulo = novoEstado ? "Activar usuario" : "Desactivar usuario";
+        const msg = novoEstado 
+          ? "¿Desea activar a " + html(usuario.nombre_mostrar || usuario.username) + "?"
+          : "¿Desea desactivar a " + html(usuario.nombre_mostrar || usuario.username) + "?\n\nEste usuario no podrá acceder al sistema.";
+        
+        qs("lbl-confirm-titulo").textContent = titulo;
+        qs("lbl-confirm-msg").textContent = msg;
+        
+        const btnOk = qs("btn-confirm-ok");
+        const btnCancel = qs("btn-confirm-cancel");
+        
+        btnCancel.onclick = () => closeModal("modal-confirmar-estado");
+        btnOk.onclick = async () => {
+          try {
+            await api("/api/admin/usuarios/" + usuario.usuario_id, {
+              method: "PATCH",
+              body: { activo: novoEstado }
+            });
+            await loadUsuarios();
+            await loadBitacoraSeguridad();
+            toast("Usuario " + (novoEstado ? "activado" : "desactivado") + ".", "success");
+            closeModal("modal-confirmar-estado");
+          } catch (_e) {
+            toast("Error al actualizar usuario.", "error");
+          }
+        };
+        
+        openModal("modal-confirmar-estado");
+      }
+
       async function loadUsuarios() {
         showTableLoading("tbody-usuarios", 6);
         try {
           const params = new URLSearchParams();
           const rolFiltro = qs("f-usr-rol") ? qs("f-usr-rol").value : "";
+          const estadoFiltro = qs("f-usr-estado") ? qs("f-usr-estado").value : "";
           const areaFiltro = qs("f-usr-area") ? qs("f-usr-area").value.trim() : "";
+          const busqueda = qs("f-usr-search") ? qs("f-usr-search").value.trim() : "";
+          
           if (rolFiltro) params.set("rol", rolFiltro);
           if (areaFiltro) params.set("area_entrega", areaFiltro);
+          if (busqueda) params.set("q", busqueda);
 
           const rows = await api("/api/admin/usuarios" + (params.toString() ? "?" + params.toString() : ""));
-          const list = Array.isArray(rows) ? rows : [];
+          let list = Array.isArray(rows) ? rows : [];
+          
+          // Filtro por estado
+          if (estadoFiltro === "activo") {
+            list = list.filter(u => u.activo === true);
+          } else if (estadoFiltro === "inactivo") {
+            list = list.filter(u => u.activo === false);
+          }
+
+          // Actualizar estadísticas
+          const stats = {
+            admin: list.filter(u => u.rol === "admin").length,
+            cocina: list.filter(u => u.rol === "cocina").length,
+            repartidor: list.filter(u => u.rol === "repartidor").length,
+            inactivos: list.filter(u => u.activo === false).length
+          };
+          qs("stat-admin").textContent = String(stats.admin);
+          qs("stat-cocina").textContent = String(stats.cocina);
+          qs("stat-repartidor").textContent = String(stats.repartidor);
+          qs("stat-inactivos").textContent = String(stats.inactivos);
+          qs("lbl-usr-total").textContent = String(list.length);
+
           const tb = qs("tbody-usuarios");
           if (!list.length) {
             tb.innerHTML = "<tr><td colspan='6' class='muted'>No hay usuarios.</td></tr>";
             return;
           }
+
+          const allUsers = list; // Guardar referencia para los botones
+
           tb.innerHTML = list.map((u) => {
             const rolClass = u.rol === "admin" ? "blue" : (u.rol === "cocina" ? "amber" : "green");
             const stateClass = u.activo ? "green" : "red";
-            const area = u.rol === "repartidor" ? (u.area_entrega || "Sin área") : "N/A";
+            const area = u.rol === "repartidor" ? (u.area_entrega || "Sin área") : "—";
             return (
               "<tr>" +
                 "<td><strong>" + html(u.nombre_mostrar || u.username || "-") + "</strong><br><span class='muted'>" + html(u.username || "-") + "</span></td>" +
@@ -3192,55 +4935,111 @@
                 "<td><span class='badge " + stateClass + "'>" + (u.activo ? "activo" : "inactivo") + "</span></td>" +
                 "<td>" + html(dateTime(u.ultimo_login)) + "</td>" +
                 "<td>" +
-                  "<button class='btn btn-toggle-user' data-id='" + Number(u.usuario_id) + "' data-active='" + (u.activo ? "1" : "0") + "' type='button'>" + (u.activo ? "Desactivar" : "Activar") + "</button> " +
-                  "<button class='btn btn-reset-pass' data-id='" + Number(u.usuario_id) + "' type='button'>Reset pass</button>" +
+                  "<button class='btn btn-editar-usr' data-id='" + Number(u.usuario_id) + "' type='button'>Editar</button> " +
+                  "<button class='btn btn-cambiar-pass' data-id='" + Number(u.usuario_id) + "' type='button'>Contraseña</button> " +
+                  "<button class='btn btn-toggle-user' data-id='" + Number(u.usuario_id) + "' type='button'>" + (u.activo ? "Desactivar" : "Activar") + "</button>" +
                 "</td>" +
               "</tr>"
             );
           }).join("");
 
+          // Event listeners para editar
+          tb.querySelectorAll(".btn-editar-usr").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const usuarioId = Number(btn.getAttribute("data-id"));
+              const usuario = allUsers.find(u => u.usuario_id === usuarioId);
+              if (usuario) openEditarUsuario(usuario);
+            });
+          });
+
+          // Event listeners para cambiar contraseña
+          tb.querySelectorAll(".btn-cambiar-pass").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const usuarioId = Number(btn.getAttribute("data-id"));
+              const usuario = allUsers.find(u => u.usuario_id === usuarioId);
+              if (usuario) openCambiarPass(usuario);
+            });
+          });
+
+          // Event listeners para toggle activo/inactivo
           tb.querySelectorAll(".btn-toggle-user").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-              const id = Number(btn.getAttribute("data-id"));
-              const isActive = btn.getAttribute("data-active") === "1";
-              try {
-                await api("/api/admin/usuarios/" + id, {
-                  method: "PATCH",
-                  body: { activo: !isActive }
-                });
-                await loadUsuarios();
-                await loadBitacoraSeguridad();
-                toast("Usuario actualizado.", "success");
-              } catch (_e) {
-                toast("No se pudo actualizar usuario.", "error");
+            btn.addEventListener("click", () => {
+              const usuarioId = Number(btn.getAttribute("data-id"));
+              const usuario = allUsers.find(u => u.usuario_id === usuarioId);
+              if (usuario) {
+                openConfirmarEstado(usuario, !usuario.activo);
               }
             });
           });
 
-          tb.querySelectorAll(".btn-reset-pass").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-              const id = Number(btn.getAttribute("data-id"));
-              const nueva = window.prompt("Nueva contrasena temporal (min 8):", "");
-              if (!nueva) return;
-              if (nueva.length < 8) {
-                toast("La contrasena debe tener al menos 8 caracteres.", "error");
-                return;
-              }
-              try {
-                await api("/api/admin/usuarios/" + id, {
-                  method: "PATCH",
-                  body: { nueva_password: nueva }
-                });
-                await loadBitacoraSeguridad();
-                toast("Contrasena reiniciada.", "success");
-              } catch (_e) {
-                toast("No se pudo reiniciar contrasena.", "error");
-              }
-            });
-          });
+          // Setup para guardar cambios en modal editar
+          qs("btn-edt-guardar").onclick = async () => {
+            const usuarioId = Number(qs("edt-usr-id").value);
+            const nombre = qs("edt-usr-nombre").value.trim();
+            const rol = qs("edt-usr-rol").value;
+            const email = qs("edt-usr-email").value.trim();
+            const telefono = qs("edt-usr-telefono").value.trim();
+            const area = qs("edt-usr-area").value.trim();
+            const activo = qs("edt-usr-activo").checked;
+
+            if (!nombre) {
+              toast("El nombre es obligatorio.", "error");
+              return;
+            }
+
+            try {
+              await api("/api/admin/usuarios/" + usuarioId, {
+                method: "PATCH",
+                body: {
+                  nombre_mostrar: nombre,
+                  rol,
+                  email,
+                  telefono,
+                  area_entrega: rol === "repartidor" ? area : null,
+                  activo
+                }
+              });
+              await loadUsuarios();
+              await loadBitacoraSeguridad();
+              toast("Usuario actualizado exitosamente.", "success");
+              closeModal("modal-editar-usuario");
+            } catch (_e) {
+              toast("Error al actualizar usuario: " + String(_e), "error");
+            }
+          };
+
+          // Setup para cambiar contraseña
+          qs("btn-pass-guardar").onclick = async () => {
+            const usuarioId = Number(qs("pass-usr-id").value);
+            const nueva = qs("pass-nueva").value;
+            const confirmar = qs("pass-confirmar").value;
+
+            if (!nueva || nueva.length < 8) {
+              toast("La contraseña debe tener mínimo 8 caracteres.", "error");
+              return;
+            }
+
+            if (nueva !== confirmar) {
+              toast("Las contraseñas no coinciden.", "error");
+              return;
+            }
+
+            try {
+              await api("/api/admin/usuarios/" + usuarioId, {
+                method: "PATCH",
+                body: { nueva_password: nueva }
+              });
+              await loadBitacoraSeguridad();
+              toast("Contraseña actualizada exitosamente.", "success");
+              closeModal("modal-cambiar-pass");
+            } catch (_e) {
+              toast("Error al cambiar contraseña: " + String(_e), "error");
+            }
+          };
+
         } catch (_e) {
           const tb = qs("tbody-usuarios");
-          tb.innerHTML = "<tr><td colspan='6' class='muted'>Error al cargar usuarios.</td></tr>";
+          tb.innerHTML = "<tr><td colspan='6' class='muted'>Error al cargar usuarios: " + html(String(_e)) + "</td></tr>";
         }
       }
 
@@ -3586,7 +5385,7 @@
         });
 
         if (!list.length) {
-          tb.innerHTML = "<tr><td colspan='6' class='muted'>Sin productos para el filtro actual.</td></tr>";
+          tb.innerHTML = "<tr><td colspan='7' class='muted'>Sin productos para el filtro actual.</td></tr>";
           return;
         }
 
@@ -3595,6 +5394,7 @@
               "<td><input class='prod-nombre' data-id='" + Number(p.producto_id) + "' value='" + html(p.nombre || "") + "' /></td>" +
               "<td><input class='prod-variante' data-id='" + Number(p.producto_id) + "' value='" + html(p.variante || "") + "' /></td>" +
               "<td><input class='prod-precio' data-id='" + Number(p.producto_id) + "' type='number' min='0' step='0.01' value='" + Number(p.precio || 0) + "' /></td>" +
+              "<td><input class='prod-costo' data-id='" + Number(p.producto_id) + "' type='number' min='0' step='0.01' value='" + Number(p.costo_referencia || 0) + "' /></td>" +
               "<td><select class='prod-activo' data-id='" + Number(p.producto_id) + "'><option value='1'" + (p.activo ? " selected" : "") + ">activo</option><option value='0'" + (!p.activo ? " selected" : "") + ">inactivo</option></select></td>" +
               "<td>" + qualityBadge(p.tiene_receta_activa ? "completo" : "sin_receta") + "</td>" +
               "<td><button class='btn btn-prod-save' data-id='" + Number(p.producto_id) + "' type='button'>Guardar</button></td>" +
@@ -3611,6 +5411,7 @@
                   nombre: tb.querySelector(".prod-nombre[data-id='" + id + "']").value.trim(),
                   variante: tb.querySelector(".prod-variante[data-id='" + id + "']").value.trim(),
                   precio: Number(tb.querySelector(".prod-precio[data-id='" + id + "']").value || 0),
+                  costo_referencia: Number(tb.querySelector(".prod-costo[data-id='" + id + "']").value || 0),
                   activo: tb.querySelector(".prod-activo[data-id='" + id + "']").value === "1"
                 }
               });
@@ -3624,7 +5425,7 @@
       }
 
       async function loadProductosAdmin() {
-        showTableLoading("tbody-productos-admin", 6);
+        showTableLoading("tbody-productos-admin", 7);
         try {
           const rows = await api("/api/admin/productos?limit=300");
           const list = Array.isArray(rows) ? rows : [];
@@ -3632,7 +5433,7 @@
           state.tableCache.productosAdmin = list;
           renderProductosAdmin();
         } catch (_e) {
-          qs("tbody-productos-admin").innerHTML = "<tr><td colspan='6' class='muted'>Error al cargar productos.</td></tr>";
+          qs("tbody-productos-admin").innerHTML = "<tr><td colspan='7' class='muted'>Error al cargar productos.</td></tr>";
         }
       }
 
@@ -4249,18 +6050,29 @@
       async function activateSection(sectionName) {
         if (!sectionMeta[sectionName]) return;
         state.current = sectionName;
+        const visualSection = sectionName === "finanzas" ? "ventas" : sectionName;
 
         document.querySelectorAll(".nav-item").forEach((el) => {
           el.classList.toggle("active", el.getAttribute("data-section") === sectionName);
         });
         document.querySelectorAll(".section").forEach((el) => {
-          el.classList.toggle("active", el.id === "section-" + sectionName);
+          el.classList.toggle("active", el.id === "section-" + visualSection);
         });
 
         qs("page-title").textContent = sectionMeta[sectionName].title;
         qs("page-subtitle").textContent = sectionMeta[sectionName].subtitle;
+        renderExecutiveChrome(sectionName);
 
-        await loadSection(sectionName);
+        await loadSection(visualSection);
+
+        if (sectionName === "finanzas") {
+          const target = qs("card-finanzas");
+          if (target && typeof target.scrollIntoView === "function") {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+          state.loaded.finanzas = true;
+        }
+
         applySmartTimers();
       }
 
@@ -4272,7 +6084,8 @@
           await Promise.allSettled([
             loadVentasKpisAndCharts(false),
             loadTopClientes(),
-            loadReporteVentasProfesional()
+            loadReporteVentasProfesional(),
+            loadFinanceWorkspace()
           ]);
           return;
         }
@@ -4427,6 +6240,55 @@
           renderTicketDetalleProfesional(selected || null);
         });
 
+        if (qs("btn-finanzas-cargar")) {
+          qs("btn-finanzas-cargar").addEventListener("click", () => loadFinanceWorkspace());
+        }
+        if (qs("btn-finanzas-hoy")) {
+          qs("btn-finanzas-hoy").addEventListener("click", () => {
+            if (qs("f-finanzas-fecha")) qs("f-finanzas-fecha").value = todayInputValue();
+            loadFinanceWorkspace();
+          });
+        }
+        if (qs("btn-factura-guardar")) {
+          qs("btn-factura-guardar").addEventListener("click", saveInvoiceDelivery);
+        }
+        if (qs("btn-invoice-refresh")) {
+          qs("btn-invoice-refresh").addEventListener("click", () => loadFinanceWorkspace());
+        }
+        if (qs("btn-invoice-filter-reset")) {
+          qs("btn-invoice-filter-reset").addEventListener("click", () => {
+            if (qs("f-invoice-search")) qs("f-invoice-search").value = "";
+            if (qs("f-invoice-state")) qs("f-invoice-state").value = "";
+            if (qs("f-invoice-send-state")) qs("f-invoice-send-state").value = "";
+            loadInvoiceWorkspace();
+          });
+        }
+        if (qs("f-invoice-search")) {
+          qs("f-invoice-search").addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              loadInvoiceWorkspace();
+            }
+          });
+        }
+        if (qs("f-invoice-state")) qs("f-invoice-state").addEventListener("change", () => loadInvoiceWorkspace());
+        if (qs("f-invoice-send-state")) qs("f-invoice-send-state").addEventListener("change", () => loadInvoiceWorkspace());
+        if (qs("tbody-fin-facturas")) {
+          qs("tbody-fin-facturas").addEventListener("click", (event) => {
+            const previewBtn = event.target.closest(".btn-invoice-preview");
+            if (previewBtn) {
+              loadInvoicePreview(Number(previewBtn.getAttribute("data-pedido-id") || 0));
+              return;
+            }
+            const sendBtn = event.target.closest(".btn-invoice-send");
+            if (sendBtn) {
+              sendInvoiceFromPreview(Number(sendBtn.getAttribute("data-pedido-id") || 0));
+            }
+          });
+        }
+        if (qs("invoice-preview-doc-save")) qs("invoice-preview-doc-save").addEventListener("click", saveInvoiceDocuments);
+        if (qs("invoice-preview-send")) qs("invoice-preview-send").addEventListener("click", () => sendInvoiceFromPreview());
+
         qs("btn-rent-filtrar").addEventListener("click", renderRentabilidad);
         qs("btn-rent-limpiar").addEventListener("click", () => {
           qs("f-rent-q").value = "";
@@ -4539,10 +6401,30 @@
 
         qs("btn-usr-filtrar").addEventListener("click", loadUsuarios);
         qs("btn-usr-limpiar").addEventListener("click", async () => {
+          if (qs("f-usr-search")) qs("f-usr-search").value = "";
           if (qs("f-usr-rol")) qs("f-usr-rol").value = "";
+          if (qs("f-usr-estado")) qs("f-usr-estado").value = "";
           if (qs("f-usr-area")) qs("f-usr-area").value = "";
           await loadUsuarios();
         });
+
+        // Event listeners para búsqueda en tiempo real
+        if (qs("f-usr-search")) {
+          qs("f-usr-search").addEventListener("keyup", (e) => {
+            if (e.key === "Enter") loadUsuarios();
+          });
+        }
+        if (qs("f-usr-rol")) {
+          qs("f-usr-rol").addEventListener("change", loadUsuarios);
+        }
+        if (qs("f-usr-estado")) {
+          qs("f-usr-estado").addEventListener("change", loadUsuarios);
+        }
+        if (qs("f-usr-area")) {
+          qs("f-usr-area").addEventListener("keyup", (e) => {
+            if (e.key === "Enter") loadUsuarios();
+          });
+        }
 
         qs("btn-seg-filtrar").addEventListener("click", () => {
           state.pages.seg.page = 1;
@@ -4719,6 +6601,7 @@
                 nombre: qs("producto-nombre").value.trim(),
                 variante: qs("producto-variante").value,
                 precio: Number(qs("producto-precio").value || 0),
+                costo_referencia: Number(qs("producto-costo").value || 0),
                 activo: qs("producto-activo").value === "1"
               }
             });
@@ -4998,6 +6881,47 @@
   </script>
   <script>
     window.addEventListener("DOMContentLoaded", function () {
+      function applyMobileLayoutFallback() {
+        const app = document.querySelector(".app");
+        const sidebar = document.querySelector(".sidebar");
+        const main = document.querySelector(".main");
+        if (!app || !sidebar || !main) return;
+
+        const isMobileLike = window.matchMedia("(max-width: 1100px)").matches;
+        if (isMobileLike) {
+          app.style.display = "block";
+          app.style.gridTemplateColumns = "1fr";
+          app.style.width = "100%";
+          app.style.maxWidth = "100%";
+
+          sidebar.style.position = "static";
+          sidebar.style.height = "auto";
+          sidebar.style.width = "100%";
+          sidebar.style.maxWidth = "100%";
+
+          main.style.width = "100%";
+          main.style.maxWidth = "100%";
+          main.style.overflowX = "hidden";
+        } else {
+          app.style.display = "";
+          app.style.gridTemplateColumns = "";
+          app.style.width = "";
+          app.style.maxWidth = "";
+
+          sidebar.style.position = "";
+          sidebar.style.height = "";
+          sidebar.style.width = "";
+          sidebar.style.maxWidth = "";
+
+          main.style.width = "";
+          main.style.maxWidth = "";
+          main.style.overflowX = "";
+        }
+      }
+
+      applyMobileLayoutFallback();
+      window.addEventListener("resize", applyMobileLayoutFallback);
+
       function ensureAdminFallbackNodes() {
         const topActions = document.getElementById("react-ui-admin-top-actions");
         if (topActions && !document.getElementById("btn-logout")) {
@@ -5038,6 +6962,7 @@
           ["react-ui-admin-head-reporte-ventas", "Reporte profesional de ventas"],
           ["react-ui-admin-head-reporte-kpis", "Reporte profesional de KPIs (Día / Mes / Año)"],
           ["react-ui-admin-head-top-clientes", "Top 20 clientes"],
+          ["react-ui-admin-head-finanzas", "Auditoría financiera operativa"],
           ["react-ui-admin-head-rentabilidad", "Rentabilidad por producto"],
           ["react-ui-admin-head-pedidos-recientes", "Pedidos recientes (activos)"],
           ["react-ui-admin-head-compras-inventario", "Ultimas compras de inventario"]
@@ -5108,6 +7033,9 @@
           });
           window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-top-clientes", {
             title: "Top 20 clientes"
+          });
+          window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-finanzas", {
+            title: "Auditoría financiera operativa"
           });
           window.QCSoftUI.mountSoftCardHeader("react-ui-admin-head-rentabilidad", {
             title: "Rentabilidad por producto"

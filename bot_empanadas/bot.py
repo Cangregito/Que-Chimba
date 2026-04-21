@@ -11,6 +11,12 @@ import unicodedata
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, Iterable, Optional, Tuple
+from urllib.parse import quote_plus
+
+try:
+	from psycopg2 import sql as pg_sql
+except Exception:
+	pg_sql = None
 
 try:
 	import requests
@@ -516,7 +522,7 @@ def _get_timeout_env(name: str, default: float) -> float:
 
 LLM_REMOTE_TIMEOUT_SEC = _get_timeout_env("LLM_REMOTE_TIMEOUT_SEC", 20.0)
 LLM_LOCAL_TIMEOUT_SEC = _get_timeout_env("LLM_LOCAL_TIMEOUT_SEC", 30.0)
-LLM_STYLE_TIMEOUT_SEC = _get_timeout_env("LLM_STYLE_TIMEOUT_SEC", 3.5)
+LLM_STYLE_TIMEOUT_SEC = _get_timeout_env("LLM_STYLE_TIMEOUT_SEC", 8.0)
 LLM_LOCAL_RETRIES = int(_get_timeout_env("LLM_LOCAL_RETRIES", 2))
 LLM_LOCAL_RETRY_BACKOFF_SEC = _get_timeout_env("LLM_LOCAL_RETRY_BACKOFF_SEC", 0.4)
 LLM_LOCAL_FAIL_COOLDOWN_SEC = _get_timeout_env("LLM_LOCAL_FAIL_COOLDOWN_SEC", 20.0)
@@ -573,8 +579,17 @@ def _as_dict(value: Any) -> Dict[str, Any]:
 
 
 def _numero_desde_from(from_num):
-	raw = from_num or ""
-	return raw.replace("whatsapp:", "").strip()
+	raw = str(from_num or "").strip()
+	raw = raw.replace("whatsapp:", "", 1)
+	raw = raw.replace("@s.whatsapp.net", "")
+	raw = raw.replace("@c.us", "")
+	raw = raw.replace("@lid", "")
+	digits = "".join(ch for ch in raw if ch.isdigit())
+	if digits:
+		if len(digits) == 10:
+			return f"52{digits}"
+		return digits
+	return raw
 
 
 def _guardar_sesion(whatsapp_id, estado, datos_temp):
@@ -628,6 +643,15 @@ def _to_float(value, default=0.0):
 		return float(value)
 	try:
 		return float(value)
+	except (TypeError, ValueError):
+		return default
+
+
+def _to_int(value, default=0):
+	if value is None:
+		return default
+	try:
+		return int(value)
 	except (TypeError, ValueError):
 		return default
 
@@ -841,10 +865,22 @@ def _nombre_cliente_es_valido(nombre: Optional[str]) -> bool:
 		"cliente whatsapp",
 		"whatsapp",
 		"sin nombre",
+		"confirmar",
+		"menu",
+		"pedido",
+		"evento",
+		"hola",
+		"buenas",
+		"gracias",
+		"ok",
+		"si",
+		"no",
 	}
 	if n in invalidos:
 		return False
 	if len(n) < 2:
+		return False
+	if any(token in n for token in ["test", "prueba", "temporal", "validacion"]):
 		return False
 	return bool(re.search(r"[a-z]", n))
 
@@ -856,7 +892,7 @@ def _extraer_nombre_cliente(texto: str) -> Optional[str]:
 
 	norm = _normalizar_texto(t)
 	patrones = [
-		r"(?:me llamo|soy|mi nombre es|nombre[:\s]+)\s+([a-zA-Z\s]{2,60})",
+		r"(?:me llamo|soy|mi nombre es|nombre[:\s]+)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,60})",
 	]
 	for patron in patrones:
 		match = re.search(patron, norm)
@@ -879,6 +915,15 @@ def _persistir_datos_cliente(cliente: Dict[str, Any], datos_temp: Dict[str, Any]
 	apellidos = datos_temp.get("cliente_apellidos")
 	genero = datos_temp.get("genero_trato")
 	_actualizar_cliente_basico(cliente_id, nombre=nombre, apellidos=apellidos, genero_trato=genero)
+
+
+def _build_qr_confirmacion_url(pedido_id: Any, codigo_entrega: Any) -> Optional[str]:
+	pid = str(pedido_id or "").strip()
+	codigo = str(codigo_entrega or "").strip().upper()
+	if not pid or not codigo:
+		return None
+	payload = f"QC|pedido:{pid}|codigo:{codigo}"
+	return f"https://quickchart.io/qr?size=420&text={quote_plus(payload)}"
 
 
 def _trato_cliente(datos_temp: Dict[str, Any]) -> str:
@@ -944,6 +989,7 @@ def _pulir_texto_con_ia(texto: str, datos_temp: Dict[str, Any]) -> str:
 	if len(base) > 420 or "\n-" in base:
 		return base
 
+	style_timeout_sec = max(LLM_STYLE_TIMEOUT_SEC, 8.0)
 	trato = _trato_cliente(datos_temp)
 	prompt = (
 		"Reescribe este mensaje para WhatsApp en espanol mexicano natural, cercano y profesional. "
@@ -971,9 +1017,10 @@ def _pulir_texto_con_ia(texto: str, datos_temp: Dict[str, Any]) -> str:
 					"model": LLM_LOCAL_MODEL,
 					"prompt": prompt,
 					"stream": False,
-					"options": {"temperature": 0.55},
+					"options": {"temperature": 0.55, "num_predict": 120},
 				},
-				LLM_STYLE_TIMEOUT_SEC,
+				style_timeout_sec,
+				registrar_salud=False,
 			)
 			body = resp.json()
 			candidato = _validar_candidato((body.get("response") or "").strip())
@@ -1001,7 +1048,7 @@ def _pulir_texto_con_ia(texto: str, datos_temp: Dict[str, Any]) -> str:
 						{"role": "user", "content": prompt},
 					],
 				},
-				timeout=LLM_STYLE_TIMEOUT_SEC,
+				timeout=style_timeout_sec,
 			)
 			resp.raise_for_status()
 			body = resp.json()
@@ -1018,7 +1065,8 @@ def _pulir_texto_con_ia(texto: str, datos_temp: Dict[str, Any]) -> str:
 def _armar_respuesta_comercial(texto: str, opciones: Optional[str], datos_temp: Dict[str, Any]) -> Dict[str, Any]:
 	trato = _trato_cliente(datos_temp)
 	prefijo = random.choice(MODISMOS_SEGUROS)
-	texto_humano = _pulir_texto_con_ia(texto, datos_temp)
+	# Evita pulido IA cuando la respuesta trae opciones estructuradas para no alterar el flujo.
+	texto_humano = (texto or "").strip() if opciones else _pulir_texto_con_ia(texto, datos_temp)
 	texto_final = f"{trato}, {texto_humano}" if trato else texto_humano
 	cuerpo = f"{prefijo} {texto_final}".strip()
 	if opciones:
@@ -1293,11 +1341,12 @@ def _registrar_exito_llm_local() -> None:
 		_llm_local_cooldown_until = 0.0
 
 
-def _registrar_fallo_llm_local(exc: Exception) -> None:
+def _registrar_fallo_llm_local(exc: Exception, force_cooldown: bool = False) -> None:
 	global _llm_local_failures, _llm_local_cooldown_until
 	_llm_local_failures += 1
 	retries = max(1, LLM_LOCAL_RETRIES)
-	if LLM_LOCAL_FAIL_COOLDOWN_SEC > 0 and _llm_local_failures >= retries:
+	activar_cooldown = force_cooldown or (LLM_LOCAL_FAIL_COOLDOWN_SEC > 0 and _llm_local_failures >= retries)
+	if LLM_LOCAL_FAIL_COOLDOWN_SEC > 0 and activar_cooldown:
 		_llm_local_cooldown_until = time.monotonic() + LLM_LOCAL_FAIL_COOLDOWN_SEC
 		logger.warning(
 			"LLM local entra en cooldown %.1fs tras %s fallos consecutivos: %s",
@@ -1309,7 +1358,23 @@ def _registrar_fallo_llm_local(exc: Exception) -> None:
 		logger.info("LLM local fallo %s/%s: %s", _llm_local_failures, retries, exc)
 
 
-def _post_ollama_generate(payload: Dict[str, Any], timeout_sec: float):
+def _ollama_status_code_from_exception(exc: Exception) -> Optional[int]:
+	response = getattr(exc, "response", None)
+	status_code = getattr(response, "status_code", None)
+	if isinstance(status_code, int):
+		return status_code
+	match = re.search(r"\b(4\d\d|5\d\d)\b", str(exc or ""))
+	if match:
+		return int(match.group(1))
+	return None
+
+
+def _ollama_es_error_final(exc: Exception, status_code: Optional[int] = None) -> bool:
+	code = status_code if isinstance(status_code, int) else _ollama_status_code_from_exception(exc)
+	return bool(code is not None and code >= 400)
+
+
+def _post_ollama_generate(payload: Dict[str, Any], timeout_sec: float, registrar_salud: bool = True):
 	if requests is None:
 		return None
 	last_exc: Optional[Exception] = None
@@ -1322,11 +1387,16 @@ def _post_ollama_generate(payload: Dict[str, Any], timeout_sec: float):
 				timeout=timeout_sec,
 			)
 			resp.raise_for_status()
-			_registrar_exito_llm_local()
+			if registrar_salud:
+				_registrar_exito_llm_local()
 			return resp
 		except Exception as exc:
 			last_exc = exc
-			_registrar_fallo_llm_local(exc)
+			status_code = _ollama_status_code_from_exception(exc)
+			if registrar_salud:
+				_registrar_fallo_llm_local(exc, force_cooldown=bool(isinstance(status_code, int) and status_code >= 500))
+			if _ollama_es_error_final(exc, status_code=status_code):
+				break
 			if attempt < retries and LLM_LOCAL_RETRY_BACKOFF_SEC > 0:
 				time.sleep(LLM_LOCAL_RETRY_BACKOFF_SEC * attempt)
 	if last_exc:
@@ -1448,9 +1518,19 @@ def _extraer_slots_llm_local(texto: str) -> Dict[str, Any]:
 		return {}
 
 
-def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], usar_llm: bool = False) -> Dict[str, Any]:
+def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], usar_llm: bool = False, estado_actual: str = "") -> Dict[str, Any]:
 	datos = _as_dict(datos_temp)
 	text = _normalizar_texto(entrada)
+	estado_norm = _normalizar_texto(estado_actual)
+	carrito_congelado = bool(datos.get("items")) and estado_norm in {
+		"metodo_entrega",
+		"solicitar_ubicacion",
+		"metodo_pago",
+		"preguntar_factura",
+		"datos_fiscales",
+		"confirmacion",
+		"confirmar_carrito",
+	}
 	datos = _aplicar_preferencia_trato(text, datos)
 
 	if not text:
@@ -1462,14 +1542,14 @@ def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], us
 		datos["tipo_servicio"] = datos.get("tipo_servicio") or "individual"
 
 	catalogo = list(_obtener_catalogo_productos())
-	if not datos.get("producto_id"):
+	if not carrito_congelado and not datos.get("producto_id"):
 		producto = _producto_desde_texto(text, catalogo)
 		if producto:
 			datos["producto_id"] = producto.get("producto_id")
 			datos["producto_nombre"] = f"{producto.get('nombre', '')} {producto.get('variante', '')}".strip()
 			datos["precio_unitario"] = _to_float(producto.get("precio"), 0)
 
-	if not datos.get("cantidad"):
+	if not carrito_congelado and not datos.get("cantidad"):
 		qty = _extraer_cantidad(text)
 		if qty and qty > 0:
 			datos["cantidad"] = qty
@@ -1510,7 +1590,7 @@ def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], us
 				datos["tipo_servicio"] = tipo_servicio
 
 			producto_llm = _normalizar_texto(slots.get("producto") or "")
-			if producto_llm and not datos.get("producto_id"):
+			if not carrito_congelado and producto_llm and not datos.get("producto_id"):
 				producto = _producto_desde_texto(producto_llm, catalogo)
 				if producto:
 					datos["producto_id"] = producto.get("producto_id")
@@ -1519,7 +1599,7 @@ def _enriquecer_datos_desde_entrada(entrada: str, datos_temp: Dict[str, Any], us
 
 			cantidad_llm = slots.get("cantidad")
 			try:
-				if cantidad_llm is not None and int(cantidad_llm) > 0:
+				if not carrito_congelado and cantidad_llm is not None and int(cantidad_llm) > 0:
 					datos["cantidad"] = int(cantidad_llm)
 			except (TypeError, ValueError):
 				pass
@@ -1727,9 +1807,18 @@ def _insert_dinamico(tabla, data):
 				returning = candidate_id
 				break
 
-		sql = f"INSERT INTO {tabla} ({fields}) VALUES ({placeholders})"
-		if returning:
-			sql += f" RETURNING {returning}"
+		if pg_sql is None:
+			sql = f"INSERT INTO {tabla} ({fields}) VALUES ({placeholders})"
+			if returning:
+				sql += f" RETURNING {returning}"
+		else:
+			sql = pg_sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+				pg_sql.Identifier(tabla),
+				pg_sql.SQL(", ").join(pg_sql.Identifier(k) for k in keys),
+				pg_sql.SQL(", ").join(pg_sql.Placeholder() for _ in keys),
+			)
+			if returning:
+				sql = sql + pg_sql.SQL(" RETURNING {}").format(pg_sql.Identifier(returning))
 
 		with conn.cursor() as cur:
 			cur.execute(sql, [payload[k] for k in keys])
@@ -1769,11 +1858,53 @@ def _guardar_direccion_en_db(cliente_id, lat=None, lng=None, codigo_postal=None,
 		return None
 	return resultado
 
-
 def _guardar_datos_fiscales_en_db(cliente_id, datos_fiscales):
+	"""Guarda datos fiscales del cliente y registra auditoría.
+	
+	Args:
+		cliente_id: ID del cliente
+		datos_fiscales: Dict con rfc, razon_social, regimen_fiscal, uso_cfdi, email
+	
+	Returns:
+		Resultado de la operación o None si falla
+	"""
 	resultado = db.guardar_datos_fiscales_cliente(cliente_id=cliente_id, datos_fiscales=datos_fiscales or {})
 	if isinstance(resultado, dict) and resultado.get("error"):
+		logger.warning(f"Error guardando datos fiscales para cliente {cliente_id}: {resultado.get('error')}")
+		# Registrar intento fallido
+		try:
+			db.registrar_auditoria_factura(
+				pedido_id=None,  # No hay pedido aún
+				evento_tipo="validacion_fallida",
+				detalles={"razon": "Error guardando datos fiscales", "error": resultado.get("error")},
+				actor_username="bot",
+				actor_rol="bot"
+			)
+		except Exception as e:
+			logger.error(f"Error registrando auditoría de fallo: {e}")
 		return None
+	
+	# Log de éxito (sin exponer datos sensibles)
+	logger.info(f"Datos fiscales guardados para cliente {cliente_id}: RFC={datos_fiscales.get('rfc', 'N/A')[:4]}*** email_present={bool(datos_fiscales.get('email'))}")
+	
+	# Registrar auditoría de éxito
+	try:
+		db.registrar_auditoria_factura(
+			pedido_id=None,
+			evento_tipo="datos_guardados",
+			detalles={
+				"cliente_id": cliente_id,
+				"rfc_partial": datos_fiscales.get('rfc', '')[:4] + "***" + datos_fiscales.get('rfc', '')[-3:],
+				"email_present": bool(datos_fiscales.get('email')),
+				"regimen": datos_fiscales.get('regimen_fiscal'),
+				"uso_cfdi": datos_fiscales.get('uso_cfdi'),
+			},
+			actor_username="bot",
+			actor_rol="bot"
+		)
+	except Exception as e:
+		logger.error(f"Error registrando auditoría de éxito: {e}")
+	
 	return resultado
 
 
@@ -1795,7 +1926,19 @@ def _actualizar_pedido_opcional(pedido_id, payload):
 
 		values.append(pedido_id)
 		with conn.cursor() as cur:
-			cur.execute(f"UPDATE pedidos SET {', '.join(updates)} WHERE pedido_id = %s", values)
+			if pg_sql is None:
+				cur.execute(f"UPDATE pedidos SET {', '.join(updates)} WHERE pedido_id = %s", values)
+			else:
+				set_parts = [
+					pg_sql.SQL("{} = {}").format(pg_sql.Identifier(key), pg_sql.Placeholder())
+					for key in payload.keys()
+					if key in cols
+				]
+				stmt = pg_sql.SQL("UPDATE {} SET {} WHERE pedido_id = %s").format(
+					pg_sql.Identifier("pedidos"),
+					pg_sql.SQL(", ").join(set_parts),
+				)
+				cur.execute(stmt, values)
 		conn.commit()
 		return True
 	except Exception:
@@ -1819,18 +1962,113 @@ def _guardar_evaluacion(pedido_id, tipo, calificacion, comentario):
 	_insert_dinamico("evaluaciones", payload)
 
 
+def _validar_email_produccion(email_str):
+	"""Validación mejorada de email para producción.
+	
+	Valida estructura básica y dominios comunes.
+	No verifica deliverability (requeriría SMTP live check).
+	"""
+	if not email_str:
+		return None
+	
+	email_str = str(email_str).strip().lower()
+	if not email_str:
+		return None
+	
+	# Validación regex mejorada
+	pattern = r'^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+	if not re.match(pattern, email_str):
+		return None
+	
+	# Rechazar emails obvios inválidos
+	if email_str.count('@') != 1:
+		return None
+	
+	parts = email_str.split('@')
+	if len(parts[0]) < 1 or len(parts[0]) > 64:  # RFC 5321
+		return None
+	
+	if len(parts[1]) < 4:  # Mínimo: a@b.co
+		return None
+	
+	if '..' in email_str or email_str.endswith('.'):
+		return None
+	
+	return email_str
+
+
 def _parsear_factura(texto):
-	# Formato esperado: RFC|RAZON SOCIAL|REGIMEN|USO_CFDI|EMAIL(opcional)
+	"""Parsea y valida datos fiscales para emisión de factura.
+	
+	Formato: RFC|RAZON SOCIAL|REGIMEN|USO_CFDI|EMAIL(opcional)
+	
+	Retorna dict con datos validados o None si falla.
+	"""
 	parts = [p.strip() for p in (texto or "").split("|")]
-	if len(parts) < 4:
+	if len(parts) < 4 or any(not p for p in parts[:4]):
+		logger.warning("Datos fiscales rechazados: partes insuficientes o vacías")
 		return None
 
+	rfc = parts[0].upper().replace(" ", "")
+	
+	# Validación RFC: 3-4 letras, 6 dígitos, 3 alfanuméricos
+	if not re.match(r"^[A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3}$", rfc):
+		logger.warning(f"RFC inválido: {rfc[:4]}... (formato no reconocido)")
+		return None
+
+	# Validación email (opcional pero si se proporciona, debe ser válido)
+	email = None
+	if len(parts) >= 5 and parts[4].strip():
+		email = _validar_email_produccion(parts[4].strip())
+		if not email:
+			logger.warning(f"Email rechazado: formato inválido en datos fiscales")
+			return None
+
+	# Validar régimen fiscal (códigos SAT comunes)
+	regimen = parts[2].upper()
+	regimenes_validos = {
+		"601",  # General de Ley Personas Morales
+		"603",  # Personas Morales con Fines no Lucrativos
+		"605",  # Sueldos y Salarios
+		"606",  # Arrendamiento
+		"607",  # Otros Ingresos
+		"608",  # Dividendos
+		"610",  # Ingresos por Intereses
+		"614",  # Ganancias de Capital
+		"616",  # Sin Obligación de llevar Contabilidad
+		"620",  # Sociedades Cooperativas
+		"621",  # Gobierno Federal
+		"622",  # Entidad Federativa
+		"623",  # Municipio
+		"624",  # Distrito Federal
+		"627",  # Organismos Descentralizados
+		"628",  # Entidades no Comerciales
+		"629",  # Corporación Estatal
+		"701",  # Personas Físicas
+		"702",  # Actividades Empresariales
+	}
+	if regimen not in regimenes_validos:
+		logger.warning(f"Régimen fiscal inválido: {regimen}")
+		# No rechazamos, permitimos régimen custom (SAT lo valida después)
+
+	# Validar uso CFDI
+	uso_cfdi = parts[3].upper()
+	usos_validos = {
+		"G01", "G02", "G03", "I01", "I02", "I03", "I04", "I05", "I06", "I07",
+		"D01", "D02", "D03", "D04", "D05", "D06", "D07", "D08", "D09", "D10"
+	}
+	if uso_cfdi not in usos_validos:
+		logger.warning(f"Uso CFDI inválido: {uso_cfdi}")
+		# No rechazamos, SAT lo valida
+
+	logger.info(f"Datos fiscales válidos: RFC={rfc[:4]}***{rfc[-3:]} email_provided={bool(email)}")
+
 	return {
-		"rfc": parts[0],
-		"razon_social": parts[1],
-		"regimen_fiscal": parts[2],
-		"uso_cfdi": parts[3],
-		"email": parts[4] if len(parts) >= 5 else None,
+		"rfc": rfc,
+		"razon_social": parts[1].upper(),
+		"regimen_fiscal": regimen,
+		"uso_cfdi": uso_cfdi,
+		"email": email,
 	}
 
 
@@ -2062,7 +2300,27 @@ def _guardar_pedido_final(cliente, datos_temp):
 
 def _manejar_inicio(_text, datos_temp, cliente):
 	datos = _as_dict(datos_temp)
-	# Requisito de negocio: siempre pedir nombre al iniciar una conversacion nueva.
+	# Requisito de negocio: siempre pedir nombre y limpiar cualquier pedido previo al reiniciar.
+	for key in [
+		"items",
+		"total",
+		"producto_id",
+		"producto_nombre",
+		"cantidad",
+		"precio_unitario",
+		"metodo_entrega",
+		"direccion_id",
+		"direccion_texto",
+		"codigo_postal",
+		"metodo_pago",
+		"pedido_id",
+		"pedido_confirmado",
+		"codigo_entrega",
+		"requiere_factura",
+		"datos_fiscales",
+		"preferir_ultimo_domicilio",
+	]:
+		datos.pop(key, None)
 	datos.pop("cliente_nombre", None)
 	datos.pop("cliente_apellidos", None)
 
@@ -2186,7 +2444,7 @@ def _manejar_cantidad(text, datos_temp):
 def _manejar_metodo_entrega(text, datos_temp):
 	t = _normalizar_texto(text)
 
-	if any(k in t for k in ["domicilio", "enviar", "mandar", "delivery", "casa"]):
+	if t == "1" or any(k in t for k in ["domicilio", "enviar", "mandar", "delivery", "casa"]):
 		datos_temp["metodo_entrega"] = "domicilio"
 		if datos_temp.get("preferir_ultimo_domicilio") and datos_temp.get("direccion_id") and (datos_temp.get("direccion_texto") or "").strip():
 			texto = f"listo, usamos tu ultimo domicilio: {datos_temp.get('direccion_texto')}"
@@ -2196,7 +2454,7 @@ def _manejar_metodo_entrega(text, datos_temp):
 		opciones = "Formato: Calle, numero, colonia, codigo postal (5 digitos)"
 		return "solicitar_ubicacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
-	if any(k in t for k in ["recoger", "tienda", "local", "llevar", "paso por", "voy por", "recojo"]):
+	if t == "2" or any(k in t for k in ["recoger", "tienda", "local", "llevar", "paso por", "voy por", "recojo"]):
 		datos_temp["metodo_entrega"] = "recoger_tienda"
 		texto = "listo, pasamos al pago."
 		opciones = "efectivo\ntarjeta\ncontra entrega"
@@ -2294,18 +2552,21 @@ def _manejar_preguntar_factura(text, datos_temp):
 	t = _normalizar_texto(text)
 	if _es_afirmativo(t) or t == "1":
 		datos_temp["requiere_factura"] = True
-		texto = "dale, pasame datos fiscales en este formato:\nRFC|RAZON SOCIAL|REGIMEN|USO_CFDI|EMAIL(opcional)"
+		texto = (
+			"Perfecto. Para emitir tu factura, compárteme tus datos fiscales en este formato:\n"
+			"RFC|RAZON SOCIAL|REGIMEN|USO_CFDI|EMAIL(opcional)"
+		)
 		opciones = "Ejemplo: ABC123456T12|QUE CHIMBA SA DE CV|601|G03|correo@mail.com"
 		return "datos_fiscales", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	if _es_negativo(t) or t in {"n", "0", "2"}:
 		datos_temp["requiere_factura"] = False
 		resumen = _resumen_pedido(datos_temp)
-		texto = f"asi va tu pedido:\n{resumen}"
+		texto = f"Este es el resumen de tu pedido:\n{resumen}"
 		opciones = "confirmar\ncancelar"
 		return "confirmacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
-	texto = "no te entendi en factura."
+	texto = "Necesito que me indiques si requieres factura."
 	opciones = "Responde: si o no"
 	return "preguntar_factura", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
@@ -2313,7 +2574,7 @@ def _manejar_preguntar_factura(text, datos_temp):
 def _manejar_datos_fiscales(text, datos_temp, cliente):
 	parsed = _parsear_factura(text)
 	if not parsed:
-		texto = "el formato no coincide."
+		texto = "No pude validar los datos fiscales. Verifica RFC, razón social, régimen, uso CFDI y correo si aplica."
 		opciones = "Usa: RFC|RAZON SOCIAL|REGIMEN|USO_CFDI|EMAIL(opcional)"
 		return "datos_fiscales", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
@@ -2321,7 +2582,7 @@ def _manejar_datos_fiscales(text, datos_temp, cliente):
 	_guardar_datos_fiscales_en_db(cliente["cliente_id"], parsed)
 
 	resumen = _resumen_pedido(datos_temp)
-	texto = f"perfecto, tengo datos fiscales y este es tu resumen:\n{resumen}"
+	texto = f"Perfecto. Tus datos fiscales quedaron registrados y tu factura queda lista para emisión.\n\nResumen del pedido:\n{resumen}"
 	opciones = "confirmar\ncancelar"
 	return "confirmacion", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
@@ -2340,7 +2601,8 @@ def _manejar_confirmacion(text, datos_temp, cliente):
 	if not _nombre_cliente_es_valido(datos_temp.get("cliente_nombre") or cliente.get("nombre")):
 		texto = "antes de confirmar necesito tu nombre para registrar la venta correctamente."
 		opciones = "Escribe tu nombre completo. Ejemplo: Mariana Soto"
-		return "bienvenida", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
+		# Mantener estado de cierre para no romper el flujo de confirmación.
+		return "completado", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
 
 	if datos_temp.get("metodo_entrega") == "domicilio" and (
 		not datos_temp.get("direccion_id")
@@ -2367,6 +2629,7 @@ def _manejar_confirmacion(text, datos_temp, cliente):
 			raise RuntimeError(resultado["error"])
 		pedido_id = resultado["pedido_id"]
 		codigo_entrega = resultado["codigo_entrega"]
+		factura_preparacion = (resultado.get("factura_preparacion") if isinstance(resultado, dict) else None)
 	except Exception as exc:
 		logger.error("Error en _manejar_confirmacion al crear pedido: %s", exc)
 		texto = f"hubo un problema al guardar el pedido ({exc}), intenta confirmarlo de nuevo."
@@ -2379,9 +2642,18 @@ def _manejar_confirmacion(text, datos_temp, cliente):
 	datos_temp["evaluar_entrega_enviada"] = False
 	datos_temp["evaluar_producto_enviada"] = False
 
+	factura_msg = ""
+	if bool(datos_temp.get("requiere_factura")):
+		if isinstance(factura_preparacion, dict) and factura_preparacion.get("ready"):
+			factura_msg = " Tu factura quedo preparada para envio (PDF y XML listos)."
+		elif isinstance(factura_preparacion, dict) and factura_preparacion.get("prepared"):
+			factura_msg = " Tu factura fue registrada, pero aun faltan documentos para envio; el equipo la revisara en panel."
+		else:
+			factura_msg = " Tu factura fue solicitada; si faltan datos o documentos, se completara desde el panel de facturacion."
+
 	texto = (
 		f"pedido confirmado y guardado en DB con folio #{pedido_id}. "
-		f"Tu codigo de entrega es: {codigo_entrega}"
+		f"Tu codigo de entrega es: {codigo_entrega}.{factura_msg}"
 	)
 	opciones = "menu\nayuda"
 	return "completado", datos_temp, _armar_respuesta_comercial(texto, opciones, datos_temp)
@@ -2437,12 +2709,15 @@ def _respuesta_menu(datos_temp):
 def _respuesta_to_handler_output(response: Dict[str, Any], nuevo_estado: str) -> Dict[str, Any]:
 	contenido = ""
 	audio_filename = None
+	qr_url = None
 	if isinstance(response, dict):
 		contenido = str(response.get("contenido") or "")
 		audio_filename = response.get("audio_filename")
+		qr_url = response.get("qr_url")
 	return {
 		"texto": contenido,
 		"audio_path": audio_filename,
+		"qr_url": qr_url,
 		"nuevo_estado": nuevo_estado,
 	}
 
@@ -2460,8 +2735,102 @@ def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 				datos_temp["cliente_apellidos"] = apellidos_ctx
 
 	t = _normalizar_texto(mensaje)
+
+	# Si estábamos esperando nombre para cerrar confirmación, retomar el cierre inmediatamente.
+	if bool(datos_temp.get("esperando_nombre_confirmacion")):
+		nombre = _extraer_nombre_cliente(mensaje)
+		if _nombre_cliente_es_valido(nombre):
+			datos_temp["cliente_nombre"] = nombre
+			partes = nombre.split()
+			if len(partes) > 1:
+				datos_temp["cliente_apellidos"] = " ".join(partes[1:])
+			datos_temp.pop("esperando_nombre_confirmacion", None)
+			nuevo_estado, nuevos_datos, response = _manejar_confirmacion("confirmar", datos_temp, cliente)
+			out = _respuesta_to_handler_output(response, nuevo_estado)
+			out["datos_temp"] = nuevos_datos
+			return out
+		response = _armar_respuesta_comercial(
+			"necesito tu nombre completo para cerrar el pedido correctamente.",
+			"Ejemplo: Mariana Soto",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "bienvenida")
+		out["datos_temp"] = datos_temp
+		return out
+	if any(
+		k in t
+		for k in [
+			"6",
+			"ultimo pedido y domicilio",
+			"ultimo pedido y direccion",
+			"ultima compra y domicilio",
+			"ultima compra y direccion",
+			"repetir ultima compra y domicilio",
+			"repetir ultima compra y usar ultimo domicilio",
+		]
+	):
+		items_prev = contexto.get("ultimo_items") if isinstance(contexto, dict) else None
+		ultima_dir = (contexto or {}).get("ultima_direccion") if isinstance(contexto, dict) else None
+		tiene_ultima_dir = isinstance(ultima_dir, dict) and _to_int(ultima_dir.get("direccion_id"), 0) > 0
+		if not isinstance(items_prev, list) or not items_prev:
+			response = _armar_respuesta_comercial(
+				"No tengo una compra anterior para repetir todavia.",
+				"1) Quiero pedir empanadas\n3) Ver menu y precios",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "bienvenida")
+			out["datos_temp"] = datos_temp
+			return out
+
+		if not tiene_ultima_dir:
+			response = _armar_respuesta_comercial(
+				"No tengo un domicilio previo guardado para usar junto con tu ultimo pedido.",
+				"4) Repetir ultima compra\n1) Quiero pedir empanadas",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "bienvenida")
+			out["datos_temp"] = datos_temp
+			return out
+
+		error_stock = _validar_items_carrito(items_prev)
+		if error_stock:
+			response = _armar_respuesta_comercial(
+				f"No pude repetir tu ultima compra completa por disponibilidad. {error_stock}",
+				"Escribe tu pedido manual o pide menu",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "seleccion_producto")
+			out["datos_temp"] = datos_temp
+			return out
+
+		total_prev = int(
+			sum(
+				_to_int(i.get("cantidad"), 0) * _to_float(i.get("precio_unit") or i.get("precio_unitario"), 0)
+				for i in items_prev
+				if isinstance(i, dict)
+			)
+		)
+		datos_temp["items"] = items_prev
+		datos_temp["total"] = total_prev
+		datos_temp["preferir_ultimo_domicilio"] = True
+		datos_temp["direccion_id"] = _to_int(ultima_dir.get("direccion_id"), 0)
+		datos_temp["direccion_texto"] = str(ultima_dir.get("direccion_texto") or "").strip()
+		datos_temp["codigo_postal"] = str(ultima_dir.get("codigo_postal") or "").strip()
+
+		resumen = _formatear_carrito(items_prev, total_prev)
+		response = _armar_respuesta_comercial(
+			f"Listo, te arme tu ultima compra y usare tu ultimo domicilio guardado: {datos_temp.get('direccion_texto')}\n\n{resumen}",
+			"1) Si, esta bien\n2) Quiero cambiar algo\n3) Usar mi ultimo domicilio guardado",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "confirmar_carrito")
+		out["datos_temp"] = datos_temp
+		return out
+
 	if any(k in t for k in ["4", "repetir", "ultima compra", "mismo pedido"]):
 		items_prev = contexto.get("ultimo_items") if isinstance(contexto, dict) else None
+		ultima_dir = (contexto or {}).get("ultima_direccion") if isinstance(contexto, dict) else None
+		tiene_ultima_dir = isinstance(ultima_dir, dict) and _to_int(ultima_dir.get("direccion_id"), 0) > 0
 		if not isinstance(items_prev, list) or not items_prev:
 			response = _armar_respuesta_comercial(
 				"No tengo una compra anterior para repetir todavia.",
@@ -2483,13 +2852,22 @@ def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 			out["datos_temp"] = datos_temp
 			return out
 
-		total_prev = int(sum(int(i.get("cantidad") or 0) * _to_float(i.get("precio_unit"), 0) for i in items_prev))
+		total_prev = int(
+			sum(
+				_to_int(i.get("cantidad"), 0) * _to_float(i.get("precio_unit") or i.get("precio_unitario"), 0)
+				for i in items_prev
+				if isinstance(i, dict)
+			)
+		)
 		datos_temp["items"] = items_prev
 		datos_temp["total"] = total_prev
 		resumen = _formatear_carrito(items_prev, total_prev)
+		opciones = "1) Si, esta bien\n2) Quiero cambiar algo"
+		if tiene_ultima_dir:
+			opciones += "\n3) Usar mi ultimo domicilio guardado"
 		response = _armar_respuesta_comercial(
 			f"Te arme tu ultima compra para confirmar:\n{resumen}",
-			"1) Si, esta bien\n2) Quiero cambiar algo",
+			opciones,
 			datos_temp,
 		)
 		out = _respuesta_to_handler_output(response, "confirmar_carrito")
@@ -2498,7 +2876,7 @@ def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 
 	if any(k in t for k in ["5", "ultimo domicilio", "mismo domicilio", "direccion anterior"]):
 		ultima = (contexto or {}).get("ultima_direccion") if isinstance(contexto, dict) else None
-		if not isinstance(ultima, dict) or not int(ultima.get("direccion_id") or 0):
+		if not isinstance(ultima, dict) or _to_int(ultima.get("direccion_id"), 0) <= 0:
 			response = _armar_respuesta_comercial(
 				"Todavia no tengo un domicilio previo guardado.",
 				"1) Quiero pedir empanadas\n2) Es para evento",
@@ -2509,7 +2887,7 @@ def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 			return out
 
 		datos_temp["preferir_ultimo_domicilio"] = True
-		datos_temp["direccion_id"] = int(ultima.get("direccion_id") or 0)
+		datos_temp["direccion_id"] = _to_int(ultima.get("direccion_id"), 0)
 		datos_temp["direccion_texto"] = str(ultima.get("direccion_texto") or "").strip()
 		datos_temp["codigo_postal"] = str(ultima.get("codigo_postal") or "").strip()
 		response = _armar_respuesta_comercial(
@@ -2548,7 +2926,9 @@ def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 		return out
 
 	nombre_saludo = (datos_temp.get("cliente_nombre") or cliente.get("nombre") or "").strip()
-	if not _nombre_cliente_es_valido(nombre_saludo):
+	if _nombre_cliente_es_valido(nombre_saludo):
+		nombre_saludo = nombre_saludo.split()[0].title()
+	else:
 		nombre_saludo = "parce"
 	resumen_ultima = _resumen_items_breve((contexto or {}).get("ultimo_items") or []) if isinstance(contexto, dict) else ""
 	ultima_dir = ""
@@ -2571,6 +2951,8 @@ def handle_bienvenida(sesion: dict, mensaje: str, cliente: dict) -> dict:
 	if ultima_dir:
 		opciones.append("5) Usar ultimo domicilio",
 		)
+	if resumen_ultima and ultima_dir:
+		opciones.append("6) Repetir ultima compra y usar ultimo domicilio")
 
 	response = _armar_respuesta_comercial(
 		"\n".join(lineas),
@@ -2643,6 +3025,9 @@ def handle_seleccion_producto(sesion: dict, mensaje: str, cliente: dict) -> dict
 def handle_confirmar_carrito(sesion: dict, mensaje: str, cliente: dict) -> dict:
 	datos_temp = _as_dict(sesion.get("datos_temp"))
 	t = _normalizar_texto(mensaje)
+	contexto = _as_dict(datos_temp.get("contexto_cliente"))
+	ultima_dir = _as_dict(contexto.get("ultima_direccion"))
+	tiene_ultima_dir = int(ultima_dir.get("direccion_id") or 0) > 0
 	if any(k in t for k in ["1", "si", "confirm", "esta bien"]):
 		response = _armar_respuesta_comercial(
 			"Listo mi llave. Como prefiere recibir su pedido?",
@@ -2650,6 +3035,41 @@ def handle_confirmar_carrito(sesion: dict, mensaje: str, cliente: dict) -> dict:
 			datos_temp,
 		)
 		out = _respuesta_to_handler_output(response, "metodo_entrega")
+		out["datos_temp"] = datos_temp
+		return out
+	if any(k in t for k in ["3", "ultimo domicilio", "mismo domicilio", "direccion guardada", "direccion anterior"]):
+		if not tiene_ultima_dir:
+			response = _armar_respuesta_comercial(
+				"No tengo un domicilio guardado para reutilizar.",
+				"1) Domicilio\n2) Recoger en local",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "metodo_entrega")
+			out["datos_temp"] = datos_temp
+			return out
+
+		datos_temp["metodo_entrega"] = "domicilio"
+		datos_temp["preferir_ultimo_domicilio"] = True
+		datos_temp["direccion_id"] = int(ultima_dir.get("direccion_id") or 0)
+		datos_temp["direccion_texto"] = str(ultima_dir.get("direccion_texto") or "").strip()
+		datos_temp["codigo_postal"] = str(ultima_dir.get("codigo_postal") or "").strip()
+
+		if not _extraer_codigo_postal(datos_temp.get("codigo_postal") or ""):
+			response = _armar_respuesta_comercial(
+				"Tengo tu direccion guardada, pero necesito confirmar el codigo postal para continuar.",
+				"Comparte: Calle, numero, colonia y codigo postal (5 digitos).",
+				datos_temp,
+			)
+			out = _respuesta_to_handler_output(response, "solicitar_ubicacion")
+			out["datos_temp"] = datos_temp
+			return out
+
+		response = _armar_respuesta_comercial(
+			f"Perfecto, usare tu domicilio guardado: {datos_temp.get('direccion_texto')}. Ahora dime metodo de pago.",
+			"1) Efectivo\n2) Tarjeta\n3) Contra entrega",
+			datos_temp,
+		)
+		out = _respuesta_to_handler_output(response, "metodo_pago")
 		out["datos_temp"] = datos_temp
 		return out
 	if any(k in t for k in ["2", "cambiar", "editar"]):
@@ -2666,7 +3086,7 @@ def handle_confirmar_carrito(sesion: dict, mensaje: str, cliente: dict) -> dict:
 
 	response = _armar_respuesta_comercial(
 		"No le cache esa respuesta. Confirmamos o cambiamos?",
-		"1) Si, esta bien\n2) Quiero cambiar algo",
+		"1) Si, esta bien\n2) Quiero cambiar algo\n3) Usar mi ultimo domicilio guardado",
 		datos_temp,
 	)
 	out = _respuesta_to_handler_output(response, "confirmar_carrito")
@@ -2749,8 +3169,15 @@ def handle_confirmacion(sesion: dict, mensaje: str, cliente: dict) -> dict:
 def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 	datos_temp = _as_dict(sesion.get("datos_temp"))
 	if datos_temp.get("pedido_id") and bool(datos_temp.get("pedido_confirmado")):
+		# Si el usuario quiere hacer un nuevo pedido, liberar sesion
+		_t = _normalizar_texto(mensaje)
+		_orden_kw = ["empanada", "quiero", "pedir", "nuevo", "orden", "otra", "carne", "pollo", "agua", "refresco", "mas", "hola", "buenas"]
+		if any(kw in _t for kw in _orden_kw):
+			datos_frescos = {}
+			return handle_bienvenida({"estado": "bienvenida", "datos_temp": datos_frescos}, mensaje, cliente)
 		pedido_id = int(datos_temp.get("pedido_id") or 0)
 		codigo = str(datos_temp.get("codigo_entrega") or "").strip().upper()
+		qr_url = _build_qr_confirmacion_url(pedido_id, codigo)
 		texto = f"Tu pedido #{pedido_id} ya esta confirmado y en proceso."
 		if codigo:
 			texto = f"{texto} Codigo de entrega: {codigo}"
@@ -2761,6 +3188,8 @@ def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 		)
 		out = _respuesta_to_handler_output(response, "completado")
 		out["datos_temp"] = datos_temp
+		if qr_url:
+			out["qr_url"] = qr_url
 		return out
 
 	try:
@@ -2817,10 +3246,16 @@ def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 
 		pedido_id = int(result.get("pedido_id") or 0)
 		codigo = str(result.get("codigo_entrega") or "").strip().upper()
+		qr_url = _build_qr_confirmacion_url(pedido_id, codigo)
 		nuevos_datos = {
 			"pedido_id": pedido_id,
 			"codigo_entrega": codigo,
 			"pedido_confirmado": True,
+			"items": items,
+			"total": int(datos_temp.get("total") or 0),
+			"metodo_entrega": datos_temp.get("metodo_entrega"),
+			"metodo_pago": datos_temp.get("metodo_pago"),
+			"qr_url": qr_url,
 		}
 
 		if requests is not None and pedido_id > 0:
@@ -2847,6 +3282,8 @@ def handle_completado(sesion: dict, mensaje: str, cliente: dict) -> dict:
 		)
 		out = _respuesta_to_handler_output(response, "completado")
 		out["datos_temp"] = nuevos_datos
+		if qr_url:
+			out["qr_url"] = qr_url
 		return out
 	except Exception:
 		logger.exception("Error al confirmar pedido en handle_completado")
@@ -2961,16 +3398,16 @@ def process_message(whatsapp_id, tipo, texto, audio_path=None, lat=None, lng=Non
 				"nuevo_estado": "inicio",
 			}
 
-		datos_temp_local = _enriquecer_datos_desde_entrada(entrada, datos_temp, usar_llm=False)
+		datos_temp_local = _enriquecer_datos_desde_entrada(entrada, datos_temp, usar_llm=False, estado_actual=estado)
 		usar_llm = _deberia_usar_llm(estado, entrada, datos_temp_local, audio_attempted)
 		if usar_llm and _faltan_slots_clave_por_estado(estado, datos_temp_local):
-			datos_temp = _enriquecer_datos_desde_entrada(entrada, datos_temp_local, usar_llm=True)
+			datos_temp = _enriquecer_datos_desde_entrada(entrada, datos_temp_local, usar_llm=True, estado_actual=estado)
 		else:
 			datos_temp = datos_temp_local
 
 		sesion_local = {"estado": estado, "datos_temp": datos_temp}
 		handlers = {
-			"inicio": handle_bienvenida,
+			"inicio": _wrap_inicio_handler,
 			"bienvenida": handle_bienvenida,
 			"tipo_servicio": lambda s, m, c: _wrap_tipo_servicio_handler(s, m, c),
 			"seleccion_producto": handle_seleccion_producto,
@@ -3013,6 +3450,7 @@ def process_message(whatsapp_id, tipo, texto, audio_path=None, lat=None, lng=Non
 			"audio_path": resultado.get("audio_path"),
 			"audio_colombiano_path": audio_colombiano,
 			"nuevo_estado": nuevo_estado,
+			"qr_url": resultado.get("qr_url"),
 		}
 
 	except Exception:
@@ -3127,6 +3565,7 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 			entrada,
 			datos_temp,
 			usar_llm=False,
+			estado_actual=estado,
 		)
 		usar_llm = _deberia_usar_llm(estado, entrada, datos_temp_local, audio_attempted)
 		if usar_llm and _faltan_slots_clave_por_estado(estado, datos_temp_local):
@@ -3134,6 +3573,7 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 				entrada,
 				datos_temp_local,
 				usar_llm=True,
+				estado_actual=estado,
 			)
 		else:
 			datos_temp = datos_temp_local
@@ -3286,6 +3726,7 @@ def procesar_mensaje(from_num, body, media_url=None, media_type=None, latitude=N
 		return response
 
 	except Exception as exc:
+		logger.exception("Error inesperado en process_message: from=%s estado=%s texto=%s", from_num, locals().get("estado"), (body or "")[:160])
 		# Nunca rompemos el webhook; regresamos mensaje amable y mantenemos reintento sencillo.
 		return _armar_respuesta(
 			"tuve un enredo tecnico momentaneo. Intenta de nuevo en un momento.",
@@ -3354,6 +3795,7 @@ def procesar_mensaje_whatsapp(whatsapp_id, mensaje, media_url=None, media_type=N
 	texto_salida = str(resultado.get("texto") or "")
 	audio_path_salida = resultado.get("audio_path")
 	audio_colombiano_path = resultado.get("audio_colombiano_path")
+	qr_url = resultado.get("qr_url")
 
 	if audio_path_salida:
 		return {
@@ -3361,10 +3803,12 @@ def procesar_mensaje_whatsapp(whatsapp_id, mensaje, media_url=None, media_type=N
 			"contenido": texto_salida,
 			"audio_filename": os.path.basename(str(audio_path_salida)),
 			"audio_colombiano_path": audio_colombiano_path,
+			"qr_url": qr_url,
 		}
 
 	return {
 		"tipo": "texto",
 		"contenido": texto_salida,
 		"audio_colombiano_path": audio_colombiano_path,
+		"qr_url": qr_url,
 	}

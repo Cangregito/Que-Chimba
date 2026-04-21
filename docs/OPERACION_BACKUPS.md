@@ -20,6 +20,7 @@ Incluye:
 
 - scripts/ops/backup_postgres.ps1
 - scripts/ops/verify_restore_postgres.ps1
+- scripts/ops/rollback_postgres.ps1
 - scripts/ops/register_backup_tasks.ps1
 - scripts/ops/run_dr_drill.ps1
 - scripts/ops/check_backup_readiness.ps1
@@ -46,7 +47,7 @@ El script valida:
 Este comando deja todo listo en una sola pasada:
 
 ```powershell
-.\scripts\ops\configure_ops_automation.ps1
+.\scripts\ops\configure_ops_automation.ps1 -EnableOneDriveMirror -RunWhetherUserLoggedOnOrNot -RunWithHighest
 ```
 
 Que configura automaticamente:
@@ -55,6 +56,7 @@ Que configura automaticamente:
 - tareas programadas (backup diario + verify semanal)
 - alertas a WhatsApp si existe `WHATSAPP_ADMIN`
 - alertas por webhook si pasas `-AlertWebhookUrl`
+- registro de tareas en modo no interactivo (ejecuta aunque no haya sesion abierta)
 
 Detalle tecnico:
 
@@ -115,6 +117,12 @@ Simulacro DR completo:
 .\scripts\ops\run_dr_drill.ps1 -DbHost localhost -DbPort 5432 -DbName que_chimba -DbUser postgres -MirrorRoot "C:\Backups\QueChimbaMirror" -AlertWebhookUrl $env:OPS_ALERT_WEBHOOK
 ```
 
+Rollback seguro a una version anterior:
+
+```powershell
+.\scripts\ops\rollback_postgres.ps1 -DbHost localhost -DbPort 5432 -DbName que_chimba -DbUser postgres -DryRun
+```
+
 ## Programacion automatica
 
 Ejemplo con argumentos de produccion local:
@@ -125,8 +133,17 @@ Ejemplo con argumentos de produccion local:
   -BackupTime 02:00 `
   -VerifyTime 03:00 `
   -VerifyDay SUN `
+  -RunWhetherUserLoggedOnOrNot `
+  -RunWithHighest `
   -BackupArguments "-DbHost localhost -DbPort 5432 -DbName que_chimba -DbUser postgres -MirrorRoot 'C:\Backups\QueChimbaMirror' -AlertWebhookUrl '$env:OPS_ALERT_WEBHOOK'" `
   -VerifyArguments "-DbHost localhost -DbPort 5432 -DbUser postgres -AlertWebhookUrl '$env:OPS_ALERT_WEBHOOK'"
+```
+
+Si quieres guardar credenciales explicitas para la tarea no interactiva:
+
+```powershell
+$taskPass = Read-Host "Password usuario tarea" -AsSecureString
+.\scripts\ops\register_backup_tasks.ps1 -RunWhetherUserLoggedOnOrNot -RunWithHighest -RunAsUser "$env:USERDOMAIN\$env:USERNAME" -RunAsPassword $taskPass
 ```
 
 ## Salidas esperadas

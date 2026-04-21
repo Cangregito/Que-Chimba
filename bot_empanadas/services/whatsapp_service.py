@@ -104,3 +104,56 @@ def send_audio_whatsapp(app, destino, audio_path, caption="", default_public_bas
         return {"error": str(msg)}
 
     return {"ok": True}
+
+
+def send_document_whatsapp(app, destino, documento_path, caption="", default_public_base_url="http://localhost:5000"):
+    """Envía un documento (PDF, imagen, etc.) por WhatsApp.
+    
+    Args:
+        app: Aplicación Flask
+        destino: Número de WhatsApp (con o sin +52)
+        documento_path: Ruta local al archivo
+        caption: Texto opcional que acompaña el documento
+        default_public_base_url: URL base para acceder al documento
+    
+    Returns:
+        Dict con {'ok': True} o {'error': 'mensaje'}
+    """
+    bridge_url = app.config.get("BAILEYS_BRIDGE_URL", "")
+    if not bridge_url or not documento_path:
+        return {"error": "BAILEYS_BRIDGE_URL o documento_path no configurados."}
+
+    # Verificar que el archivo existe
+    if not os.path.exists(documento_path):
+        return {"error": f"Archivo no encontrado: {documento_path}"}
+
+    bridge_token = app.config.get("BAILEYS_BRIDGE_API_TOKEN", "")
+    headers = {"Content-Type": "application/json"}
+    if bridge_token:
+        headers["x-bridge-token"] = bridge_token
+
+    documento_filename = os.path.basename(str(documento_path))
+    base_url = app.config.get("PUBLIC_BASE_URL") or default_public_base_url
+    documento_url = f"{base_url}/documents/{documento_filename}"
+
+    try:
+        resp = requests.post(
+            f"{bridge_url}/api/send-document",
+            json={"to": destino, "documentUrl": documento_url, "caption": caption},
+            timeout=10,
+            headers=headers,
+        )
+    except Exception as exc:
+        return {"error": f"No se pudo enviar documento al bridge: {exc}"}
+
+    try:
+        payload = resp.json()
+    except Exception:
+        payload = {}
+
+    if not resp.ok or payload.get("ok") is not True:
+        msg = payload.get("error") or f"Bridge respondio HTTP {resp.status_code}"
+        return {"error": str(msg)}
+
+    return {"ok": True}
+

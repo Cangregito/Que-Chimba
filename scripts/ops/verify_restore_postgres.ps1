@@ -172,6 +172,27 @@ if (-not (Test-Path -LiteralPath $BackupFile)) {
     throw "El archivo de backup no existe: $BackupFile"
 }
 
+$backupBaseName = [System.IO.Path]::GetFileNameWithoutExtension($BackupFile)
+$backupMetaFile = Join-Path (Split-Path -Parent $BackupFile) ($backupBaseName + ".json")
+if (Test-Path -LiteralPath $backupMetaFile) {
+    try {
+        $backupMeta = Get-Content -LiteralPath $backupMetaFile -Raw | ConvertFrom-Json
+        $expectedHash = [string]($backupMeta.sha256)
+        if (-not [string]::IsNullOrWhiteSpace($expectedHash)) {
+            $realHash = (Get-FileHash -LiteralPath $BackupFile -Algorithm SHA256).Hash
+            if ($realHash -ne $expectedHash) {
+                throw "Checksum SHA256 no coincide para el backup seleccionado. Posible corrupcion del archivo."
+            }
+        }
+    }
+    catch {
+        throw "No se pudo validar metadata/checksum del backup: $($_.Exception.Message)"
+    }
+}
+else {
+    Write-Log "WARN" "El backup no tiene metadata .json asociada; se continua sin checksum externo."
+}
+
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("qc_restore_" + [Guid]::NewGuid().ToString("N"))
 $null = New-Item -ItemType Directory -Path $tmpDir -Force
 
@@ -236,13 +257,22 @@ try {
         throw "La DB restaurada no contiene tablas en schema public."
     }
 
+    $rowCountText = Invoke-Psql -Database $restoreDb -Sql "SELECT COALESCE(SUM(n_live_tup), 0) FROM pg_stat_user_tables;" -Raw
+    $rowCount = 0
+    [void][int]::TryParse($rowCountText.Trim(), [ref]$rowCount)
+    if ($rowCount -lt 0) {
+        throw "No se pudo validar el volumen estimado de filas restauradas."
+    }
+
     Write-Log "INFO" ("Verificacion OK. Tablas public detectadas: " + $tableCount)
+    Write-Log "INFO" ("Filas estimadas restauradas: " + $rowCount)
     Write-Log "INFO" "Prueba de restore finalizada correctamente"
     if ($AlertOnSuccess) {
         Send-Alert -Status "ok" -Message "Restore verification finalizada correctamente" -Extra @{
             backupFile = $BackupFile
             restoreDb = $restoreDb
             tableCount = $tableCount
+            rowCount = $rowCount
         }
         Send-AlertWhatsApp -Status "ok" -Message ("Restore OK sobre backup: " + [System.IO.Path]::GetFileName($BackupFile))
     }

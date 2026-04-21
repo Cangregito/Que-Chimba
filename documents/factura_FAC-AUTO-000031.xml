@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<factura_operativa version="1.0">
+  <folio>FAC-AUTO-000031</folio>
+  <pedido_id>31</pedido_id>
+  <fecha_emision>2026-04-21T07:29:33.451288Z</fecha_emision>
+  <total>95.00</total>
+  <cliente>
+    <cliente_id>33</cliente_id>
+    <nombre>Te Ira Biennn</nombre>
+    <apellidos>Ira Biennn</apellidos>
+    <whatsapp_id>117707940831245</whatsapp_id>
+  </cliente>
+  <fiscal>
+    <datos_fiscales_id>13</datos_fiscales_id>
+    <rfc></rfc>
+    <razon_social></razon_social>
+    <regimen_fiscal></regimen_fiscal>
+    <uso_cfdi>G01</uso_cfdi>
+    <email></email>
+  </fiscal>
+  <items>
+    <item><nombre>Empanada</nombre><cantidad>2</cantidad><precio_unitario>35.00</precio_unitario><subtotal>70.00</subtotal></item>
+    <item><nombre>Jugo</nombre><cantidad>1</cantidad><precio_unitario>25.00</precio_unitario><subtotal>25.00</subtotal></item>
+  </items>
+</factura_operativa>

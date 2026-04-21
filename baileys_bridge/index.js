@@ -88,9 +88,9 @@ function toJid(numberOrJid) {
   if (!digits) {
     return "";
   }
-  // Heuristica: IDs largos suelen venir como LID (no MSISDN telefonico).
-  // MX normal: 52 + 10 digitos (12). LID suele ser bastante mas largo.
-  if (digits.length >= 15) {
+  // Heuristica: todo identificador numerico mas largo que un MSISDN MX normal
+  // (52 + 10 digitos = 12) suele corresponder a un LID y debe salir por @lid.
+  if (digits.length > 12) {
     return `${digits}@lid`;
   }
   return `${digits}@s.whatsapp.net`;
@@ -356,6 +356,26 @@ async function sendAudioFromUrl(to, audioUrl, caption = "") {
   }
 }
 
+async function sendImageFromUrl(to, imageUrl, caption = "") {
+  if (!sock) {
+    throw new Error("Baileys no esta conectado.");
+  }
+  const jid = toJid(to);
+  if (!jid) {
+    throw new Error("Numero destino invalido.");
+  }
+
+  const response = await axios.get(String(imageUrl), {
+    responseType: "arraybuffer",
+    timeout: 30000,
+  });
+
+  await sock.sendMessage(jid, {
+    image: Buffer.from(response.data),
+    caption: String(caption || ""),
+  });
+}
+
 async function processIncomingMessage(msg) {
   if (!msg?.message) {
     return;
@@ -420,6 +440,14 @@ async function processIncomingMessage(msg) {
   const tipo = String(flaskData?.tipo || "texto").toLowerCase();
   const contenido = String(flaskData?.contenido || "").trim();
   const parsed = parseQuickReplyOptions(contenido);
+
+  if (flaskData?.qr_url) {
+    try {
+      await sendImageFromUrl(replyTarget, flaskData.qr_url, "");
+    } catch (error) {
+      logger.error({ err: error?.message, qrUrl: flaskData?.qr_url }, "No se pudo enviar QR al usuario");
+    }
+  }
 
   if (tipo === "audio" && flaskData?.audio_url) {
     try {

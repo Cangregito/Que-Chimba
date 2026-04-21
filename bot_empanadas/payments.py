@@ -99,7 +99,7 @@ def crear_link_pago(pedido_id: int, total: float, descripcion: str) -> dict:
         "items": [
             {
                 "id":          str(pedido_id),
-                "title":       descripcion or f"Pedido #{pedido_id} – Que Chimba Empanadas",
+                "title":       descripcion or f"Pedido #{pedido_id} – La Malparida Empanada",
                 "quantity":    1,
                 "currency_id": "MXN",
                 "unit_price":  round(float(total), 2),
@@ -113,7 +113,7 @@ def crear_link_pago(pedido_id: int, total: float, descripcion: str) -> dict:
         },
         "auto_return":          "approved",
         "notification_url":     f"{base}/webhook/pago",
-        "statement_descriptor": "QUE CHIMBA EMPANADAS",
+        "statement_descriptor": "LA MALPARIDA EMP",
         "payment_methods": {
             "installments": 1,          # sin meses sin intereses (sandbox demo)
         },
@@ -229,20 +229,20 @@ def enviar_whatsapp_pago(whatsapp_id: str, pedido_id: int, estado_mp: str) -> No
     """
     mensajes = {
         "approved": (
-            f"Ay que chimba, parce. Tu pago del pedido #{pedido_id} fue aprobado. "
-            "Ya estamos preparando tus empanadas con todo el amor colombiano. Buena nota."
+            f"Confirmamos que el pago de tu pedido #{pedido_id} fue aprobado. "
+            "Ya estamos preparando tu orden y te mantendremos informado por WhatsApp."
         ),
         "rejected": (
-            f"Uy parce, el pago del pedido #{pedido_id} no paso. "
-            "Intenta con otra tarjeta o escribenos para ayudarte. Dale que si."
+            f"El pago de tu pedido #{pedido_id} no pudo ser aprobado. "
+            "Puedes intentar nuevamente con otra tarjeta o escribirnos para ayudarte."
         ),
         "cancelled": (
-            f"Parce, el pago del pedido #{pedido_id} fue cancelado. "
-            "Si fue un error, vuelve a intentar. Aqui estamos, mi rey."
+            f"El pago de tu pedido #{pedido_id} fue cancelado. "
+            "Si deseas continuar con la compra, podemos apoyarte con un nuevo intento de pago."
         ),
         "pending": (
-            f"Listo parce, el pago del pedido #{pedido_id} esta en proceso. "
-            "Te avisamos en cuanto se confirme. Tranquilo mi rey, vas a comer rico."
+            f"El pago de tu pedido #{pedido_id} se encuentra en validación. "
+            "Te notificaremos en cuanto quede confirmado."
         ),
     }
 

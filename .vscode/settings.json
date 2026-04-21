@@ -9,5 +9,19 @@
   "[sql]": {
     "editor.defaultFormatter": null
   },
-  "mssql.enableQueryHistoryFeature": false
+  "mssql.enableQueryHistoryFeature": false,
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "Que Chimba Local",
+      "database": "que_chimba",
+      "group": "Local",
+      "username": "postgres",
+      "password": "postgres"
+    }
+  ]
 }

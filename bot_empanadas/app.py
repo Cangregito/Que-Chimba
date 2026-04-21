@@ -3,7 +3,7 @@ import importlib
 import logging
 import os
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from xml.sax.saxutils import escape as xml_escape
 
@@ -120,7 +120,7 @@ else:
         longitude=None,
     ):
         texto = (
-            f"Ay que chimba, {whatsapp_id}. Recibi: '{mensaje or 'audio'}'. "
+            f"Ay, {whatsapp_id}. Recibi: '{mensaje or 'audio'}'. "
             "Listo parce, tu pedido va en camino en el flujo demo."
         )
         return {"tipo": "texto", "contenido": texto}
@@ -138,9 +138,12 @@ app.config["PUBLIC_BASE_URL"] = env_str("PUBLIC_BASE_URL", "").rstrip("/")
 app.config["BAILEYS_BRIDGE_URL"] = (env_str("BAILEYS_BRIDGE_URL", DEFAULT_BAILEYS_BRIDGE_URL) or DEFAULT_BAILEYS_BRIDGE_URL).rstrip("/")
 app.config["BAILEYS_BRIDGE_API_TOKEN"] = env_str("BAILEYS_BRIDGE_API_TOKEN", "").strip()
 app.config["BAILEYS_WEBHOOK_TOKEN"] = env_str("BAILEYS_WEBHOOK_TOKEN", "").strip()
+app.config["WHATSAPP_LEGACY_WEBHOOK_TOKEN"] = env_str("WHATSAPP_LEGACY_WEBHOOK_TOKEN", "").strip()
+app.config["MP_WEBHOOK_TOKEN"] = env_str("MP_WEBHOOK_TOKEN", "").strip()
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = env_str("SESSION_COOKIE_SAMESITE", "Lax").strip() or "Lax"
-app.config["SESSION_COOKIE_SECURE"] = env_bool("SESSION_COOKIE_SECURE", False)
+app.config["SESSION_COOKIE_SECURE"] = env_bool("SESSION_COOKIE_SECURE", is_production())
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=max(15, env_int("SESSION_TTL_MINUTES", 720)))
 
 root_templates_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "templates"))
 if os.path.isdir(root_templates_dir):
@@ -163,9 +166,24 @@ app.logger.setLevel(_log_level)
 if not (os.getenv("FLASK_SECRET", "") or "").strip():
     app.logger.warning("FLASK_SECRET no esta configurado. Se usa una clave aleatoria temporal para esta ejecucion.")
 
+if is_production() and not (os.getenv("FLASK_SECRET", "") or "").strip():
+    raise RuntimeError(
+        "FLASK_SECRET no esta configurado en produccion; se requiere un secreto persistente para sesiones seguras."
+    )
+
 if is_production() and not app.config.get("BAILEYS_WEBHOOK_TOKEN"):
-    app.logger.error(
+    raise RuntimeError(
         "BAILEYS_WEBHOOK_TOKEN no esta configurado en produccion; el webhook del bridge queda sin autenticacion de token."
+    )
+
+if is_production() and not app.config.get("WHATSAPP_LEGACY_WEBHOOK_TOKEN"):
+    raise RuntimeError(
+        "WHATSAPP_LEGACY_WEBHOOK_TOKEN no esta configurado en produccion; el webhook legacy queda sin autenticacion compartida."
+    )
+
+if is_production() and not (os.getenv("SENSITIVE_DATA_KEY", "") or "").strip():
+    raise RuntimeError(
+        "SENSITIVE_DATA_KEY no esta configurada en produccion; se requiere para proteger datos sensibles."
     )
 
 
@@ -242,6 +260,9 @@ def _es_origen_valido() -> bool:
 
 @app.before_request
 def _hardening_before_request():
+    if session.get("user"):
+        session.permanent = True
+
     method = request.method.upper()
     if method not in {"POST", "PUT", "PATCH", "DELETE"}:
         return None
@@ -263,6 +284,17 @@ def _enviar_texto_whatsapp(destino, texto):
 
 def _enviar_audio_whatsapp(destino, audio_path, caption=""):
     return send_audio_whatsapp(app, destino, audio_path, caption=caption, default_public_base_url=DEFAULT_PUBLIC_BASE_URL)
+
+
+def _verificar_pago_externo(payment_id):
+    try:
+        try:
+            import payments as _payments
+        except Exception:
+            from bot_empanadas import payments as _payments
+        return _payments.verificar_pago_mp(payment_id)
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 def login_required(roles=None):
@@ -309,6 +341,7 @@ _order_route_deps = {
     "estados_validos_pedido": ESTADOS_VALIDOS_PEDIDO,
     "send_text_whatsapp": _enviar_texto_whatsapp,
     "normalize_whatsapp_id": _normalizar_whatsapp_id,
+    "normalize_ticket_destination": _normalizar_destino_ticket_whatsapp,
 }
 
 _report_route_deps = {
@@ -317,6 +350,8 @@ _report_route_deps = {
     "error": _error,
     "login_required": login_required,
     "serialize": _serialize,
+    "send_text_whatsapp": _enviar_texto_whatsapp,
+    "normalize_ticket_destination": _normalizar_destino_ticket_whatsapp,
 }
 
 _admin_route_deps = {
@@ -344,6 +379,7 @@ _webhook_route_deps = {
     "procesar_mensaje_whatsapp": procesar_mensaje_whatsapp,
     "messaging_response_cls": MessagingResponse,
     "send_audio_whatsapp": _enviar_audio_whatsapp,
+    "verify_payment_status": _verificar_pago_externo,
 }
 
 _audit_parser_route_deps = {

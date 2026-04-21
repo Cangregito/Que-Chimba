@@ -6,6 +6,7 @@ import uuid
 import importlib
 import asyncio
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -61,23 +62,23 @@ _cleanup_temp_audios()
 
 FRASES_COLOMBIANAS = {
     "bienvenida": [
-        "Ey parce, que mas. Bienvenido a Que Chimba, pidamos esas empanadas de una.",
-        "Quiubo mi llave, llegaste a Que Chimba. Elige una opcion y hagamosle pues.",
+        "Ey parce, que mas. Bienvenido a La Malparida Empanada, pidamos esas empanadas de una.",
+        "Quiubo mi llave, llegaste a La Malparida Empanada. Elige una opcion y hagamosle pues.",
         "Buenas mi rey/reina, aqui estamos al pie del canon. Dime si vas por pedido o evento.",
     ],
     "seleccion_producto": [
         "Bacano parce, tenemos carne y pollo a treinta y cinco. Manda cantidades y te lo armo.",
         "Listo mi llave, suelteme el combo: cuantas de carne, cuantas de pollo y si le metemos bebida.",
-        "Que chimba, ya estamos cocinando antojo. Escriba su pedido completo y seguimos.",
+        "Excelente, ya estamos cocinando antojo. Escriba su pedido completo y seguimos.",
     ],
     "confirmar_carrito": [
         "Buena nota parce, revise su carrito y me confirma si asi queda.",
         "Listo mi rey/reina, ya lo cuadre. Confirmamos o cambiamos algo.",
-        "Uy que chimba va ese pedido. Mire el resumen y me dice si le damos confirmar.",
+        "Ese pedido va excelente. Mire el resumen y me dice si le damos confirmar.",
     ],
     "metodo_entrega": [
         "Dale parce, ahora elija como le queda mejor, domicilio o recoger en local.",
-        "Listo mi llave, digame si se lo llevamos o si pasa por Que Chimba.",
+        "Listo mi llave, digame si se lo llevamos o si pasa por La Malparida Empanada.",
         "Berraco, vamos bien. Elija metodo de entrega para cerrar este paso.",
     ],
     "solicitar_ubicacion": [
@@ -88,7 +89,7 @@ FRASES_COLOMBIANAS = {
     "metodo_pago": [
         "Listo mi llave, como va a pagar, efectivo o tarjeta con link seguro.",
         "Bacano parce, toca cuadrar pago. Diga uno: efectivo o tarjeta.",
-        "Que chimba, ya casi. Elija metodo de pago y le sigo con lo ultimo.",
+        "Excelente, ya casi. Elija metodo de pago y le sigo con lo ultimo.",
     ],
     "preguntar_factura": [
         "Mi rey/reina, necesita factura o se va sin factura esta vez.",
@@ -103,20 +104,20 @@ FRASES_COLOMBIANAS = {
     "confirmacion": [
         "Perfecto parce, revise resumen final y confirmamos ese pedido de una.",
         "Listo mi llave, todo esta cuadrado. Si esta bien, confirme y salimos volando.",
-        "Uy que chimba, ya quedo armado. Mire total, entrega y pago, y me confirma.",
+        "Excelente, ya quedo armado. Mire total, entrega y pago, y me confirma.",
     ],
     "completado": [
-        "Ay que chimba parce, pedido confirmado en Que Chimba. Guarde su codigo y pendiente del reparto.",
+        "Ay parce, pedido confirmado en La Malparida Empanada. Guarde su codigo y pendiente del reparto.",
         "Listo mi rey/reina, su pedido quedo confirmado. Guarde ese codigo de entrega y fresco.",
         "Bacano mi llave, ya entro a cocina. Tenga a la mano su codigo cuando llegue el repartidor.",
     ],
     "en_camino": [
         "Ey parce, buenas noticias, su pedido ya va en camino. Tenga listo su codigo.",
         "Mi llave, arrancamos moto. Su pedido va pa alla, tenga su codigo a la mano.",
-        "Que chimba, ya salio el repartidor. Preparese que en nada le timbran.",
+        "Excelente, ya salio el repartidor. Preparese que en nada le timbran.",
     ],
     "entrega_confirmada": [
-        "Listo parce, entrega confirmada. Buen provecho y gracias por pedir en Que Chimba.",
+        "Listo parce, entrega confirmada. Buen provecho y gracias por pedir en La Malparida Empanada.",
         "Buena nota mi rey/reina, ya quedo entregado. Que disfrute esas empanadas.",
         "Dale mi llave, pedido entregado al cien. En un rato le pedimos su opinion.",
     ],
@@ -132,16 +133,16 @@ FRASES_COLOMBIANAS = {
     ],
     "datos_evento": [
         "Berraco parce, para evento le ayudo de una. Digame cantidad, fecha y tipo.",
-        "Que chimba esa celebracion, mi llave. Paseme datos del evento y se lo mando al admin.",
+        "Excelente esa celebracion, mi llave. Paseme datos del evento y se lo mando al admin.",
         "Listo mi rey/reina, armemos su cotizacion. Escriba personas, fecha y requisito especial.",
     ],
     "confirmacion_pedido": [
-        "Uy que chimba de pedido, {nombre}. Te dejo confirmado: {productos}. Total: {total}.",
+        "Excelente pedido, {nombre}. Te dejo confirmado: {productos}. Total: {total}.",
         "Listo mi rey/reina, ya te tome la orden de {productos}. Queda en {total}.",
         "Bacano parce, pedido confirmado para {nombre}. Van {productos} y el total es {total}.",
     ],
     "pedido_entregado": [
-        "Buena nota, {nombre}. Ya llego tu pedidito. Disfrutalo y gracias por pedir en Que Chimba.",
+        "Buena nota, {nombre}. Ya llego tu pedidito. Disfrutalo y gracias por pedir en La Malparida Empanada.",
         "Dale parce, tu pedido ya fue entregado. Que lo disfrutes bien berraco.",
         "Chevere mi llave, ya tienes tus empanadas contigo. Gracias por la confianza.",
     ],
@@ -290,13 +291,87 @@ def _inferir_perfil_locucion(texto: str) -> str:
     return "neutral"
 
 
+def _monto_a_locucion(numero_raw: str) -> str:
+    raw = (numero_raw or "").strip()
+    if not raw:
+        return "0 pesos"
+
+    # Soporta entradas como 1,234.50 o 1234,50.
+    if "," in raw and "." in raw:
+        if raw.rfind(",") > raw.rfind("."):
+            normalizado = raw.replace(".", "").replace(",", ".")
+        else:
+            normalizado = raw.replace(",", "")
+    elif "," in raw:
+        normalizado = raw.replace(",", ".")
+    else:
+        normalizado = raw
+
+    try:
+        value = float(normalizado)
+    except ValueError:
+        return f"{raw} pesos"
+
+    entero = int(value)
+    centavos = int(round((value - entero) * 100))
+    if centavos == 100:
+        entero += 1
+        centavos = 0
+
+    if centavos <= 0:
+        return f"{entero} pesos"
+    return f"{entero} pesos con {centavos} centavos"
+
+
+def _normalizar_numeros_y_montos(texto: str) -> str:
+    clean = str(texto or "")
+
+    # Evita que el TTS lea markdown/simbolos raros literalmente.
+    clean = clean.replace("*", " ")
+    clean = clean.replace("_", " ")
+    clean = clean.replace("`", " ")
+
+    # #123 -> numero 123
+    clean = re.sub(r"#\s*(\d+)", r"numero \1", clean)
+
+    # $35 o $ 35.50 -> 35 pesos (...)
+    clean = re.sub(
+        r"\$\s*([0-9]+(?:[\.,][0-9]{1,2})?)",
+        lambda m: _monto_a_locucion(m.group(1)),
+        clean,
+    )
+
+    # 35 MXN -> 35 pesos
+    clean = re.sub(
+        r"\b([0-9]+(?:[\.,][0-9]{1,2})?)\s*(mxn|m\.n\.|pesos?)\b",
+        lambda m: _monto_a_locucion(m.group(1)),
+        clean,
+        flags=re.IGNORECASE,
+    )
+
+    # Total: 35 -> Total: 35 pesos
+    clean = re.sub(
+        r"\b(total|monto|precio|cuesta|vale)\s*[:=]?\s*([0-9]+(?:[\.,][0-9]{1,2})?)\b",
+        lambda m: f"{m.group(1)} { _monto_a_locucion(m.group(2)) }",
+        clean,
+        flags=re.IGNORECASE,
+    )
+
+    return clean
+
+
 def _normalizar_pausas(texto: str) -> str:
-    clean = " ".join(str(texto or "").split())
-    clean = clean.replace(". ", ". ... ")
-    clean = clean.replace(": ", ": ... ")
-    clean = clean.replace("; ", ", ")
-    clean = clean.replace("? ", "? ... ")
-    clean = clean.replace("! ", "! ... ")
+    clean = _normalizar_numeros_y_montos(texto)
+    clean = " ".join(clean.split())
+
+    # Normaliza separadores para que la voz haga pausas mas naturales.
+    clean = re.sub(r"\s*;\s*", ", ", clean)
+    clean = re.sub(r"\s*:\s*", ", ", clean)
+    clean = re.sub(r"\s*,\s*", ", ", clean)
+    clean = re.sub(r"\s*([\.\?\!])\s*", r"\1  ", clean)
+
+    # Recorta exceso pero conserva doble espacio post-frase (respiracion ligera).
+    clean = re.sub(r"[ ]{3,}", "  ", clean).strip()
     return clean
 
 

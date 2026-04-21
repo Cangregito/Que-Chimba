@@ -1,4 +1,5 @@
 from typing import Any
+from pathlib import Path
 
 from flask import request, session
 
@@ -12,6 +13,209 @@ def register_order_routes(app, deps: dict):
     estados_validos_pedido = deps["estados_validos_pedido"]
     send_text_whatsapp = deps["send_text_whatsapp"]
     normalize_whatsapp_id = deps["normalize_whatsapp_id"]
+    normalize_ticket_destination = deps["normalize_ticket_destination"]
+
+    def _auto_enviar_factura_entregada(pedido_id: int, actor_username: str | None) -> dict[str, Any]:
+        resultado = {
+            "intentado": False,
+            "enviado": False,
+            "motivo": "No aplica envio automatico de factura.",
+        }
+
+        if not hasattr(db, "obtener_preview_factura"):
+            resultado["motivo"] = "Modulo de facturacion no disponible en DB."
+            return resultado
+
+        preview = db.obtener_preview_factura(pedido_id)
+        if isinstance(preview, dict) and preview.get("error"):
+            if hasattr(db, "reparar_factura_pedido"):
+                reparacion = db.reparar_factura_pedido(pedido_id=pedido_id, actor_usuario=actor_username or "sistema")
+                if not (isinstance(reparacion, dict) and reparacion.get("error")):
+                    preview = db.obtener_preview_factura(pedido_id)
+        if isinstance(preview, dict) and preview.get("error"):
+            resultado["motivo"] = preview.get("error") or "Factura no encontrada."
+            return resultado
+        if not isinstance(preview, dict):
+            resultado["motivo"] = "Respuesta de facturacion invalida."
+            return resultado
+
+        resultado["intentado"] = True
+        estado_envio = str(preview.get("ultimo_envio_estado") or "").strip().lower()
+        if estado_envio == "enviado":
+            resultado["motivo"] = "La factura ya estaba enviada previamente."
+            resultado["enviado"] = True
+            return resultado
+
+        docs = preview.get("documentos") or {}
+        pdf_info = docs.get("pdf") or {}
+        xml_info = docs.get("xml") or {}
+        if not pdf_info.get("ready") or not xml_info.get("ready"):
+            resultado["motivo"] = "Factura sin PDF/XML listos para envio."
+            if hasattr(db, "registrar_resultado_envio_factura"):
+                db.registrar_resultado_envio_factura(
+                    pedido_id,
+                    "error",
+                    destino=preview.get("whatsapp_id"),
+                    error_detalle=resultado["motivo"],
+                    marcar_entregada=False,
+                )
+            return resultado
+
+        destino = normalize_ticket_destination(preview.get("whatsapp_id"))
+        if not destino:
+            resultado["motivo"] = "Factura sin destino WhatsApp valido."
+            if hasattr(db, "registrar_resultado_envio_factura"):
+                db.registrar_resultado_envio_factura(
+                    pedido_id,
+                    "error",
+                    destino=None,
+                    error_detalle=resultado["motivo"],
+                    marcar_entregada=False,
+                )
+            return resultado
+
+        try:
+            from services.whatsapp_service import send_document_whatsapp
+        except ImportError:
+            from bot_empanadas.services.whatsapp_service import send_document_whatsapp
+
+        pdf_path = str(pdf_info.get("path") or "").strip()
+        xml_path = str(xml_info.get("path") or "").strip()
+        if not pdf_path or not xml_path:
+            resultado["motivo"] = "Rutas de documentos faltantes para envio."
+            return resultado
+
+        caption_pdf = f"Factura {preview.get('folio_factura')} · Pedido #{pedido_id}"
+        caption_xml = f"XML CFDI {preview.get('folio_factura')} · Pedido #{pedido_id}"
+        pdf_result = send_document_whatsapp(app, destino, pdf_path, caption=caption_pdf)
+        if isinstance(pdf_result, dict) and pdf_result.get("error"):
+            motivo = pdf_result.get("error") or "Error enviando PDF."
+            resultado["motivo"] = motivo
+            if hasattr(db, "registrar_resultado_envio_factura"):
+                db.registrar_resultado_envio_factura(
+                    pedido_id,
+                    "error",
+                    destino=destino,
+                    error_detalle=motivo,
+                    marcar_entregada=False,
+                )
+            return resultado
+
+        xml_result = send_document_whatsapp(app, destino, xml_path, caption=caption_xml)
+        if isinstance(xml_result, dict) and xml_result.get("error"):
+            motivo = xml_result.get("error") or "Error enviando XML."
+            resultado["motivo"] = motivo
+            if hasattr(db, "registrar_resultado_envio_factura"):
+                db.registrar_resultado_envio_factura(
+                    pedido_id,
+                    "error",
+                    destino=destino,
+                    error_detalle=motivo,
+                    marcar_entregada=False,
+                )
+            return resultado
+
+        warning_texto = None
+        if callable(send_text_whatsapp):
+            confirmacion = (
+                f"✅ Tu factura #{preview.get('folio_factura')} fue enviada automaticamente al marcar tu pedido como entregado.\n"
+                f"Pedido: #{pedido_id}\n"
+                "Incluye PDF y XML."
+            )
+            text_result = send_text_whatsapp(destino=destino, texto=confirmacion)
+            if isinstance(text_result, dict) and text_result.get("error"):
+                warning_texto = text_result.get("error")
+
+        if hasattr(db, "registrar_resultado_envio_factura"):
+            db.registrar_resultado_envio_factura(
+                pedido_id,
+                "enviado",
+                destino=destino,
+                error_detalle=warning_texto,
+                marcar_entregada=True,
+            )
+        if hasattr(db, "registrar_auditoria_factura"):
+            try:
+                db.registrar_auditoria_factura(
+                    pedido_id=pedido_id,
+                    evento_tipo="notificacion_whatsapp_enviada",
+                    detalles={
+                        "origen": "auto_estado_entregado",
+                        "destino": destino,
+                        "documentos": [Path(pdf_path).name, Path(xml_path).name],
+                        "warning": warning_texto,
+                    },
+                    actor_username=actor_username,
+                    actor_rol="admin",
+                )
+            except Exception:
+                pass
+        if hasattr(db, "crear_log_notificacion"):
+            db.crear_log_notificacion(
+                {
+                    "pedido_id": pedido_id,
+                    "canal": "whatsapp",
+                    "destino": destino,
+                    "tipo": "factura_entregada_auto",
+                    "mensaje": f"Factura {preview.get('folio_factura')} enviada automaticamente (PDF y XML).",
+                    "total": preview.get("total"),
+                    "direccion": None,
+                }
+            )
+
+        return {
+            "intentado": True,
+            "enviado": True,
+            "motivo": warning_texto or None,
+            "destino": destino,
+            "folio_factura": preview.get("folio_factura"),
+        }
+
+    def _notificar_cliente_pedido(pedido_id: int, mensaje: str, tipo_log: str) -> dict[str, Any]:
+        resultado = {
+            "enviado": False,
+            "motivo": "No se intento enviar notificacion.",
+        }
+
+        if not callable(send_text_whatsapp):
+            resultado["motivo"] = "Servicio de WhatsApp no disponible."
+            return resultado
+
+        destino_data = db.obtener_destino_whatsapp_por_pedido(pedido_id=pedido_id)
+        if isinstance(destino_data, dict) and destino_data.get("error"):
+            resultado["motivo"] = destino_data.get("error") or "No se encontro WhatsApp del cliente."
+            return resultado
+
+        destino = normalize_ticket_destination((destino_data or {}).get("whatsapp_id"))
+        if not destino:
+            resultado["motivo"] = "Cliente sin whatsapp_id valido."
+            resultado["destino"] = None
+            return resultado
+
+        enviado = send_text_whatsapp(destino=destino, texto=mensaje)
+        if isinstance(enviado, dict) and enviado.get("error"):
+            resultado["motivo"] = enviado["error"]
+            resultado["destino"] = destino
+            return resultado
+
+        if hasattr(db, "crear_log_notificacion"):
+            db.crear_log_notificacion(
+                {
+                    "pedido_id": pedido_id,
+                    "canal": "whatsapp",
+                    "destino": destino,
+                    "tipo": tipo_log,
+                    "mensaje": mensaje,
+                    "total": None,
+                    "direccion": None,
+                }
+            )
+
+        return {
+            "enviado": True,
+            "motivo": None,
+            "destino": destino,
+        }
 
     @login_required(roles=["admin", "cocina", "repartidor"])
     def api_pedidos():
@@ -96,7 +300,26 @@ def register_order_routes(app, deps: dict):
         if isinstance(created, dict) and created.get("error"):
             return error(created["error"], 500)
 
-        return ok(created, 201)
+        response_data: dict[str, Any] = dict(created or {})
+        pedido_id_creado = int(response_data.get("pedido_id") or 0)
+        codigo = (response_data.get("codigo_entrega") or "").strip()
+        mensaje_confirmacion = (
+            f"Confirmamos que ya recibimos tu pedido #{pedido_id_creado} y lo estamos preparando."
+        )
+        if codigo:
+            mensaje_confirmacion = (
+                f"{mensaje_confirmacion} Tu codigo de entrega es: {codigo}."
+            )
+        response_data["notificacion_cliente"] = _notificar_cliente_pedido(
+            pedido_id_creado,
+            mensaje_confirmacion,
+            "confirmacion_recepcion",
+        ) if pedido_id_creado > 0 else {
+            "enviado": False,
+            "motivo": "Pedido sin identificador valido para notificar.",
+        }
+
+        return ok(response_data, 201)
 
     app.add_url_rule("/api/pedidos", endpoint="api_crear_pedido", view_func=api_crear_pedido, methods=["POST"])
 
@@ -152,7 +375,36 @@ def register_order_routes(app, deps: dict):
             else:
                 status = 500
             return error(updated["error"], status)
-        return ok(updated)
+
+        response_data: dict[str, Any] = dict(updated or {})
+        response_data["notificacion_cliente"] = {
+            "enviado": False,
+            "motivo": "No se intento enviar notificacion.",
+        }
+        response_data["factura_envio"] = {
+            "intentado": False,
+            "enviado": False,
+            "motivo": "No aplica envio automatico.",
+        }
+
+        estado_confirmado = (response_data.get("estado") or "").strip().lower()
+        if estado_confirmado in {"recibido", "en_preparacion"}:
+            mensaje = (
+                f"Confirmamos que ya recibimos tu pedido #{pedido_id} y lo estamos preparando. "
+                "Te avisaremos cuando vaya en camino."
+            )
+            response_data["notificacion_cliente"] = _notificar_cliente_pedido(
+                pedido_id,
+                mensaje,
+                "confirmacion_recepcion",
+            )
+        elif estado_confirmado == "entregado":
+            response_data["factura_envio"] = _auto_enviar_factura_entregada(
+                pedido_id=pedido_id,
+                actor_username=actor.get("username"),
+            )
+
+        return ok(response_data)
 
     app.add_url_rule(
         "/api/pedidos/<int:pedido_id>/estado",
@@ -233,14 +485,27 @@ def register_order_routes(app, deps: dict):
             "enviado": False,
             "motivo": "No se intento enviar notificacion.",
         }
+        response_data["factura_envio"] = {
+            "intentado": False,
+            "enviado": False,
+            "motivo": "No aplica envio automatico.",
+        }
 
         destino_data = db.obtener_destino_whatsapp_por_pedido(pedido_id=pedido_id)
         if isinstance(destino_data, dict) and not destino_data.get("error"):
-            destino = normalize_whatsapp_id(destino_data.get("whatsapp_id"))
+            destino = normalize_ticket_destination(destino_data.get("whatsapp_id"))
+            if not destino:
+                response_data["notificacion_cliente"] = {
+                    "enviado": False,
+                    "motivo": "Cliente sin whatsapp_id valido.",
+                    "destino": None,
+                }
+                return ok(response_data)
+
             confirmacion_pago = (response_data.get("confirmacion_pago") or "").strip()
             mensaje = (
-                f"Muchisimas gracias por tu compra, parce. Confirmamos que tu pedido #{pedido_id} "
-                "ya fue entregado. Que lo disfrutes."
+                f"Gracias por tu compra. Confirmamos que tu pedido #{pedido_id} "
+                "ha sido entregado correctamente. Esperamos que lo disfrutes."
             )
             if confirmacion_pago:
                 mensaje = (
@@ -287,6 +552,11 @@ def register_order_routes(app, deps: dict):
                 "enviado": False,
                 "motivo": motivo,
             }
+
+        response_data["factura_envio"] = _auto_enviar_factura_entregada(
+            pedido_id=pedido_id,
+            actor_username=actor.get("username"),
+        )
 
         return ok(response_data)
 
@@ -345,6 +615,28 @@ def register_order_routes(app, deps: dict):
         methods=["GET"],
     )
 
+    @login_required(roles=["admin", "cocina", "repartidor"])
+    def api_obtener_codigo_entrega_pedido(pedido_id):
+        data = db.obtener_o_generar_codigo_entrega_pedido(pedido_id=pedido_id)
+        if isinstance(data, dict) and data.get("error"):
+            msg = data["error"].lower()
+            status = 404 if "no encontrado" in msg else 400
+            return error(data["error"], status)
+        return ok(
+            {
+                "pedido_id": pedido_id,
+                "codigo_entrega": data.get("codigo_entrega"),
+                "message": "Codigo de entrega disponible.",
+            }
+        )
+
+    app.add_url_rule(
+        "/api/pedidos/<int:pedido_id>/codigo-entrega",
+        endpoint="api_obtener_codigo_entrega_pedido",
+        view_func=api_obtener_codigo_entrega_pedido,
+        methods=["GET"],
+    )
+
     @login_required(roles=["admin", "repartidor"])
     def api_reenviar_codigo_pedido(pedido_id):
         data = db.obtener_o_generar_codigo_entrega_pedido(pedido_id=pedido_id)
@@ -360,10 +652,13 @@ def register_order_routes(app, deps: dict):
             return error(destino_data["error"], status)
 
         codigo = data.get("codigo_entrega")
-        destino = normalize_whatsapp_id(destino_data.get("whatsapp_id"))
+        destino = normalize_ticket_destination(destino_data.get("whatsapp_id"))
+        if not destino:
+            return error("No se encontro un WhatsApp valido para reenviar el codigo.", 400)
+
         mensaje = (
             f"Buena nota, tu codigo de entrega para el pedido #{pedido_id} es: {codigo}. "
-            "Compartelo al repartidor para liberar el pedido."
+            "Si no te aparece el QR, comparte este codigo al repartidor para liberar el pedido."
         )
 
         enviado = send_text_whatsapp(destino=destino, texto=mensaje)

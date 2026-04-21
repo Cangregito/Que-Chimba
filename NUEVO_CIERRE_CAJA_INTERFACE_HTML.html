@@ -1,0 +1,502 @@
+<!-- 
+  NUEVA INTERFAZ DE CIERRE DE CAJA v2.0 - PROFESIONAL
+  Reemplaza la sección "Registrar cierre de caja real por turno" en admin.html
+  
+  Características:
+  - Flujo asistido paso a paso
+  - Pre-llenado automático
+  - Validación en tiempo real
+  - Visualización clara de diferencias
+  - Workflow de investigación para diferencias
+  - Aprobación requerida por gerente
+-->
+
+<!-- SECCIÓN PRINCIPAL DE CIERRE DE CAJA -->
+<article class="flat card" style="margin-bottom:10px; border-left: 4px solid #007bff;">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom:16px;">
+    <div>
+      <h3 style="margin: 0; color: #1a1a1a;">CIERRE DE CAJA - Workflow Profesional</h3>
+      <p style="margin: 4px 0 0 0; font-size:0.9em; color: #666;">Asistente para cierre diario por turno</p>
+    </div>
+    <div style="text-align: right;">
+      <div id="cierre-status-badge" style="padding:6px 12px; border-radius: 4px; background: #f0f0f0; color: #666; font-weight: 500; font-size: 0.9em;">
+        Estado: Listo
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 1: SELECCIÓN DE TURNO -->
+  <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee;">
+    <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px;">
+      <span style="display: inline-block; width: 24px; height: 24px; background: #007bff; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 0.9em;">1</span>
+      <h4 style="margin: 0; color: #1a1a1a;">Selecciona el turno a cerrar</h4>
+    </div>
+    <div class="form-grid cols-3" style="gap: 12px;">
+      <div class="field">
+        <label for="cierre-turno">Turno</label>
+        <select id="cierre-turno" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+          <option value="">-- Seleccionar turno --</option>
+          <option value="manana">Mañana (8am - 2pm)</option>
+          <option value="tarde">Tarde (2pm - 7pm)</option>
+          <option value="noche">Noche (7pm - 12am)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="cierre-fecha">Fecha</label>
+        <input id="cierre-fecha" type="date" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;" />
+      </div>
+      <div class="field" style="align-self: end;">
+        <button id="cierre-btn-cargar" class="btn secondary" type="button" style="width: 100%;">Cargar datos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 2: VISUALIZACIÓN DE DATOS ESPERADOS -->
+  <div id="cierre-seccion-datos" style="display: none; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee;">
+    <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px;">
+      <span style="display: inline-block; width: 24px; height: 24px; background: #007bff; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 0.9em;">2</span>
+      <h4 style="margin: 0; color: #1a1a1a;">Revisa el estado del sistema</h4>
+    </div>
+    <div style="background: #f8f9fa; padding: 16px; border-radius: 6px; margin-bottom: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+        <div style="text-align: center;">
+          <div style="font-size: 0.85em; color: #666; margin-bottom: 4px;">Caja Inicial</div>
+          <div style="font-size: 1.3em; font-weight: bold; color: #1a1a1a;" id="cierre-dato-caja-inicial">$0.00</div>
+        </div>
+        <div style="text-align: center; border-left: 1px solid #ddd; border-right: 1px solid #ddd;">
+          <div style="font-size: 0.85em; color: #666; margin-bottom: 4px;">Efectivo Sistema</div>
+          <div style="font-size: 1.3em; font-weight: bold; color: #1a1a1a;" id="cierre-dato-eff-sistema">$0.00</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.85em; color: #666; margin-bottom: 4px;">Digital Sistema</div>
+          <div style="font-size: 1.3em; font-weight: bold; color: #1a1a1a;" id="cierre-dato-dig-sistema">$0.00</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.85em; color: #666; margin-bottom: 4px;">Efectivo Esperado</div>
+          <div style="font-size: 1.3em; font-weight: bold; color: #007bff;" id="cierre-dato-eff-esperado">$0.00</div>
+        </div>
+      </div>
+      <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0; font-size: 0.9em; color: #666;">
+        <strong>Tolerancia aplicada:</strong> ±<span id="cierre-tolerancia">0.00</span> (dinámica según volumen)
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 3: ENTRADA DE DATOS (CONTEO FÍSICO) -->
+  <div id="cierre-seccion-conteo" style="display: none; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee;">
+    <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px;">
+      <span style="display: inline-block; width: 24px; height: 24px; background: #007bff; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 0.9em;">3</span>
+      <h4 style="margin: 0; color: #1a1a1a;">Ingresa lo contado físicamente</h4>
+    </div>
+    <div style="background: #fff9e6; padding: 12px; border-left: 3px solid #ffc107; border-radius: 4px; margin-bottom: 16px; font-size: 0.9em; color: #666;">
+      💡 <strong>Consejo:</strong> Cuenta todo el efectivo y verifica con la máquina de tarjeta antes de ingresar los montos.
+    </div>
+    
+    <div class="form-grid cols-2" style="gap: 16px;">
+      <div class="field">
+        <label for="cierre-eff-contado">Efectivo contado (billetes + monedas)</label>
+        <div style="position: relative;">
+          <input id="cierre-eff-contado" type="number" min="0" step="0.01" placeholder="0.00" style="padding: 12px; border: 1px solid #ddd; border-radius: 4px; width: 100%;" />
+          <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #999;">$</span>
+        </div>
+        <div style="font-size: 0.85em; color: #666; margin-top: 4px;">
+          <span id="cierre-eff-diferencia" style="color: #666;">Diferencia: --</span>
+        </div>
+      </div>
+      
+      <div class="field">
+        <label for="cierre-dig-contado">Digital/Tarjeta contado (según máquina)</label>
+        <div style="position: relative;">
+          <input id="cierre-dig-contado" type="number" min="0" step="0.01" placeholder="0.00" style="padding: 12px; border: 1px solid #ddd; border-radius: 4px; width: 100%;" />
+          <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #999;">$</span>
+        </div>
+        <div style="font-size: 0.85em; color: #666; margin-top: 4px;">
+          <span id="cierre-dig-diferencia" style="color: #666;">Diferencia: --</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- GASTOS DESAGREGADOS -->
+    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">
+      <h5 style="margin: 0 0 12px 0; color: #1a1a1a; font-size: 0.95em;">Gastos operativos (opcional)</h5>
+      <div class="form-grid cols-3" style="gap: 12px;">
+        <div class="field">
+          <label for="cierre-gastos-insumos">Insumos consumidos</label>
+          <input id="cierre-gastos-insumos" type="number" min="0" step="0.01" placeholder="0.00" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;" />
+        </div>
+        <div class="field">
+          <label for="cierre-gastos-combustible">Combustible/Transporte</label>
+          <input id="cierre-gastos-combustible" type="number" min="0" step="0.01" placeholder="0.00" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;" />
+        </div>
+        <div class="field">
+          <label for="cierre-gastos-otro">Otros gastos</label>
+          <input id="cierre-gastos-otro" type="number" min="0" step="0.01" placeholder="0.00" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 4: RESULTADO Y ACCIONES -->
+  <div id="cierre-seccion-resultado" style="display: none; margin-bottom: 20px; padding-bottom: 20px;">
+    <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px;">
+      <span style="display: inline-block; width: 24px; height: 24px; background: #007bff; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 0.9em;">4</span>
+      <h4 style="margin: 0; color: #1a1a1a;">Resultado del cierre</h4>
+    </div>
+
+    <!-- RESULTADO PRINCIPAL -->
+    <div id="cierre-resultado-box" style="padding: 16px; border-radius: 6px; border: 2px solid #ddd; margin-bottom: 16px; text-align: center;">
+      <div style="font-size: 0.9em; color: #666; margin-bottom: 8px;">Estado del cierre:</div>
+      <div style="font-size: 2em; font-weight: bold; color: #1a1a1a; margin-bottom: 8px;" id="cierre-estado-texto">--</div>
+      <div style="font-size: 0.95em;" id="cierre-diferencia-txt">--</div>
+    </div>
+
+    <!-- DETALLES DE CÁLCULO -->
+    <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 0.9em;">
+        <div>
+          <div style="color: #666; margin-bottom: 4px;">Efectivo:</div>
+          <div style="font-weight: bold; color: #1a1a1a;">
+            <span id="cierre-calc-eff">--</span> (esperado) vs <span id="cierre-calc-eff-contado">--</span> (contado)
+          </div>
+        </div>
+        <div>
+          <div style="color: #666; margin-bottom: 4px;">Digital:</div>
+          <div style="font-weight: bold; color: #1a1a1a;">
+            <span id="cierre-calc-dig">--</span> (esperado) vs <span id="cierre-calc-dig-contado">--</span> (contado)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALERTAS/NOTAS -->
+    <div id="cierre-alerta-box" style="padding: 12px; border-left: 4px solid #ffc107; background: #fffbf0; border-radius: 4px; margin-bottom: 16px; display: none;">
+      <div style="font-weight: bold; color: #ff8c00; margin-bottom: 6px;" id="cierre-alerta-titulo">Atención</div>
+      <div style="font-size: 0.9em; color: #666;" id="cierre-alerta-texto"></div>
+      <div style="margin-top: 8px;">
+        <button id="cierre-btn-investigar" class="btn secondary" type="button" style="padding: 6px 12px; font-size: 0.9em;">
+          Iniciar investigación...
+        </button>
+      </div>
+    </div>
+
+    <!-- OBSERVACIONES -->
+    <div class="field" style="margin-bottom: 16px;">
+      <label for="cierre-notas">Observaciones (opcional)</label>
+      <input id="cierre-notas" placeholder="Notas sobre el cierre..." style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; width: 100%; " />
+    </div>
+
+    <!-- BOTONES DE ACCIÓN -->
+    <div style="display: flex; gap: 12px;">
+      <button id="cierre-btn-guardar" class="btn primary" type="button" style="flex: 1; padding: 12px;">
+        💾 Guardar cierre
+      </button>
+      <button id="cierre-btn-cancelar" class="btn secondary" type="button" style="flex: 0 0 auto; padding: 12px 24px;">
+        Cancelar
+      </button>
+    </div>
+  </div>
+
+  <!-- ESTADO DE CARGA -->
+  <div id="cierre-estado-cargando" style="display: none; text-align: center; padding: 20px;">
+    <div style="color: #666;">⏳ Cargando datos del sistema...</div>
+  </div>
+</article>
+
+<!-- HISTORIAL DE CIERRES RECIENTES -->
+<article class="flat card" style="margin-bottom:10px;">
+  <div class="small" style="margin-bottom:12px;">Historial de cierres recientes</div>
+  <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+    <table>
+      <thead style="position: sticky; top: 0; background: white;">
+        <tr>
+          <th>Turno</th>
+          <th>Fecha</th>
+          <th>Efectivo</th>
+          <th>Digital</th>
+          <th>Diferencia</th>
+          <th>Estado</th>
+          <th>Cerrado por</th>
+        </tr>
+      </thead>
+      <tbody id="cierre-historial-body">
+        <tr><td colspan="7" class="muted" style="text-align: center;">Cargando historial...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</article>
+
+<style>
+#cierre-resultado-box.resultado-cuadrado {
+  background: #d4edda;
+  border-color: #28a745;
+  color: #155724;
+}
+
+#cierre-resultado-box.resultado-faltante {
+  background: #f8d7da;
+  border-color: #dc3545;
+  color: #721c24;
+}
+
+#cierre-resultado-box.resultado-sobrante {
+  background: #fff3cd;
+  border-color: #ffc107;
+  color: #856404;
+}
+
+#cierre-eff-diferencia.positiva, #cierre-dig-diferencia.positiva {
+  color: #28a745;
+}
+
+#cierre-eff-diferencia.negativa, #cierre-dig-diferencia.negativa {
+  color: #dc3545;
+}
+
+#cierre-eff-diferencia.neutral, #cierre-dig-diferencia.neutral {
+  color: #ffc107;
+}
+</style>
+
+<script>
+// Estado del módulo de cierre de caja v2
+const cierreState = {
+  turno: null,
+  fecha: null,
+  datos_sistema: null,
+  caja_inicial: null,
+  eff_sistema: null,
+  dig_sistema: null,
+  tolerancia: null,
+};
+
+// Cargar fecha actual por default
+document.addEventListener('DOMContentLoaded', () => {
+  const inputFecha = qs('cierre-fecha');
+  if (inputFecha) {
+    const hoy = new Date().toISOString().split('T')[0];
+    inputFecha.value = hoy;
+  }
+
+  // Event listeners
+  qs('cierre-turno')?.addEventListener('change', actualizarVisualizacion);
+  qs('cierre-fecha')?.addEventListener('change', actualizarVisualizacion);
+  qs('cierre-btn-cargar')?.addEventListener('click', cargarDatos);
+  qs('cierre-eff-contado')?.addEventListener('input', calcularDiferencias);
+  qs('cierre-dig-contado')?.addEventListener('input', calcularDiferencias);
+  qs('cierre-btn-guardar')?.addEventListener('click', guardarCierre);
+  qs('cierre-btn-cancelar')?.addEventListener('click', limpiarFormulario);
+  qs('cierre-btn-investigar')?.addEventListener('click', abrirInvestigacion);
+});
+
+function actualizarVisualizacion() {
+  const turno = (qs('cierre-turno')?.value || '').trim();
+  const fecha = (qs('cierre-fecha')?.value || '').trim();
+  
+  if (!turno || !fecha) {
+    qs('cierre-seccion-datos')!.style.display = 'none';
+    qs('cierre-seccion-conteo')!.style.display = 'none';
+    qs('cierre-seccion-resultado')!.style.display = 'none';
+    return;
+  }
+  
+  qs('cierre-estado-badge')!.textContent = 'Estado: Listo para cargar';
+}
+
+async function cargarDatos() {
+  const turno = (qs('cierre-turno')?.value || '').trim();
+  const fecha = (qs('cierre-fecha')?.value || '').trim();
+  
+  if (!turno || !fecha) {
+    toast('Selecciona turno y fecha primero', 'error');
+    return;
+  }
+
+  qs('cierre-estado-cargando')!.style.display = 'block';
+  qs('cierre-seccion-datos')!.style.display = 'none';
+  qs('cierre-seccion-conteo')!.style.display = 'none';
+  qs('cierre-seccion-resultado')!.style.display = 'none';
+
+  try {
+    const res = await api('/api/admin/finanzas/cierre-caja/prefill?fecha=' + fecha + '&turno=' + turno);
+    
+    if (res.error) {
+      toast(res.error, 'error');
+      qs('cierre-estado-cargando')!.style.display = 'none';
+      return;
+    }
+
+    // Actualizar estado
+    cierreState.turno = turno;
+    cierreState.fecha = fecha;
+    cierreState.datos_sistema = res;
+    cierreState.caja_inicial = res.caja_inicial || 0;
+    cierreState.eff_sistema = res.efectivo_sistema || 0;
+    cierreState.dig_sistema = res.digital_sistema || 0;
+
+    // Rellenar formulario
+    const cajaElement = qs('cierre-dato-caja-inicial');
+    if (cajaElement) {
+      cajaElement.textContent = mxn(cierreState.caja_inicial);
+    }
+    
+    qs('cierre-dato-eff-sistema')!.textContent = mxn(cierreState.eff_sistema);
+    qs('cierre-dato-dig-sistema')!.textContent = mxn(cierreState.dig_sistema);
+    const effEsperado = cierreState.caja_inicial + cierreState.eff_sistema;
+    qs('cierre-dato-eff-esperado')!.textContent = mxn(effEsperado);
+
+    // Calcular tolerancia (0.5% del volumen o $3, lo que sea mayor)
+    const tolerancia = Math.max(3, Math.abs(cierreState.eff_sistema) * 0.005 + Math.abs(cierreState.dig_sistema) * 0.003);
+    cierreState.tolerancia = tolerancia;
+    qs('cierre-tolerancia')!.textContent = num(tolerancia.toFixed(2));
+
+    // Mostrar secciones
+    qs('cierre-estado-cargando')!.style.display = 'none';
+    qs('cierre-seccion-datos')!.style.display = 'block';
+    qs('cierre-seccion-conteo')!.style.display = 'block';
+    qs('cierre-seccion-resultado')!.style.display = 'block';
+    
+    // Limpiar campos de entrada
+    qs('cierre-eff-contado')!.value = '';
+    qs('cierre-dig-contado')!.value = '';
+    
+    qs('cierre-estado-badge')!.textContent = 'Estado: Datos cargados';
+  } catch (e) {
+    toast('Error al cargar datos: ' + String(e), 'error');
+  }
+}
+
+function calcularDiferencias() {
+  const effContado = parseFloat((qs('cierre-eff-contado')?.value || '0'));
+  const digContado = parseFloat((qs('cierre-dig-contado')?.value || '0'));
+
+  const effEsperado = cierreState.caja_inicial + cierreState.eff_sistema;
+  const digEsperado = cierreState.dig_sistema;
+
+  const diffEff = effContado - effEsperado;
+  const diffDig = digContado - digEsperado;
+  const diffTotal = diffEff + diffDig;
+
+  // Mostrar diferencias
+  qs('cierre-eff-diferencia')!.textContent = (diffEff >= 0 ? '+' : '') + mxn(diffEff);
+  qs('cierre-eff-diferencia')!.className = diffEff > cierreState.tolerancia ? 'positiva' : (diffEff < -cierreState.tolerancia ? 'negativa' : 'neutral');
+
+  qs('cierre-dig-diferencia')!.textContent = (diffDig >= 0 ? '+' : '') + mxn(diffDig);
+  qs('cierre-dig-diferencia')!.className = diffDig > cierreState.tolerancia ? 'positiva' : (diffDig < -cierreState.tolerancia ? 'negativa' : 'neutral');
+
+  // Determinar estado
+  let estado = 'cuadrado';
+  let clase = 'resultado-cuadrado';
+  let texto = '✓ CUADRADO';
+  let descripcion = 'Cierre balanceado';
+
+  if (Math.abs(diffTotal) > cierreState.tolerancia) {
+    if (diffTotal < 0) {
+      estado = 'faltante';
+      clase = 'resultado-faltante';
+      texto = '❌ FALTANTE';
+      descripcion = 'Faltan ' + mxn(Math.abs(diffTotal));
+    } else {
+      estado = 'sobrante';
+      clase = 'resultado-sobrante';
+      texto = '⚠️ SOBRANTE';
+      descripcion = 'Sobran ' + mxn(diffTotal);
+    }
+  }
+
+  // Actualizar caja de resultado
+  const box = qs('cierre-resultado-box');
+  box.className = clase;
+  qs('cierre-estado-texto')!.textContent = texto;
+  qs('cierre-diferencia-txt')!.textContent = descripcion;
+
+  // Detalles de cálculo
+  qs('cierre-calc-eff')!.textContent = mxn(effEsperado);
+  qs('cierre-calc-eff-contado')!.textContent = mxn(effContado);
+  qs('cierre-calc-dig')!.textContent = mxn(digEsperado);
+  qs('cierre-calc-dig-contado')!.textContent = mxn(digContado);
+
+  // Mostrar alerta si hay diferencia
+  const alertaBox = qs('cierre-alerta-box');
+  if (Math.abs(diffTotal) > cierreState.tolerancia) {
+    alertaBox.style.display = 'block';
+    if (diffTotal < 0) {
+      qs('cierre-alerta-titulo')!.textContent = '⚠️ Diferencia negativa detectada';
+      qs('cierre-alerta-texto')!.textContent = `Faltan ${mxn(Math.abs(diffTotal))}. Recuenta el efectivo o verifica la máquina de tarjeta.`;
+    } else {
+      qs('cierre-alerta-titulo')!.textContent = '💰 Sobrante detectado';
+      qs('cierre-alerta-texto')!.textContent = `Sobran ${mxn(diffTotal)}. Verifica billetes/monedas extra.`;
+    }
+  } else {
+    alertaBox.style.display = 'none';
+  }
+}
+
+async function guardarCierre() {
+  const turno = cierreState.turno;
+  const fecha = cierreState.fecha;
+  const effContado = parseFloat(qs('cierre-eff-contado')!.value || '0');
+  const digContado = parseFloat(qs('cierre-dig-contado')!.value || '0');
+  const gastosInsumos = parseFloat(qs('cierre-gastos-insumos')!.value || '0');
+  const gastosCombustible = parseFloat(qs('cierre-gastos-combustible')!.value || '0');
+  const gastosOtro = parseFloat(qs('cierre-gastos-otro')!.value || '0');
+  const notas = (qs('cierre-notas')!.value || '').trim();
+
+  if (!turno || !fecha || effContado === 0) {
+    toast('Completa todos los campos requeridos', 'error');
+    return;
+  }
+
+  qs('cierre-btn-guardar')!.disabled = true;
+  qs('cierre-btn-guardar')!.textContent = '⏳ Guardando...';
+
+  try {
+    const res = await api('/api/admin/finanzas/cierre-caja/v2', {
+      method: 'POST',
+      body: {
+        fecha_operacion: fecha,
+        turno,
+        caja_inicial: cierreState.caja_inicial,
+        efectivo_contado: effContado,
+        digital_contado: digContado,
+        gastos_insumos: gastosInsumos,
+        gastos_combustible: gastosCombustible,
+        gastos_otro: gastosOtro,
+        notas,
+      }
+    });
+
+    if (res.error) {
+      toast('Error: ' + res.error, 'error');
+      return;
+    }
+
+    toast('✓ Cierre guardado exitosamente', 'success');
+    limpiarFormulario();
+  } catch (e) {
+    toast('Error al guardar: ' + String(e), 'error');
+  } finally {
+    qs('cierre-btn-guardar')!.disabled = false;
+    qs('cierre-btn-guardar')!.textContent = '💾 Guardar cierre';
+  }
+}
+
+function limpiarFormulario() {
+  qs('cierre-turno')!.value = '';
+  qs('cierre-eff-contado')!.value = '';
+  qs('cierre-dig-contado')!.value = '';
+  qs('cierre-gastos-insumos')!.value = '';
+  qs('cierre-gastos-combustible')!.value = '';
+  qs('cierre-gastos-otro')!.value = '';
+  qs('cierre-notas')!.value = '';
+  
+  qs('cierre-seccion-datos')!.style.display = 'none';
+  qs('cierre-seccion-conteo')!.style.display = 'none';
+  qs('cierre-seccion-resultado')!.style.display = 'none';
+  qs('cierre-estado-badge')!.textContent = 'Estado: Listo';
+}
+
+function abrirInvestigacion() {
+  toast('Funcionalidad de investigación próximamente', 'info');
+  // Aquí se abriría un modal de investigación
+}
+</script>

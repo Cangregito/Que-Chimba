@@ -30,6 +30,7 @@ def register_admin_routes(app, deps: dict):
             nombre=payload.get("nombre"),
             variante=payload.get("variante"),
             precio=payload.get("precio"),
+            costo_referencia=payload.get("costo_referencia") if "costo_referencia" in payload else None,
             activo=payload.get("activo", True),
         )
         if isinstance(created, dict) and created.get("error"):
@@ -46,6 +47,7 @@ def register_admin_routes(app, deps: dict):
             nombre=payload.get("nombre") if "nombre" in payload else None,
             variante=payload.get("variante") if "variante" in payload else None,
             precio=payload.get("precio") if "precio" in payload else None,
+            costo_referencia=payload.get("costo_referencia") if "costo_referencia" in payload else None,
             activo=payload.get("activo") if "activo" in payload else None,
         )
         if isinstance(updated, dict) and updated.get("error"):
@@ -265,8 +267,9 @@ def register_admin_routes(app, deps: dict):
     def api_admin_usuarios_listar():
         rol = (request.args.get("rol") or "").strip() or None
         area_entrega = (request.args.get("area_entrega") or "").strip() or None
+        busqueda = (request.args.get("q") or "").strip() or None
 
-        data = db.obtener_usuarios_sistema(rol=rol, area_entrega=area_entrega)
+        data = db.obtener_usuarios_sistema(rol=rol, area_entrega=area_entrega, busqueda=busqueda)
         if isinstance(data, dict) and data.get("error"):
             return error(data["error"], 500)
         return ok(data)
@@ -310,6 +313,7 @@ def register_admin_routes(app, deps: dict):
             usuario_id=usuario_id,
             rol=payload.get("rol"),
             nombre_mostrar=payload.get("nombre_mostrar"),
+            email=payload.get("email") if "email" in payload else None,
             telefono=payload.get("telefono"),
             area_entrega=payload.get("area_entrega") if "area_entrega" in payload else None,
             activo=payload.get("activo") if "activo" in payload else None,
@@ -334,8 +338,9 @@ def register_admin_routes(app, deps: dict):
 
     @login_required(roles=["admin"])
     def api_admin_logs_backups():
-        import os
+        import datetime
         import pathlib
+        import re
         
         limit = request.args.get("limit", "50")
         try:
@@ -349,41 +354,71 @@ def register_admin_routes(app, deps: dict):
         if not base_path.exists():
             return ok({"logs": [], "total": 0})
         
-        # Leer archivos de logs de backups
+        def _parse_line(line, log_type):
+            text = (line or "").strip()
+            if not text:
+                return None
+
+            # Formato esperado: YYYY-MM-DD HH:MM:SS [LEVEL] mensaje
+            ts = text[:19] if len(text) >= 19 else ""
+            level = "ERROR" if "[ERROR]" in text else ("WARN" if "[WARN]" in text else "INFO")
+
+            if re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", ts):
+                sort_key = ts
+            else:
+                ts = ""
+                sort_key = ""
+
+            return {
+                "type": log_type,
+                "timestamp": ts,
+                "message": text,
+                "level": level,
+                "sort_key": sort_key,
+            }
+
+        def _read_recent_lines(paths, log_type, max_entries):
+            collected = []
+            remaining = max_entries
+            for path in paths:
+                if remaining <= 0:
+                    break
+                if not path.exists():
+                    continue
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                    for line in reversed(lines):
+                        parsed = _parse_line(line, log_type)
+                        if parsed:
+                            collected.append(parsed)
+                            remaining -= 1
+                            if remaining <= 0:
+                                break
+                except Exception:
+                    continue
+            return collected
+
+        backup_logs = sorted(base_path.glob("backup-postgres-*.log"), key=lambda p: p.name, reverse=True)
+        verify_logs = sorted(base_path.glob("verify-restore-postgres-*.log"), key=lambda p: p.name, reverse=True)
+        rollback_logs = sorted(base_path.glob("rollback-postgres-*.log"), key=lambda p: p.name, reverse=True)
+
+        per_type_limit = max(50, limit_int)
+
+        # Leer archivos de logs de backups de forma dinámica
         logs = []
         try:
-            # Backup logs
-            backup_log = base_path / "backup-postgres-2026-04.log"
-            if backup_log.exists():
-                with open(backup_log, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                    for line in reversed(lines[-limit_int:]):
-                        if line.strip():
-                            logs.append({
-                                "type": "backup",
-                                "timestamp": line[:19] if len(line) > 19 else line[:10],
-                                "message": line.strip(),
-                                "level": "ERROR" if "[ERROR]" in line else "INFO"
-                            })
-            
-            # Verify logs
-            verify_log = base_path / "verify-restore-postgres-2026-04.log"
-            if verify_log.exists():
-                with open(verify_log, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                    for line in reversed(lines[-limit_int:]):
-                        if line.strip():
-                            logs.append({
-                                "type": "verify",
-                                "timestamp": line[:19] if len(line) > 19 else line[:10],
-                                "message": line.strip(),
-                                "level": "ERROR" if "[ERROR]" in line else "INFO"
-                            })
+            logs.extend(_read_recent_lines(backup_logs, "backup", per_type_limit))
+            logs.extend(_read_recent_lines(verify_logs, "verify", per_type_limit))
+            logs.extend(_read_recent_lines(rollback_logs, "rollback", per_type_limit))
         except Exception as e:
             return error(f"Error leyendo logs: {str(e)}", 500)
         
-        # Ordenar por timestamp descendente
-        logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        # Ordenar por timestamp descendente (cuando está disponible)
+        logs.sort(key=lambda x: x.get("sort_key", ""), reverse=True)
+
+        for item in logs:
+            item.pop("sort_key", None)
         
         return ok({"logs": logs[:limit_int], "total": len(logs)})
 
@@ -391,13 +426,62 @@ def register_admin_routes(app, deps: dict):
 
     @login_required(roles=["admin"])
     def api_admin_backup_estadisticas():
-        import os
+        import csv
+        import io
         import pathlib
+        import subprocess
         
         base_path = pathlib.Path(__file__).parent.parent.parent / "backups" / "postgres"
+
+        def _task_info(task_name):
+            try:
+                proc = subprocess.run(
+                    ["schtasks", "/Query", "/TN", task_name, "/V", "/FO", "CSV"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="ignore",
+                    check=False,
+                )
+                if proc.returncode != 0 or not proc.stdout.strip():
+                    return None
+
+                reader = csv.DictReader(io.StringIO(proc.stdout))
+                row = next(reader, None)
+                if not row:
+                    return None
+
+                def _pick(*keys):
+                    for k in keys:
+                        if k in row and row[k] is not None:
+                            return str(row[k]).strip()
+                    return ""
+
+                return {
+                    "name": _pick("TaskName", "Nombre de tarea"),
+                    "next_run": _pick("Next Run Time", "Hora próxima ejecución"),
+                    "last_run": _pick("Last Run Time", "Último tiempo de ejecución"),
+                    "last_result": _pick("Last Result", "Último resultado"),
+                    "status": _pick("Status", "Estado"),
+                    "logon_mode": _pick("Logon Mode", "Modo de inicio de sesión"),
+                }
+            except Exception:
+                return None
         
         if not base_path.exists():
-            return ok({"total_backups": 0, "total_size_mb": 0, "ultimo_backup": None, "proxima_ejecucion": "02:00 (diario)"})
+            backup_task = _task_info("QueChimba-Postgres-Backup")
+            verify_task = _task_info("QueChimba-Postgres-VerifyRestore")
+            return ok({
+                "total_backups": 0,
+                "total_size_mb": 0,
+                "ultimo_backup": None,
+                "proxima_ejecucion": (backup_task or {}).get("next_run") or "N/A",
+                "proxima_verificacion": (verify_task or {}).get("next_run") or "N/A",
+                "scheduler": {
+                    "backup": backup_task,
+                    "verify": verify_task,
+                },
+            })
         
         try:
             # Contar backups y tamaño
@@ -411,13 +495,20 @@ def register_admin_routes(app, deps: dict):
                 import datetime
                 timestamp = datetime.datetime.fromtimestamp(archivo_mas_reciente.stat().st_mtime)
                 ultimo_backup = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+            backup_task = _task_info("QueChimba-Postgres-Backup")
+            verify_task = _task_info("QueChimba-Postgres-VerifyRestore")
             
             return ok({
                 "total_backups": len(backup_files),
                 "total_size_mb": round(total_size, 2),
                 "ultimo_backup": ultimo_backup,
-                "proxima_ejecucion": "02:00 (diario)",
-                "proxima_verificacion": "03:00 domingo (semanal)"
+                "proxima_ejecucion": (backup_task or {}).get("next_run") or "02:00 (diario)",
+                "proxima_verificacion": (verify_task or {}).get("next_run") or "03:00 domingo (semanal)",
+                "scheduler": {
+                    "backup": backup_task,
+                    "verify": verify_task,
+                },
             })
         except Exception as e:
             return error(f"Error obteniendo estadísticas: {str(e)}", 500)
